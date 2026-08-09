@@ -237,6 +237,33 @@ function marketScore(item: Type2MedicationConsideration, request: Type2Considera
   return score;
 }
 
+/**
+ * The access-oriented scenario may optimize within clinically appropriate
+ * choices, but cost/coverage must never promote a medicine that drops the
+ * guideline-mandated cardiorenal benefit for an established outcome phenotype.
+ */
+function isOutcomeAlignedAccessCandidate(item: Type2MedicationConsideration, request: Type2ConsiderationRequest) {
+  const eGfr = request.clinicalContext?.kidney?.eGfr ?? request.eGfr;
+  const dialysis = Boolean(request.clinicalContext?.kidney?.dialysis);
+  const canStartSglt2 = !dialysis && (eGfr === undefined || eGfr >= 20);
+
+  if (hasFactor(request, "heart_failure")) {
+    if (isSglt2(item) && canStartSglt2) return true;
+    if (hasFactor(request, "ckd") && isGlp1(item)) return true;
+    return false;
+  }
+  if (hasFactor(request, "ckd")) {
+    return isGlp1(item) || (isSglt2(item) && canStartSglt2);
+  }
+  if (hasFactor(request, "ascvd")) {
+    return isSglt2(item) || isGlp1(item);
+  }
+  if (hasFactor(request, "masld_mash")) {
+    return isGlp1(item) || classKey(item) === "resmetirom";
+  }
+  return true;
+}
+
 function isCompatiblePair(left: Type2MedicationConsideration, right: Type2MedicationConsideration) {
   const leftKey = classKey(left);
   const rightKey = classKey(right);
@@ -388,8 +415,10 @@ export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Ty
   usedPrimary.add(first.genericMedicationId);
 
   if (scenarios.length < maxScenarios) {
-    const access = [...eligible]
-      .filter((item) => !usedPrimary.has(item.genericMedicationId))
+    const accessPool = eligible.filter((item) => !usedPrimary.has(item.genericMedicationId));
+    const clinicallyAlignedPool = accessPool.filter((item) => isOutcomeAlignedAccessCandidate(item, request));
+    const candidates = clinicallyAlignedPool.length ? clinicallyAlignedPool : accessPool;
+    const access = [...candidates]
       .sort((left, right) => marketScore(right, request, input.insuranceProvider) - marketScore(left, request, input.insuranceProvider))[0];
     if (access) {
       scenarios.push(makeScenario(2, "access_balanced", access, [access], request, input.insuranceProvider, input.costingPlansByMedicationId));
