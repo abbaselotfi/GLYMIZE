@@ -8,17 +8,22 @@ const medicines: GenericMedication[] = [
   { id: "sitagliptin", canonicalName: "Sitagliptin", persianName: "سیتاگلیپتین", className: "DPP-4 inhibitor", therapyGroup: "oral_glucose_lowering", administrationRoute: "oral" },
 ];
 
-const request: Type2ConsiderationRequest = {
+const clinicalRequest: Type2ConsiderationRequest = {
   currentHba1c: 8,
   targetHba1c: 7,
   factors: [],
-  costPreference: "insured_only",
+  costPreference: "moderate",
   routePreference: "oral_and_injectable",
+};
+
+const insuredRequest: Type2ConsiderationRequest = {
+  ...clinicalRequest,
+  costPreference: "insured_only",
 };
 
 describe("selected insurance provider gate", () => {
   it("does not treat coverage by a different insurer as coverage for the selected insurer", () => {
-    const base = buildType2Assessment(medicines, request);
+    const base = buildType2Assessment(medicines, clinicalRequest);
     const assessment: Type2AssessmentResult = {
       ...base,
       medications: base.medications.map((item) => item.genericMedicationId === "metformin"
@@ -26,7 +31,7 @@ describe("selected insurance provider gate", () => {
         : { ...item, insuranceCoverages: [{ provider: "health_insurance", percent: 90 }] }),
     };
 
-    const result = buildType2TreatmentScenarios({ assessment, request, insuranceProvider: "social_security" });
+    const result = buildType2TreatmentScenarios({ assessment, request: insuredRequest, insuranceProvider: "social_security" });
     const selected = result.flatMap((scenario) => scenario.medications);
 
     expect(selected.length).toBeGreaterThan(0);
