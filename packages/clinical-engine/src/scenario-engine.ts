@@ -133,6 +133,11 @@ function coverageFor(item: Type2MedicationConsideration, provider?: InsurancePro
   return item.insuranceCoverages.find((entry) => entry.provider === provider);
 }
 
+function hasPositiveInsuranceCoverage(item: Type2MedicationConsideration, provider?: InsuranceProvider) {
+  if (provider) return (coverageFor(item, provider)?.percent ?? 0) > 0;
+  return item.insuranceCoverages.some((entry) => entry.percent > 0);
+}
+
 function effectiveRetailPrice(price?: MedicationPrice) {
   if (!price) return undefined;
   return price.manualOverrideToman ?? price.amountToman;
@@ -394,7 +399,7 @@ export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Ty
     .filter((item) => !item.blockedBy?.length)
     .filter((item) => !item.currentMedication && !currentIds.has(item.genericMedicationId))
     .filter((item) => request.routePreference !== "oral_only" || !isInjectable(item))
-    .filter((item) => request.costPreference !== "insured_only" || item.insuranceCoverages.length > 0)
+    .filter((item) => request.costPreference !== "insured_only" || hasPositiveInsuranceCoverage(item, input.insuranceProvider))
     .sort((left, right) => adjustedClinicalScore(right, request) - adjustedClinicalScore(left, request));
 
   if (!eligible.length) return [maintenanceScenario(request)];
