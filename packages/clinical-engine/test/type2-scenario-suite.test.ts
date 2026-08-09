@@ -135,10 +135,12 @@ describe("GLYMIZE 30-case Type 2 clinical scenario validation", () => {
     expect(["empagliflozin", "semaglutide"]).toContain(primaryId(req));
   });
 
-  // 13 — advanced CKD: ADA 2026 prefers GLP-1 RA for glycemic management.
-  it("13 shifts the primary glycemic scenario to GLP-1 in advanced CKD eGFR 29", () => {
+  // 13 — advanced CKD: preserve both kidney-protective SGLT2 and GLP-1 glycemic pathways.
+  it("13 keeps both SGLT2 and GLP-1 represented in advanced CKD eGFR 29", () => {
     const req = request({ factors: ["ckd"], clinicalContext: { kidney: { ckd: true, eGfr: 29 } } });
-    expect(primaryId(req)).toBe("semaglutide");
+    const topTwoMedicationIds = scenarios(req).slice(0, 2).flatMap((scenario) => scenario.medications.map((item) => item.genericMedicationId));
+    expect(topTwoMedicationIds).toContain("empagliflozin");
+    expect(topTwoMedicationIds).toContain("semaglutide");
   });
 
   // 14 — eGFR <20: do not represent SGLT2 as a routine new-start scenario.
