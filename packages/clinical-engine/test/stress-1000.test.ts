@@ -12,22 +12,25 @@ function rng(seed:number){let x=seed>>>0;return()=>{x=(x*1664525+1013904223)>>>0
 function pick<T>(r:()=>number,items:readonly T[]):T{return items[Math.floor(r()*items.length)]!}
 
 function makeCase(index:number){
-  const r=rng(910247+index*3571),provider=pick(r,providers);
+  const r=rng(910247+index*3571),provider=pick(r,providers),origin=index%2===0?"assistant_handoff":"physician_direct" as const;
+  const assistantValue=6+r()*5,assistantConfirmed=r()<.78;
+  const currentHba1c=origin==="assistant_handoff"?(assistantConfirmed?assistantValue:6+r()*5):6+r()*5;
   const request:Type2ConsiderationRequest={
-    currentHba1c:6+r()*5,targetHba1c:7,factors:[],
+    currentHba1c,targetHba1c:7,factors:[],
     costPreference:r()<.5?"insured_only":"no_constraint",routePreference:"oral_and_injectable",
     hyperglycemiaSymptoms:r()<.06,catabolicFeatures:r()<.03,
   };
   const assessment=buildType2Assessment(medicines,request);
   const enriched={...assessment,medications:assessment.medications.map((item):Type2MedicationConsideration=>({...item,price:{amountToman:10000+Math.round(r()*90000),priceKind:"consumer_retail"},insuranceCoverages:r()<.5?[{provider,percent:50,referencePriceToman:50000,runtimeEligibleForRanking:true}]:[]}))};
-  return{request,assessment:enriched,scenarios:buildType2TreatmentScenarios({assessment:enriched,request,insuranceProvider:provider,maxScenarios:3})};
+  return{origin,assistantConfirmed,request,assessment:enriched,scenarios:buildType2TreatmentScenarios({assessment:enriched,request,insuranceProvider:provider,maxScenarios:3})};
 }
 
 describe("GLYMIZE randomized 1000-case scenario acceptance",()=>{
-  it("keeps clinical need, access filtering, urgent state and financial values separate",()=>{
-    const summary={cases:1000,maintenance:0,accessConstrained:0,insuredOnly:0,urgent:0,costEstimates:0};
+  it("keeps assistant review, clinical need, access filtering, urgent state and financial values separate",()=>{
+    const summary={cases:1000,assistantHandoff:0,physicianDirect:0,assistantConfirmed:0,maintenance:0,accessConstrained:0,insuredOnly:0,urgent:0,costEstimates:0};
     for(let index=0;index<1000;index++){
-      const {request,assessment,scenarios}=makeCase(index);
+      const {origin,assistantConfirmed,request,assessment,scenarios}=makeCase(index);
+      if(origin==="assistant_handoff"){summary.assistantHandoff++;if(assistantConfirmed)summary.assistantConfirmed++}else summary.physicianDirect++;
       expect(scenarios.length).toBeGreaterThan(0);
       expect(scenarios.length).toBeLessThanOrEqual(3);
       expect(new Set(scenarios.map(item=>item.id)).size).toBe(scenarios.length);
@@ -48,6 +51,8 @@ describe("GLYMIZE randomized 1000-case scenario acceptance",()=>{
         for(const scenario of scenarios)for(const medication of scenario.medications)expect(medication.insuranceCoverages.some(item=>item.percent>0)).toBe(true);
       }
     }
+    expect(summary.assistantHandoff).toBe(500);
+    expect(summary.physicianDirect).toBe(500);
     console.log("GLYMIZE_STRESS_1000_ACCEPTANCE",JSON.stringify(summary));
   },30000);
 });
