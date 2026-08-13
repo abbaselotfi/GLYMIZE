@@ -1,4 +1,6 @@
 @import "./workspace-v3-foundation.css";
+@import "./profile/profile-v3-surfaces.css";
+@import "./profile/profile-v3-controls.css";
 @import "./type-2/type2-redesign-v3.css";
 @import "./type-2/type2-redesign-v3-meta.css";
 @import "./type-2/type2-redesign-v3-accessibility.css";
