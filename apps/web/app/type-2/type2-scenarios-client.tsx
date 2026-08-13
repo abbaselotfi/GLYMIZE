@@ -21,6 +21,10 @@ import {
 } from "@glymize/clinical-engine/scenario-engine";
 import { apiFetch } from "../../lib/api-client";
 import { formatCoveragePercent } from "../../lib/medication-market";
+import {
+  clinicianCostingProfileForMedication,
+  type ClinicianMedicationCostingProfile,
+} from "../../lib/clinician-market-v2";
 import MedicationMarketDetails from "../components/medication-market-details";
 import PatientHandoffLookup from "../components/patient-handoff-lookup";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
@@ -111,6 +115,83 @@ function tomanRange(min?: number, max?: number, locale: "fa" | "en" = "fa") {
   return `${toman(min, locale)} – ${toman(max, locale)}`;
 }
 
+
+function costingUnitLabels(profile: ClinicianMedicationCostingProfile | undefined, fa: boolean) {
+  const basis = profile?.basis ?? "unknown";
+  const labels: Record<string, { fa: string; en: string }> = {
+    insulin_unit: { fa: "واحد انسولین", en: "insulin unit" },
+    tablet: { fa: "قرص", en: "tablet" },
+    capsule: { fa: "کپسول", en: "capsule" },
+    mL: { fa: "mL", en: "mL" },
+    actuation: { fa: "پاف", en: "actuation" },
+    vial: { fa: "ویال", en: "vial" },
+    ampoule: { fa: "آمپول", en: "ampoule" },
+    pen: { fa: "قلم", en: "pen" },
+    unknown: { fa: "واحد", en: "unit" },
+  };
+  const current = labels[basis] ?? labels.unknown!;
+  const unitLabel = fa ? current.fa : current.en;
+  return {
+    unitLabel,
+    dailyLabel: fa ? `${unitLabel}/روز` : `${unitLabel}/day`,
+    packageLabel: fa ? `${unitLabel}/بسته` : `${unitLabel}/package`,
+  };
+}
+
+function normalizedCostUnit(value?: string) {
+  const normalized = (value ?? "").trim().toLocaleLowerCase();
+  if (normalized === "insulin_unit" || normalized === "unit" || normalized === "u") return "unit";
+  if (normalized === "ml") return "ml";
+  return normalized;
+}
+
+function currentDailyQuantityForProfile(
+  profile: ClinicianMedicationCostingProfile | undefined,
+  medicationId: string,
+  genericName: string,
+  request: Type2ConsiderationRequest,
+) {
+  if (!profile) return undefined;
+  const current = (request.currentMedications ?? []).find((item) =>
+    item.genericMedicationId === medicationId ||
+    item.genericName.trim().toLocaleLowerCase() === genericName.trim().toLocaleLowerCase()
+  );
+  if (!current || typeof current.totalDailyDose !== "number" || current.totalDailyDose <= 0) return undefined;
+  const expected = normalizedCostUnit(profile.dailyInputUnit);
+  const actual = normalizedCostUnit(current.totalDailyDoseUnit ?? current.doseUnit);
+  return expected === actual ? current.totalDailyDose : undefined;
+}
+
+function costingProfileHint(
+  profile: ClinicianMedicationCostingProfile | undefined,
+  fa: boolean,
+) {
+  if (!profile) return fa
+    ? "Package profile معتبر برای این دارو ثبت نشده است؛ مقدار بسته را پزشک وارد می‌کند."
+    : "No validated package profile is available; enter the package measure manually.";
+
+  const labels = costingUnitLabels(profile, fa);
+  if (
+    profile.autoFillEligible &&
+    profile.packageMeasureQuantity !== undefined &&
+    profile.displayContainerCount !== undefined &&
+    profile.displayQuantityPerContainer !== undefined
+  ) {
+    return fa
+      ? `بسته NFI: ${profile.displayContainerCount} ${profile.displayContainerUnit ?? "ظرف"} × ${profile.displayQuantityPerContainer} ${labels.unitLabel} = ${profile.packageMeasureQuantity} ${labels.unitLabel}`
+      : `NFI package: ${profile.displayContainerCount} ${profile.displayContainerUnit ?? "container"} × ${profile.displayQuantityPerContainer} ${labels.unitLabel} = ${profile.packageMeasureQuantity} ${labels.unitLabel}`;
+  }
+  if (profile.autoFillEligible && profile.packageMeasureQuantity !== undefined) {
+    return fa
+      ? `اندازه بسته از Market v2.3: ${profile.packageMeasureQuantity} ${labels.unitLabel}`
+      : `Market v2.3 package measure: ${profile.packageMeasureQuantity} ${labels.unitLabel}`;
+  }
+  return fa
+    ? `واحد محاسبه: ${labels.unitLabel}. اندازه بسته بین فرآورده‌ها متفاوت/مبهم است و Auto-fill عمداً غیرفعال است.`
+    : `Costing unit: ${labels.unitLabel}. Package size varies or is ambiguous, so auto-fill is intentionally disabled.`;
+}
+
+// GLYMIZE_MARKET_V23_INTEGRATION
 export default function Type2ScenariosClient() {
   const { locale, isRtl } = useGlymizeLocale();
   const fa = locale === "fa";
@@ -148,17 +229,54 @@ export default function Type2ScenariosClient() {
     return Math.round((weight / ((height / 100) ** 2)) * 10) / 10;
   }, [context.height, context.weight]);
 
+  const defaultCostPlans = useMemo<Record<string, Type2CostingPlan>>(() => {
+    if (!assessment || !submittedRequest) return {};
+    const next: Record<string, Type2CostingPlan> = {};
+    for (const medication of assessment.medications) {
+      const profile = clinicianCostingProfileForMedication(
+        medication.genericName,
+        medication.brandRegistryCode,
+      );
+      if (!profile) continue;
+      const labels = costingUnitLabels(profile, fa);
+      next[medication.genericMedicationId] = {
+        dailyUnits: currentDailyQuantityForProfile(
+          profile,
+          medication.genericMedicationId,
+          medication.genericName,
+          submittedRequest,
+        ),
+        unitsPerPackage: profile.autoFillEligible
+          ? profile.packageMeasureQuantity
+          : undefined,
+        unitLabel: labels.unitLabel,
+        marketPackageVerified: profile.autoFillEligible,
+      };
+    }
+    return next;
+  }, [assessment, submittedRequest, fa]);
+
+  const effectiveCostPlans = useMemo<Record<string, Type2CostingPlan>>(() => {
+    const keys = new Set([...Object.keys(defaultCostPlans), ...Object.keys(costPlans)]);
+    return Object.fromEntries(
+      [...keys].map((key) => [
+        key,
+        { ...(defaultCostPlans[key] ?? {}), ...(costPlans[key] ?? {}) },
+      ]),
+    );
+  }, [defaultCostPlans, costPlans]);
+
   const scenarioList = useMemo(() => {
     if (!assessment || !submittedRequest) return [];
     return buildType2TreatmentScenarios({
       assessment,
       request: submittedRequest,
       insuranceProvider,
-      costingPlansByMedicationId: costPlans,
+      costingPlansByMedicationId: effectiveCostPlans,
       sortMode: scenarioSortMode,
       maxScenarios: 3,
     });
-  }, [assessment, submittedRequest, insuranceProvider, costPlans, scenarioSortMode]);
+  }, [assessment, submittedRequest, insuranceProvider, effectiveCostPlans, scenarioSortMode]);
 
   function setFactor(key: Type2DecisionFactor) {
     setFactors((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
@@ -346,7 +464,7 @@ export default function Type2ScenariosClient() {
                 <div className={styles.medIndex}>{index + 1}</div>
                 <label><span>{fa ? "دارو" : "Medicine"}</span><input list="type2-drugs" value={item.genericName} onChange={(event) => updateMedicationName(item.id, event.target.value)} placeholder="Metformin" /></label>
                 <label><span>{fa ? "دوز هر نوبت" : "Dose"}</span><input type="number" min="0" step="0.1" value={item.doseAmount} onChange={(event) => updateMedication(item.id, { doseAmount: event.target.value })} /></label>
-                <label><span>{fa ? "واحد" : "Unit"}</span><select value={item.doseUnit} onChange={(event) => updateMedication(item.id, { doseUnit: event.target.value })}><option>mg</option><option>g</option><option>mcg</option><option>unit</option><option>mL</option></select></label>
+                <label><span>{fa ? "واحد" : "Unit"}</span><select value={item.doseUnit} onChange={(event) => updateMedication(item.id, { doseUnit: event.target.value })}><option>mg</option><option>g</option><option>mcg</option><option>unit</option><option>mL</option><option>tablet</option><option>capsule</option><option>actuation</option><option>vial</option><option>ampoule</option><option>pen</option></select></label>
                 <label><span>{fa ? "دفعات/روز" : "Times/day"}</span><input type="number" min="0" max="12" step="0.5" value={item.frequencyPerDay} onChange={(event) => updateMedication(item.id, { frequencyPerDay: event.target.value })} /></label>
                 <button className={styles.remove} type="button" aria-label={fa ? "حذف دارو" : "Remove medicine"} onClick={() => setMedications((current) => current.filter((row) => row.id !== item.id))}>×</button>
               </div>)}
@@ -434,7 +552,13 @@ export default function Type2ScenariosClient() {
 
           {scenario.medications.length > 0 && <div className={styles.scenarioMeds}>{scenario.medications.map((medication, medIndex) => {
             const estimate = scenario.cost30Days[medIndex];
-            const plan = costPlans[medication.genericMedicationId] ?? {};
+            const profile = clinicianCostingProfileForMedication(
+              medication.genericName,
+              medication.brandRegistryCode,
+            );
+            const labels = costingUnitLabels(profile, fa);
+            const plan = effectiveCostPlans[medication.genericMedicationId] ?? {};
+            const profileHint = costingProfileHint(profile, fa);
             return <section className={styles.scenarioMed} key={medication.cardId ?? medication.genericMedicationId}>
               <div className={styles.medTop}><div><b>{medication.displayName ?? medication.persianName}</b>{medication.selectedBrandName && <small>{fa ? "ژنریک" : "Generic"}: {medication.persianName}</small>}<small>{medication.therapeuticClass}</small></div><span>{medication.priorityScore}/100</span></div>
               <div className={styles.insuranceRow}>{medication.insuranceCoverages.length ? medication.insuranceCoverages.map((entry) => <span key={entry.provider}>✓ {INSURERS.find((item) => item.value === entry.provider)?.[fa ? "fa" : "en"] ?? entry.provider}: {formatCoveragePercent(entry.percent, locale)}%</span>) : <span>{fa ? "پوشش بیمه ثبت نشده" : "No recorded coverage"}</span>}</div>
@@ -443,9 +567,10 @@ export default function Type2ScenariosClient() {
               <div className={styles.costBox}>
                 <div className={styles.costTitle}><div><b>{fa ? "برآورد هزینه ۳۰روزه" : "30-day cost estimate"}</b><small>{fa ? "این ورودی‌ها برای هزینه‌اند، نه پیشنهاد دوز." : "These inputs are for costing, not dose recommendation."}</small></div><span>{estimate?.status === "calculated" ? "✓" : "…"}</span></div>
                 <div className={styles.costInputs}>
-                  <label><span>{fa ? "واحد مصرف/روز" : "Units/day"}</span><input type="number" min="0" step="0.1" value={plan.dailyUnits ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], dailyUnits: numberOrUndefined(event.target.value) } }))} placeholder="2" /></label>
-                  <label><span>{fa ? "واحد در بسته" : "Units/package"}</span><input type="number" min="0" step="1" value={plan.unitsPerPackage ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], unitsPerPackage: numberOrUndefined(event.target.value), unitLabel: fa ? "واحد" : "unit" } }))} placeholder="30" /></label>
+                  <label><span>{labels.dailyLabel}</span><input type="number" min="0" step="0.1" value={plan.dailyUnits ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], dailyUnits: numberOrUndefined(event.target.value), unitLabel: labels.unitLabel } }))} placeholder={fa ? "ورود پزشک" : "Clinician input"} /></label>
+                  <label><span>{labels.packageLabel}</span><input type="number" min="0" step="0.1" value={plan.unitsPerPackage ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], unitsPerPackage: numberOrUndefined(event.target.value), unitLabel: labels.unitLabel, marketPackageVerified: false } }))} placeholder={profile?.autoFillEligible ? String(profile.packageMeasureQuantity ?? "") : (fa ? "انتخاب/ورود بسته" : "Select/enter package")} /></label>
                 </div>
+                <p className={styles.costProfileHint}>{profileHint}</p>
                 <div className={styles.costNumbers}>
                   <div><small>{fa ? "قیمت هر بسته" : "Retail/package"}</small><b>{estimate?.retailPerPackageMinToman !== undefined
                     ? `${tomanRange(estimate.retailPerPackageMinToman, estimate.retailPerPackageMaxToman, locale)} ${fa ? "تومان" : "Toman"}`

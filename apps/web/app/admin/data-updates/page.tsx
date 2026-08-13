@@ -197,9 +197,9 @@ export default function DrugDataUpdatesPage() {
       </section>
 
       <section className="panel">
-        <span className="eyebrow">Contract v2 · Primary</span><h2>Market v2 — مسیر اصلی داده</h2>
-        <p>Canonical v2 ابتدا از Safety Preflight عبور می‌کند. Runtime Index باید Full Clinical Market باشد و هیچ دارویی صرفاً به علت ATC، حوزه درمانی یا حجم فایل حذف نشود.</p>
-        <Link className="admin-link" href="/admin/data-updates/v2-preflight">اجرای Preflight فایل v2</Link>
+        <span className="eyebrow">Contract v2.3 · Primary import</span><h2>Market v2.3 — ورود، بهینه‌سازی و نصب Runtime</h2>
+        <p>فایل Runtime جدید را مستقیم Validate کنید، Package/Costing Gateها را ببینید و نسخه بهینه مرورگر را بدون حذف هیچ Product بسازید. Canonical برای Deep Audit اختیاری باقی می‌ماند.</p>
+        <Link className="admin-link" href="/admin/data-updates/v2-preflight">باز کردن Import / Preflight v2.3</Link>
       </section>
 
       <section className="panel">

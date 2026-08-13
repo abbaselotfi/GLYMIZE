@@ -358,4 +358,28 @@ describe("GLYMIZE 30-case Type 2 clinical scenario validation", () => {
     expect(result.insurer30DaysToman).toBe(0);
   });
 
+  it("36 calculates a multi-presentation retail range only when Market v2.3 verifies a common package measure", () => {
+    const result = estimateType2Medication30DayCost({
+      priceRange: {
+        minToman: 100_000,
+        medianToman: 150_000,
+        maxToman: 220_000,
+        productCount: 12,
+        basis: "nfi_generic_market_range",
+        costComparable: false,
+        presentationCount: 4,
+      },
+      plan: {
+        dailyUnits: 20,
+        unitsPerPackage: 900,
+        unitLabel: "واحد انسولین",
+        marketPackageVerified: true,
+      },
+    });
+    expect(result.status).toBe("calculated_range");
+    expect(result.packagesFor30Days).toBe(1);
+    expect(result.retail30DaysMinToman).toBe(100_000);
+    expect(result.retail30DaysMaxToman).toBe(220_000);
+  });
+
 });

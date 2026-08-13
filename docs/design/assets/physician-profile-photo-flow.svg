@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="720" viewBox="0 0 1500 720">
+<defs>
+<style>
+.bg{fill:#f8fbfc}.p{fill:#fff;stroke:#cfe3e8;stroke-width:2}.ok{fill:#eaf8f5;stroke:#52b5a9;stroke-width:2}
+.h{font:700 25px Arial,sans-serif;fill:#0b405b}.t{font:400 18px Arial,sans-serif;fill:#405f6d}.s{font:400 15px Arial,sans-serif;fill:#617985}
+.line{stroke:#6ba8b2;stroke-width:3;fill:none;marker-end:url(#a)}
+</style>
+<marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3z" fill="#6ba8b2"/></marker>
+</defs>
+<rect class="bg" width="1500" height="720"/>
+<text x="60" y="65" class="h">GLYMIZE — Physician profile photo onboarding flow</text>
+<text x="60" y="100" class="t">Identity verification stays independent from the display image.</text>
+
+<rect x="70" y="180" rx="24" width="290" height="150" class="p"/>
+<text x="105" y="230" class="h">1. Registration</text>
+<text x="105" y="270" class="t">Medical Council number</text>
+<text x="105" y="300" class="s">Name + identity inputs</text>
+
+<rect x="435" y="180" rx="24" width="300" height="150" class="ok"/>
+<text x="470" y="230" class="h">2. Exact IRIMC match</text>
+<text x="470" y="270" class="t">Verified physician identity</text>
+<text x="470" y="300" class="s">Photo is not a verification factor</text>
+
+<rect x="810" y="180" rx="24" width="300" height="150" class="p"/>
+<text x="845" y="230" class="h">3. Photo lookup</text>
+<text x="845" y="270" class="t">Fetch suggested public photo</text>
+<text x="845" y="300" class="s">Server-side · fail-soft</text>
+
+<rect x="1185" y="145" rx="24" width="250" height="220" class="p"/>
+<text x="1218" y="200" class="h">4. Physician choice</text>
+<text x="1218" y="245" class="t">Use photo</text>
+<text x="1218" y="280" class="t">Change photo</text>
+<text x="1218" y="315" class="t">Remove photo</text>
+<text x="1218" y="345" class="s">Source shown transparently</text>
+
+<path d="M360 255 L435 255" class="line"/>
+<path d="M735 255 L810 255" class="line"/>
+<path d="M1110 255 L1185 255" class="line"/>
+
+<rect x="435" y="430" rx="24" width="675" height="170" class="p"/>
+<text x="475" y="480" class="h">Fail-soft rule</text>
+<text x="475" y="525" class="t">Photo missing / endpoint fails / uncertain ownership → registration continues.</text>
+<text x="475" y="565" class="t">Fallback: initials or neutral physician avatar.</text>
+
+<path d="M960 330 C960 390 900 410 900 430" class="line"/>
+</svg>

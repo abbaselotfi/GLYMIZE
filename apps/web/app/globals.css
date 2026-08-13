@@ -504,3 +504,9 @@ img[src$="/icon-512x512.png"],
   flex-basis: 58px !important;
 }
 /* GLYMIZE_ICON_LAYOUT_FIX_END */
+
+/* GLYMIZE_MARKET_V23_BUTTON_STATES */
+button:not(.secondary):hover,.primary-button:hover,.admin-link:hover{background:#16877d;color:#fff}
+button:not(.secondary):active,.primary-button:active,.admin-link:active{background:#0d6f68;color:#fff}
+button.secondary:hover,.secondary:hover{background:#f0f8f7;color:var(--ink);border-color:#bcd7d4}
+button:focus-visible,a:focus-visible{outline:3px solid rgba(22,135,125,.28);outline-offset:2px}

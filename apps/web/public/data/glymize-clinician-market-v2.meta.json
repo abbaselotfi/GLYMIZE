@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "runtimeSchemaVersion": 2,
+  "kind": "glymize_clinician_market_deployment_meta",
+  "sourceFile": "glymize-clinician-market-v2(2).json",
+  "sourceGeneratedAt": "2026-08-12T16:00:39+00:00",
+  "canonicalSha256": "c7e3d4a57cde131f9531e414ddd1b179536ff78ec5084a7d362e42ee0abdc444",
+  "deploymentSha256": "34cc20f2196978555deed3cc8e9653ed6a6d9ed43dc9969392fac06ef913e77e",
+  "scope": {
+    "genericCount": 349,
+    "insuranceRecordCount": 2300,
+    "presentationSummaryCount": 3508,
+    "productCount": 7066,
+    "rule": "No ATC therapeutic-area exclusion; all canonical products retained.",
+    "runtimeEligibleInsuranceRecordCount": 2102
+  },
+  "runtimeIntegrity": {
+    "canonicalProductCount": 7066,
+    "missingCanonicalProductIds": [],
+    "productRetentionPercent": 100.0,
+    "runtimeProductCount": 7066,
+    "unexpectedRuntimeProductIds": []
+  },
+  "sourceCalculationValidation": {
+    "costingProfileAmbiguousCount": 472,
+    "inhalerProductsCount": 56,
+    "inhalerProductsWithResolvedActuationCount": 55,
+    "insulinProductsCount": 118,
+    "insulinProductsWithResolvedTotalUnitsPerPackageCount": 118,
+    "liquidProductsCount": 1415,
+    "liquidProductsWithResolvedTotalVolumeCount": 1322,
+    "packageDerivationErrorCount": 0,
+    "productsWithResolvedCostingProfileCount": 6594,
+    "productsWithResolvedPackageCount": 6674,
+    "tabletCapsuleProductsCount": 4918,
+    "tabletCapsuleProductsWithResolvedUnitsPerPackageCount": 4831
+  },
+  "sourceSemanticValidation": {
+    "combinationProductsWithoutComponentsCount": 0,
+    "crossQueryContaminationCount": 0,
+    "genericCodeIdentityCollisionCount": 0,
+    "productsWithMergedQueryNamesWithoutComponents": 0,
+    "suspiciousSearchScopeCount": 0,
+    "unsafeComparableCombinationSummaryCount": 0
+  },
+  "dashboardMetrics": {
+    "productCount": 7066,
+    "genericCount": 349,
+    "verifiedPresentationCount": 3365,
+    "insuranceRecordCount": 2300
+  }
+}

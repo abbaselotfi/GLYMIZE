@@ -338,3 +338,20 @@
   }
 }
 /* GLYMIZE_LOCAL_RC_MOBILE_HEADER_END */
+
+/* GLYMIZE_MARKET_V23_READABILITY */
+.glymize-internal-shell .page-content small{font-size:12.5px;line-height:1.75}
+.glymize-internal-shell .page-content article p,
+.glymize-internal-shell .page-content section>p,
+.glymize-internal-shell .page-content section>div>p{font-size:13px;line-height:1.85}
+@media(max-width:760px){
+  .glymize-internal-shell .page-content small,
+  .glymize-internal-shell .page-content article p,
+  .glymize-internal-shell .page-content section>p,
+  .glymize-internal-shell .page-content section>div>p{font-size:13px}
+}
+
+/* GLYMIZE_CONTACT_EMAIL */
+.support-email{display:inline-block;margin-top:8px;color:var(--teal);font-size:11.5px;font-weight:800;text-decoration:none;direction:ltr;unicode-bidi:isolate}
+.support-email:hover{text-decoration:underline;color:#16877d}
+.support-email:focus-visible{outline:2px solid rgba(22,135,125,.3);outline-offset:2px;border-radius:4px}

@@ -13,10 +13,13 @@ export type Type2ScenarioKind = "clinical_best" | "access_balanced" | "alternati
 export type Type2ScenarioSortMode = "balanced" | "clinical" | "patient_cost" | "insurance_access";
 export type Type2MonthlyCostStatus = "calculated" | "calculated_range" | "retail_only" | "per_package_only" | "price_missing" | "dose_or_pack_missing";
 
+// GLYMIZE_MARKET_V23_INTEGRATION
 export interface Type2CostingPlan {
   dailyUnits?: number;
   unitsPerPackage?: number;
   unitLabel?: string;
+  /** True only when Market v2.3 proves a common package measure for the price range. */
+  marketPackageVerified?: boolean;
 }
 
 export interface Type2MonthlyCostEstimate {
@@ -188,11 +191,11 @@ export function estimateType2Medication30DayCost(input: {
       coveragePercent: coverage?.percent,
       insuranceProvider: input.insuranceProvider,
     };
-    if (range.costComparable === false) {
+    if (range.costComparable === false && input.plan?.marketPackageVerified !== true) {
       return {
         ...base,
         status: "per_package_only",
-        calculationBasis: "این بازه برای نمایش قیمت بازار ژنریک است و چند Presentation متفاوت را پوشش می‌دهد؛ برای محاسبه ۳۰روزه باید فرآورده/قدرت/بسته مشخص شود.",
+        calculationBasis: "این بازه چند Presentation متفاوت را پوشش می‌دهد و Package measure مشترک تأیید نشده است؛ برای محاسبه ۳۰روزه باید فرآورده/قدرت/بسته مشخص شود.",
       };
     }
     const dailyUnits = input.plan?.dailyUnits;
@@ -211,7 +214,9 @@ export function estimateType2Medication30DayCost(input: {
       packagesFor30Days: packages,
       retail30DaysMinToman: packages * range.minToman,
       retail30DaysMaxToman: packages * range.maxToman,
-      calculationBasis: "هزینه خرده‌فروشی ۳۰روزه به‌صورت بازه از قیمت فرآورده‌های NFI محاسبه شده است؛ سهم دقیق بیمار نیازمند انتخاب فرآورده و تعرفه/سهم ریالی معتبر بیمه است.",
+      calculationBasis: range.costComparable === false
+        ? "Package measure بین فرآورده‌های این بازه توسط Market v2.3 همسان و معتبر تشخیص داده شد؛ هزینه خرده‌فروشی ۳۰روزه به‌صورت بازه محاسبه شد. سهم دقیق بیمار نیازمند انتخاب فرآورده و تعرفه/سهم ریالی معتبر بیمه است."
+        : "هزینه خرده‌فروشی ۳۰روزه به‌صورت بازه از قیمت فرآورده‌های NFI محاسبه شده است؛ سهم دقیق بیمار نیازمند انتخاب فرآورده و تعرفه/سهم ریالی معتبر بیمه است.",
     };
   }
 

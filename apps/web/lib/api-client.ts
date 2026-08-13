@@ -78,6 +78,21 @@ let publishTimer: ReturnType<typeof setTimeout> | null = null;
 let publishBatchDepth = 0;
 let pendingPublishState: BrowserCatalogState | null = null;
 
+let genericListCache: GenericMedication[] | null = null;
+let medicationChecklistCache: MedicationChecklistItem[] | null = null;
+let medicationChecklistById = new Map<string, MedicationChecklistItem>();
+let medicationReferencesByGenericKey = new Map<
+  string,
+  MedicationChecklistItem[]
+>();
+
+function invalidateDerivedCatalogCaches() {
+  genericListCache = null;
+  medicationChecklistCache = null;
+  medicationChecklistById = new Map();
+  medicationReferencesByGenericKey = new Map();
+}
+
 function emptyState(): BrowserCatalogState {
   return {
     visibility: {},
@@ -147,6 +162,7 @@ async function ensureState() {
     } catch {
       stateCache = localDraft?.state ?? emptyState();
     }
+    invalidateDerivedCatalogCaches();
     stateLoaded = true;
   })();
   return statePromise;
@@ -188,6 +204,7 @@ function schedulePublish(state: BrowserCatalogState) {
 
 function saveState(state: BrowserCatalogState, publish = true) {
   stateCache = state;
+  invalidateDerivedCatalogCaches();
   window.localStorage.setItem(storageKey, JSON.stringify({ schemaVersion: 2, savedAt: new Date().toISOString(), state }));
   window.dispatchEvent(new CustomEvent("glymize-catalog-change"));
   if (publish) schedulePublish(state);
@@ -288,18 +305,40 @@ function masterToGenericMedication(entry: MasterDrugRegistryEntry): GenericMedic
 }
 
 function listGenerics() {
+  if (genericListCache) return genericListCache;
+
   const state = readState();
   const merged = new Map<string, GenericMedication>();
-  for (const medication of ada2026Type2GenericSeed) merged.set(masterGenericKey(medication.canonicalName), medication);
-  for (const entry of state.masterRegistry.filter((item) => item.reviewState === "approved")) {
-    merged.set(masterGenericKey(entry.canonicalName), masterToGenericMedication(entry));
+  for (const medication of ada2026Type2GenericSeed) {
+    merged.set(masterGenericKey(medication.canonicalName), medication);
+  }
+  for (const entry of state.masterRegistry.filter(
+    (item) => item.reviewState === "approved",
+  )) {
+    merged.set(
+      masterGenericKey(entry.canonicalName),
+      masterToGenericMedication(entry),
+    );
   }
   for (const medication of state.customGenerics) {
     const key = masterGenericKey(medication.canonicalName);
     const current = merged.get(key);
-    merged.set(key, current ? { ...current, ...medication, id: current.id, masterRegistryId: current.masterRegistryId ?? medication.masterRegistryId } : medication);
+    merged.set(
+      key,
+      current
+        ? {
+            ...current,
+            ...medication,
+            id: current.id,
+            masterRegistryId:
+              current.masterRegistryId ?? medication.masterRegistryId,
+          }
+        : medication,
+    );
   }
-  return [...merged.values()];
+
+  genericListCache = [...merged.values()];
+  return genericListCache;
 }
 
 function presentationMatchesMaster(presentation: ReferenceMedicationPresentation, entry: MasterDrugRegistryEntry) {
@@ -315,27 +354,47 @@ function findMasterForPresentation(presentation: ReferenceMedicationPresentation
   return registry.find((entry) => entry.reviewState === "approved" && presentationMatchesMaster(presentation, entry));
 }
 
-function masterReferencePresentations(state: BrowserCatalogState, basePresentations: ReferenceMedicationPresentation[]): ReferenceMedicationPresentation[] {
+function masterReferencePresentations(
+  state: BrowserCatalogState,
+  basePresentations: ReferenceMedicationPresentation[],
+): ReferenceMedicationPresentation[] {
+  const baseGenericKeys = new Set(
+    basePresentations.map((presentation) =>
+      masterGenericKey(presentation.genericName),
+    ),
+  );
+
   return state.masterRegistry
     .filter((entry) => entry.reviewState === "approved")
-    .filter((entry) => !basePresentations.some((presentation) => presentationMatchesMaster(presentation, entry)))
+    .filter(
+      (entry) =>
+        !baseGenericKeys.has(masterGenericKey(entry.canonicalName)),
+    )
     .map((entry) => {
       const therapyGroup = inferTherapyGroup(entry);
       return {
         id: `master-ref-${entry.id.toLocaleLowerCase()}`,
         therapeuticClass: entry.drugClass ?? "Clinical catalog",
-        mechanismOrSubclass: entry.guidelineRole ?? "WorldDrug clinical knowledge",
+        mechanismOrSubclass:
+          entry.guidelineRole ?? "WorldDrug clinical knowledge",
         genericName: entry.canonicalName,
-        administrationRoute: inferAdministrationRouteFromMaster(entry, therapyGroup),
+        administrationRoute: inferAdministrationRouteFromMaster(
+          entry,
+          therapyGroup,
+        ),
         dosageForm: "Clinical catalog · فرم بازار در انتظار NFI",
-        strengthPresentation: "قدرت/فرآورده در انتظار تطبیق NFI",
+        strengthPresentation:
+          "قدرت/فرآورده در انتظار تطبیق NFI",
         indicationScope: entry.primaryIndications?.join("؛ "),
-        marketStatus: "Clinical catalog — Iran market product pending",
+        marketStatus:
+          "Clinical catalog — Iran market product pending",
         sourceUrl: entry.sourceUrls[0] ?? "about:blank",
-        coverageNotes: "هویت و نقش علمی از WorldDrug؛ برند/فرآورده و وضعیت بازار ایران باید با NFI تکمیل شود.",
+        coverageNotes:
+          "هویت و نقش علمی از WorldDrug؛ برند/فرآورده و وضعیت بازار ایران باید با NFI تکمیل شود.",
         sourceFile: entry.sourceFile ?? "WorldDrug.xlsx",
-        sourceObservedAt: entry.sourceObservedAt ?? new Date().toISOString(),
-        reviewState: "reference_only"
+        sourceObservedAt:
+          entry.sourceObservedAt ?? new Date().toISOString(),
+        reviewState: "reference_only",
       } satisfies ReferenceMedicationPresentation;
     });
 }
@@ -365,35 +424,97 @@ function nfiPriceRange(brands: MedicationBrand[]): MedicationPriceRange | undefi
 }
 
 function listMedicationChecklist(): MedicationChecklistItem[] {
+  if (medicationChecklistCache) return medicationChecklistCache;
+
   const state = readState();
-  const basePresentations = [...clinicianMarketPresentations(), ...globalReferenceCatalogue, ...state.customPresentations];
-  const presentations = [...basePresentations, ...masterReferencePresentations(state, basePresentations)];
-  return presentations.map((presentation) => {
+  const basePresentations = [
+    ...clinicianMarketPresentations(),
+    ...globalReferenceCatalogue,
+    ...state.customPresentations,
+  ];
+  const presentations = [
+    ...basePresentations,
+    ...masterReferencePresentations(state, basePresentations),
+  ];
+
+  const masterById = new Map(
+    state.masterRegistry.map((entry) => [
+      entry.id.toUpperCase(),
+      entry,
+    ]),
+  );
+  const approvedMasterByGenericKey = new Map(
+    state.masterRegistry
+      .filter((entry) => entry.reviewState === "approved")
+      .map((entry) => [
+        masterGenericKey(entry.canonicalName),
+        entry,
+      ]),
+  );
+
+  const items = presentations.map((presentation) => {
     const market = state.marketData[presentation.id] ?? {};
-    const master = findMasterForPresentation(presentation, state.masterRegistry);
-    const runtimeMarket = clinicianMarketPresentationData(presentation.id);
-    const brands = runtimeMarket?.brands ?? state.brands[presentation.id] ?? [];
-    const nfiVerified = Boolean(runtimeMarket) ||
+    const masterId = presentation.id.startsWith("master-ref-")
+      ? presentation.id.slice("master-ref-".length).toUpperCase()
+      : undefined;
+    const master =
+      (masterId ? masterById.get(masterId) : undefined) ??
+      approvedMasterByGenericKey.get(
+        masterGenericKey(presentation.genericName),
+      );
+
+    const runtimeMarket =
+      clinicianMarketPresentationData(presentation.id);
+    const brands =
+      runtimeMarket?.brands ??
+      state.brands[presentation.id] ??
+      [];
+    const nfiVerified =
+      Boolean(runtimeMarket) ||
       presentation.reviewState === "validated_for_iran" ||
       isNfiSourceUrl(market.sourceUrl) ||
-      brands.some((brand) => brand.sourceDiscovered && !brand.hiddenFromSource && isNfiSourceUrl(brand.sourceUrl));
-    const adminOverride = Boolean(state.marketOverrides[presentation.id]?.approved);
-    const marketVerification = nfiVerified ? "nfi_verified" as const : adminOverride ? "admin_override" as const : "not_verified" as const;
-    const showInApp = state.visibility[presentation.id] === false ? false : marketVerification !== "not_verified";
-    const priceRange = runtimeMarket?.priceRange ?? nfiPriceRange(brands);
-    const marketBadge = market.marketBadge ?? (marketVerification === "admin_override" ? {
-      key: "admin-market-override",
-      labelFa: "تأیید دستی ادمین · خارج از NFI فعلی",
-      labelEn: "Admin-approved · outside current NFI",
-      tone: "neutral" as const,
-      confirmedByAdmin: true
-    } : master && presentation.reviewState === "reference_only" ? {
-      key: "clinical-catalog",
-      labelFa: "Clinical Catalog · وضعیت بازار در انتظار NFI",
-      labelEn: "Clinical Catalog · Iran market pending",
-      tone: "neutral" as const,
-      confirmedByAdmin: false
-    } : undefined);
+      brands.some(
+        (brand) =>
+          brand.sourceDiscovered &&
+          !brand.hiddenFromSource &&
+          isNfiSourceUrl(brand.sourceUrl),
+      );
+    const adminOverride = Boolean(
+      state.marketOverrides[presentation.id]?.approved,
+    );
+    const marketVerification = nfiVerified
+      ? ("nfi_verified" as const)
+      : adminOverride
+        ? ("admin_override" as const)
+        : ("not_verified" as const);
+    const showInApp =
+      state.visibility[presentation.id] === false
+        ? false
+        : marketVerification !== "not_verified";
+    const priceRange =
+      runtimeMarket?.priceRange ?? nfiPriceRange(brands);
+    const marketBadge =
+      market.marketBadge ??
+      (marketVerification === "admin_override"
+        ? {
+            key: "admin-market-override",
+            labelFa: "تأیید دستی ادمین · خارج از NFI فعلی",
+            labelEn: "Admin-approved · outside current NFI",
+            tone: "neutral" as const,
+            confirmedByAdmin: true,
+          }
+        : master && presentation.reviewState === "reference_only"
+          ? {
+              key: "clinical-catalog",
+              labelFa:
+                "Clinical Catalog · وضعیت بازار در انتظار NFI",
+              labelEn:
+                "Clinical Catalog · Iran market pending",
+              tone: "neutral" as const,
+              confirmedByAdmin: false,
+            }
+          : undefined);
+
     return {
       referencePresentationId: presentation.id,
       genericName: presentation.genericName,
@@ -401,39 +522,86 @@ function listMedicationChecklist(): MedicationChecklistItem[] {
       administrationRoute: presentation.administrationRoute,
       dosageForm: presentation.dosageForm,
       strengthPresentation: presentation.strengthPresentation,
-      sourceUrl: runtimeMarket?.sourceUrl ?? market.sourceUrl ?? presentation.sourceUrl,
+      sourceUrl:
+        runtimeMarket?.sourceUrl ??
+        market.sourceUrl ??
+        presentation.sourceUrl,
       reviewState: presentation.reviewState,
       showInApp,
-      insuranceCoverages: runtimeMarket?.insuranceCoverages ?? state.insurance[presentation.id] ?? [],
+      insuranceCoverages:
+        runtimeMarket?.insuranceCoverages ??
+        state.insurance[presentation.id] ??
+        [],
       brands,
-      displayMode: market.displayMode ?? "generic_or_primary_brand",
-      clinicalDomains: market.clinicalDomains ?? clinicalDomainsFromMaster(master),
-      clinicalEffects: market.clinicalEffects ?? master?.clinicalEffects,
-      genericRegistryCode: runtimeMarket?.genericRegistryCode ?? market.genericRegistryCode,
+      displayMode:
+        market.displayMode ?? "generic_or_primary_brand",
+      clinicalDomains:
+        market.clinicalDomains ??
+        clinicalDomainsFromMaster(master),
+      clinicalEffects:
+        market.clinicalEffects ?? master?.clinicalEffects,
+      genericRegistryCode:
+        runtimeMarket?.genericRegistryCode ??
+        market.genericRegistryCode,
       price: market.price,
       priceRange,
-      marketBadge: runtimeMarket?.marketBadge ?? marketBadge,
-      sourceObservedAt: runtimeMarket?.sourceObservedAt ?? market.sourceObservedAt ?? master?.sourceObservedAt,
-      marketVerification
+      marketBadge:
+        runtimeMarket?.marketBadge ?? marketBadge,
+      sourceObservedAt:
+        runtimeMarket?.sourceObservedAt ??
+        market.sourceObservedAt ??
+        master?.sourceObservedAt,
+      marketVerification,
     } satisfies MedicationChecklistItem;
   });
+
+  medicationChecklistCache = items;
+  medicationChecklistById = new Map(
+    items.map((item) => [
+      item.referencePresentationId,
+      item,
+    ]),
+  );
+  medicationReferencesByGenericKey = new Map();
+  for (const item of items) {
+    const key = masterGenericKey(item.genericName);
+    const current = medicationReferencesByGenericKey.get(key);
+    if (current) current.push(item);
+    else medicationReferencesByGenericKey.set(key, [item]);
+  }
+
+  return items;
 }
 
 function checklistItem(referencePresentationId: string) {
-  return listMedicationChecklist().find((item) => item.referencePresentationId === referencePresentationId);
+  listMedicationChecklist();
+  return medicationChecklistById.get(referencePresentationId);
 }
 
 function normalizedTerms(value: string): string[] {
-  return value.toLocaleLowerCase().replace(/[^a-z]+/g, " ").split(" ").filter((term) => term.length >= 5);
+  return value
+    .toLocaleLowerCase()
+    .replace(/[^a-z]+/g, " ")
+    .split(" ")
+    .filter((term) => term.length >= 5);
 }
 
 function matchingReferences(medication: GenericMedication) {
-  const medicationKey = masterGenericKey(medication.canonicalName);
-  return listMedicationChecklist().filter((presentation) => masterGenericKey(presentation.genericName) === medicationKey);
+  listMedicationChecklist();
+  const medicationKey = masterGenericKey(
+    medication.canonicalName,
+  );
+  return (
+    medicationReferencesByGenericKey.get(medicationKey) ?? []
+  );
 }
 
 function listClinicianGenerics() {
-  return listGenerics().filter((medication) => matchingReferences(medication).some((item) => item.showInApp));
+  return listGenerics().filter((medication) =>
+    matchingReferences(medication).some(
+      (item) => item.showInApp,
+    ),
+  );
 }
 
 function mergeInsuranceCoverages(coverages: InsuranceCoverage[]): InsuranceCoverage[] {
