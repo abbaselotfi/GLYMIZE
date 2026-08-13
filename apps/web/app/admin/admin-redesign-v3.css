@@ -1,0 +1,110 @@
+/* GLYMIZE Admin redesign v3 — legacy surfaces inherit the same visual contract. */
+.glymize-internal-shell[data-route="admin"] .page-content {
+  --admin-surface: var(--glymize-surface);
+  --admin-surface-soft: var(--glymize-surface-soft);
+  --admin-ink: var(--glymize-ink);
+  --admin-muted: var(--glymize-muted);
+  --admin-line: var(--glymize-line);
+  --admin-accent: var(--glymize-accent-600);
+  --admin-accent-strong: var(--glymize-accent-700);
+  --admin-accent-soft: var(--glymize-accent-soft);
+  --admin-accent-soft-strong: var(--glymize-accent-soft-strong);
+  color: var(--admin-ink);
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content .panel,
+.glymize-internal-shell[data-route="admin"] .page-content .compact-panel,
+.glymize-internal-shell[data-route="admin"] .page-content .catalog-toolbar,
+.glymize-internal-shell[data-route="admin"] .page-content .medication-group,
+.glymize-internal-shell[data-route="admin"] .page-content .import-card {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-surface) !important;
+  color: var(--admin-ink) !important;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content h1,
+.glymize-internal-shell[data-route="admin"] .page-content h2,
+.glymize-internal-shell[data-route="admin"] .page-content h3,
+.glymize-internal-shell[data-route="admin"] .page-content strong,
+.glymize-internal-shell[data-route="admin"] .page-content label {
+  color: var(--admin-ink);
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content p,
+.glymize-internal-shell[data-route="admin"] .page-content small,
+.glymize-internal-shell[data-route="admin"] .page-content .muted {
+  color: var(--admin-muted) !important;
+  font-size: 13.5px !important;
+  font-weight: 600;
+  line-height: 1.75;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content label {
+  font-size: 13.5px !important;
+  font-weight: 750 !important;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content input,
+.glymize-internal-shell[data-route="admin"] .page-content select,
+.glymize-internal-shell[data-route="admin"] .page-content textarea {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-surface-soft) !important;
+  color: var(--admin-ink) !important;
+  font-size: 14px !important;
+  font-weight: 650;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content button:not(.danger-button),
+.glymize-internal-shell[data-route="admin"] .page-content .admin-link,
+.glymize-internal-shell[data-route="admin"] .page-content .primary-button {
+  border: 1px solid color-mix(in srgb,var(--admin-accent) 36%,var(--admin-line));
+  background: var(--admin-accent);
+  color: #fff;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content button:not(.danger-button):not(.secondary):hover,
+.glymize-internal-shell[data-route="admin"] .page-content .admin-link:hover,
+.glymize-internal-shell[data-route="admin"] .page-content .primary-button:hover {
+  border-color: var(--glymize-accent-500) !important;
+  background: var(--glymize-accent-500) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content button.secondary,
+.glymize-internal-shell[data-route="admin"] .page-content .secondary {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-surface) !important;
+  color: var(--admin-ink) !important;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content button.secondary:hover,
+.glymize-internal-shell[data-route="admin"] .page-content .secondary:hover {
+  border-color: color-mix(in srgb,var(--admin-accent) 48%,var(--admin-line)) !important;
+  background: var(--admin-accent-soft) !important;
+  color: var(--admin-accent-strong) !important;
+  transform: translateY(-1px);
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content .danger-button:hover {
+  background: #ffe4e1 !important;
+  color: #8e3733 !important;
+  border-color: #cf716b !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="admin"] .page-content .danger-button:hover {
+  background: #472927 !important;
+  color: #ffc0bb !important;
+  border-color: #ba6c66 !important;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content .file-picker input,
+.glymize-internal-shell[data-route="admin"] .page-content .medication-row,
+.glymize-internal-shell[data-route="admin"] .page-content .medication-admin-row,
+.glymize-internal-shell[data-route="admin"] .page-content .brand-branch,
+.glymize-internal-shell[data-route="admin"] .page-content .source-run,
+.glymize-internal-shell[data-route="admin"] .page-content .update-run-list article {
+  border-color: var(--admin-line) !important;
+  background: var(--admin-surface-soft) !important;
+  color: var(--admin-ink) !important;
+}
