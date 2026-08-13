@@ -1,0 +1,391 @@
+"use client";
+
+import Link from "next/link";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  PatientCodeKind,
+  PatientHandoffClinicalFlags,
+  PatientHandoffLab,
+  PatientHandoffMedication,
+  PatientHandoffVitals,
+} from "@glymize/contracts";
+import { recognizeClinicalDocument, type OcrProgress } from "../../lib/client-ocr";
+import { lookupPatientHandoff, savePatientHandoff, validateIranianNationalId } from "../../lib/patient-handoff-client";
+import { useGlymizeLocale } from "../components/use-glymize-locale";
+import styles from "./care-team.module.css";
+
+type MedicationDraft = {
+  id: string;
+  genericName: string;
+  doseAmount: string;
+  doseUnit: string;
+  frequencyPerDay: string;
+  verification: "unverified" | "confirmed" | "rejected";
+};
+
+const EMPTY_VITALS = { weightKg: "", heightCm: "", systolicBp: "", diastolicBp: "", pulseBpm: "" };
+const EMPTY_FLAGS: PatientHandoffClinicalFlags = {};
+
+const FREQUENCY_ALIASES: Record<string, { timesPerDay: number; code: string }> = {
+  "1": { timesPerDay: 1, code: "OD" },
+  "OD": { timesPerDay: 1, code: "OD" },
+  "QD": { timesPerDay: 1, code: "OD" },
+  "Q24H": { timesPerDay: 1, code: "OD" },
+  "2": { timesPerDay: 2, code: "BID" },
+  "BID": { timesPerDay: 2, code: "BID" },
+  "BD": { timesPerDay: 2, code: "BID" },
+  "Q12H": { timesPerDay: 2, code: "BID" },
+  "3": { timesPerDay: 3, code: "TID" },
+  "TID": { timesPerDay: 3, code: "TID" },
+  "TDS": { timesPerDay: 3, code: "TID" },
+  "Q8H": { timesPerDay: 3, code: "TID" },
+  "4": { timesPerDay: 4, code: "QID" },
+  "QID": { timesPerDay: 4, code: "QID" },
+  "QDS": { timesPerDay: 4, code: "QID" },
+  "Q6H": { timesPerDay: 4, code: "QID" },
+};
+
+function asciiMedicationFrequency(value: string) {
+  const persian = "۰۱۲۳۴۵۶۷۸۹";
+  const arabic = "٠١٢٣٤٥٦٧٨٩";
+  return value.replace(/[۰-۹٠-٩]/g, (digit) => {
+    const p = persian.indexOf(digit);
+    if (p >= 0) return String(p);
+    const a = arabic.indexOf(digit);
+    return a >= 0 ? String(a) : digit;
+  });
+}
+
+function parseMedicationFrequency(value: string) {
+  const normalized = asciiMedicationFrequency(value).trim().toUpperCase().replace(/[\s._-]+/g, "");
+  if (!normalized) return { timesPerDay: undefined as number | undefined, code: undefined as string | undefined, valid: true };
+  const alias = FREQUENCY_ALIASES[normalized];
+  if (alias) return { ...alias, valid: true };
+  const numeric = Number(normalized);
+  if (Number.isFinite(numeric) && numeric > 0 && numeric <= 24) {
+    const canonical = Object.values(FREQUENCY_ALIASES).find((item) => item.timesPerDay === numeric)?.code;
+    return { timesPerDay: numeric, code: canonical ?? `${numeric}/DAY`, valid: true };
+  }
+  return { timesPerDay: undefined as number | undefined, code: normalized, valid: false };
+}
+
+function frequencyInputFromStored(item: PatientHandoffMedication) {
+  if (item.frequencyCode) return item.frequencyCode;
+  if (item.frequencyPerDay === undefined) return "";
+  const canonical = Object.values(FREQUENCY_ALIASES).find((entry) => entry.timesPerDay === item.frequencyPerDay)?.code;
+  return canonical ?? String(item.frequencyPerDay);
+}
+
+
+function numberOrUndefined(value: string) {
+  const number = Number(value);
+  return value.trim() && Number.isFinite(number) ? number : undefined;
+}
+
+function newMedication(): MedicationDraft {
+  return { id: crypto.randomUUID(), genericName: "", doseAmount: "", doseUnit: "mg", frequencyPerDay: "", verification: "unverified" };
+}
+
+export default function CareTeamClient() {
+  const { locale, isRtl } = useGlymizeLocale();
+  const fa = locale === "fa";
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [patientCodeKind, setPatientCodeKind] = useState<PatientCodeKind>("file_number");
+  const [patientCode, setPatientCode] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [vitals, setVitals] = useState(EMPTY_VITALS);
+  const [flags, setFlags] = useState<PatientHandoffClinicalFlags>(EMPTY_FLAGS);
+  const [medications, setMedications] = useState<MedicationDraft[]>([]);
+  const [labs, setLabs] = useState<PatientHandoffLab[]>([]);
+  const [ocrText, setOcrText] = useState("");
+  const [nurseNotes, setNurseNotes] = useState("");
+  const [ocrProgress, setOcrProgress] = useState<OcrProgress | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [loadedRevision, setLoadedRevision] = useState<number | null>(null);
+
+  const nationalIdWarning = useMemo(() => patientCodeKind === "national_id" && patientCode.trim() && !validateIranianNationalId(patientCode), [patientCode, patientCodeKind]);
+
+  function updateVital(key: keyof typeof EMPTY_VITALS, value: string) {
+    setVitals((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleFlag(key: keyof PatientHandoffClinicalFlags) {
+    setFlags((current) => ({ ...current, [key]: !current[key] }));
+  }
+
+  function updateMedication(id: string, patch: Partial<MedicationDraft>) {
+    setMedications((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function updateLab(id: string, patch: Partial<PatientHandoffLab>) {
+    setLabs((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+
+  function hydrateFromRecord(record: import("@glymize/contracts").PatientHandoffRecord) {
+    setPatientCodeKind(record.patientCodeKind);
+    setFirstName(record.firstName ?? "");
+    setLastName(record.lastName ?? "");
+    setVitals({
+      weightKg: record.vitals.weightKg !== undefined ? String(record.vitals.weightKg) : "",
+      heightCm: record.vitals.heightCm !== undefined ? String(record.vitals.heightCm) : "",
+      systolicBp: record.vitals.systolicBp !== undefined ? String(record.vitals.systolicBp) : "",
+      diastolicBp: record.vitals.diastolicBp !== undefined ? String(record.vitals.diastolicBp) : "",
+      pulseBpm: record.vitals.pulseBpm !== undefined ? String(record.vitals.pulseBpm) : "",
+    });
+    setFlags(record.clinicalFlags ?? {});
+    setLabs(record.labs ?? []);
+    setMedications((record.medications ?? []).map((item) => ({
+      id: crypto.randomUUID(),
+      genericName: item.genericName,
+      doseAmount: item.doseAmount !== undefined ? String(item.doseAmount) : "",
+      doseUnit: item.doseUnit ?? "mg",
+      frequencyPerDay: frequencyInputFromStored(item),
+      verification: item.verification,
+    })));
+    setNurseNotes(record.nurseNotes ?? "");
+    setOcrText(record.ocrText ?? "");
+    setLoadedRevision(record.revision);
+  }
+
+  async function loadExisting(explicitCode?: string) {
+    const code = (explicitCode ?? patientCode).trim();
+    if (!code) {
+      setStatus(fa ? "برای باز کردن پرونده، کد بیمار را وارد کنید." : "Enter the patient code to open the existing handoff.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await lookupPatientHandoff(code);
+      if (!result.found || !result.record) {
+        setStatus(fa ? "پرونده‌ای با این کد پیدا نشد." : "No handoff was found for this patient code.");
+        return;
+      }
+      setPatientCode(code);
+      hydrateFromRecord(result.record);
+      setStatus(fa
+        ? `پرونده نسخه ${result.record.revision} برای ویرایش باز شد. ذخیره بعدی یک نسخه جدید ایجاد می‌کند.`
+        : `Revision ${result.record.revision} opened for editing. The next save creates a new revision.`);
+    } catch (error) {
+      const codeValue = error instanceof Error ? error.message : "LOOKUP_FAILED";
+      setStatus(codeValue === "AMBIGUOUS_PATIENT_CODE"
+        ? (fa ? "این کد در بیش از یک نوع شناسه وجود دارد." : "This code exists under more than one identifier type.")
+        : codeValue === "HANDOFF_UNAUTHORIZED"
+          ? (fa ? "توکن handoff با API هماهنگ نیست." : "The handoff token does not match the API.")
+          : (fa ? "باز کردن پرونده انجام نشد." : "Could not open the existing handoff."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    const pendingCode = window.sessionStorage.getItem("glymize:care-team-edit-code");
+    if (!pendingCode) return;
+    window.sessionStorage.removeItem("glymize:care-team-edit-code");
+    setPatientCode(pendingCode);
+    void loadExisting(pendingCode);
+    // The handoff code is consumed once when this page opens from Type 2.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
+  async function processFile(file?: File) {
+    if (!file) return;
+    setBusy(true);
+    setStatus("");
+    setOcrProgress({ stage: "prepare", progress: 0, message: fa ? "آماده‌سازی فایل…" : "Preparing file…" });
+    try {
+      const result = await recognizeClinicalDocument(file, setOcrProgress);
+      setOcrText((current) => [current, result.rawText].filter(Boolean).join("\n\n"));
+      setLabs((current) => {
+        const existingKeys = new Set(current.map((item) => item.canonicalKey).filter(Boolean));
+        return [...current, ...result.labs.filter((item) => !item.canonicalKey || !existingKeys.has(item.canonicalKey))];
+      });
+      const extractionModeFa = result.ocrPages > 0
+        ? (result.embeddedTextPages > 0 ? ` · ${result.embeddedTextPages} صفحه متن PDF + ${result.ocrPages} صفحه OCR` : ` · ${result.ocrPages} صفحه OCR`)
+        : (result.embeddedTextPages > 0 ? ` · متن ساختاری PDF بدون OCR تصویری` : "");
+      const extractionModeEn = result.ocrPages > 0
+        ? (result.embeddedTextPages > 0 ? ` · ${result.embeddedTextPages} PDF text + ${result.ocrPages} OCR page(s)` : ` · ${result.ocrPages} OCR page(s)`)
+        : (result.embeddedTextPages > 0 ? ` · embedded PDF text (no image OCR needed)` : "");
+      setStatus(fa
+        ? `${result.processedPageCount}${result.truncated ? ` از ${result.sourcePageCount}` : ""} صفحه/تصویر پردازش شد${result.truncated ? " (سقف ایمن پیش‌نمایش: ۱۰ صفحه)" : ""}${extractionModeFa}. مقادیر استخراج‌شده تا زمان تأیید شما وارد موتور درمان نمی‌شوند.`
+        : `${result.processedPageCount}${result.truncated ? ` of ${result.sourcePageCount}` : ""} page(s)/image processed${result.truncated ? " (safe preview cap: 10 pages)" : ""}${extractionModeEn}. Extracted values remain excluded from the treatment engine until you confirm them.`);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "OCR_FAILED";
+      const message = code === "FILE_TOO_LARGE"
+        ? (fa ? "حجم فایل بیش از ۱۸ مگابایت است." : "The file is larger than 18 MB.")
+        : code === "UNSUPPORTED_FILE_TYPE"
+          ? (fa ? "فقط PDF و تصویر پشتیبانی می‌شود." : "Only PDF and image files are supported.")
+          : (fa ? "OCR انجام نشد. فایل، اتصال اینترنت برای مدل زبان یا سازگاری مرورگر را بررسی کنید." : "OCR failed. Check the file, language-model network access, or browser support.");
+      setStatus(message);
+    } finally {
+      setBusy(false);
+      setOcrProgress(null);
+      if (cameraRef.current) cameraRef.current.value = "";
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function save() {
+    if (!patientCode.trim()) {
+      setStatus(fa ? "کد بیمار الزامی است." : "Patient code is required.");
+      return;
+    }
+    if (nationalIdWarning) {
+      setStatus(fa ? "کد ملی واردشده از نظر ساختار/رقم کنترل معتبر نیست؛ برای تست می‌توانید نوع کد را «شماره پرونده» انتخاب کنید." : "The national ID checksum is invalid. For synthetic testing, use File number instead.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const mappedVitals: PatientHandoffVitals = {
+        weightKg: numberOrUndefined(vitals.weightKg),
+        heightCm: numberOrUndefined(vitals.heightCm),
+        systolicBp: numberOrUndefined(vitals.systolicBp),
+        diastolicBp: numberOrUndefined(vitals.diastolicBp),
+        pulseBpm: numberOrUndefined(vitals.pulseBpm),
+      };
+      const mappedMeds: PatientHandoffMedication[] = medications
+        .filter((item) => item.genericName.trim())
+        .map((item) => ({
+          genericName: item.genericName.trim(),
+          doseAmount: numberOrUndefined(item.doseAmount),
+          doseUnit: item.doseAmount.trim() ? item.doseUnit : undefined,
+          frequencyPerDay: parseMedicationFrequency(item.frequencyPerDay).timesPerDay,
+          frequencyCode: parseMedicationFrequency(item.frequencyPerDay).code,
+          status: "active",
+          verification: item.verification,
+        }));
+      const record = await savePatientHandoff({
+        patientCode,
+        patientCodeKind,
+        firstName,
+        lastName,
+        status: "ready_for_physician",
+        vitals: mappedVitals,
+        clinicalFlags: flags,
+        labs,
+        medications: mappedMeds,
+        nurseNotes,
+        ocrText,
+      });
+      setStatus(fa
+        ? `پرونده برای پزشک آماده شد · نسخه ${record.revision} · کد نمایشی ${record.patientCodeDisplay}`
+        : `Handoff ready for physician · revision ${record.revision} · ${record.patientCodeDisplay}`);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "SAVE_FAILED";
+      setStatus(code === "HANDOFF_UNAUTHORIZED"
+        ? (fa ? "توکن دسترسی handoff با API هماهنگ نیست." : "The handoff token does not match the API.")
+        : code === "HANDOFF_API_NOT_CONFIGURED"
+          ? (fa ? "API محلی handoff اجرا نشده است. برنامه را با start-local.ps1 اجرا کنید." : "The local handoff API is not running. Start GLYMIZE with start-local.ps1.")
+          : code === "HANDOFF_INPUT_INVALID"
+            ? (fa ? "شناسه بیمار معتبر نیست؛ نوع کد و مقدار آن را بررسی کنید." : "The patient identifier is invalid; review its type and value.")
+            : (fa ? "ذخیره پرونده انجام نشد." : "Could not save the patient handoff."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const progressPercent = ocrProgress ? Math.max(0, Math.min(100, Math.round(ocrProgress.progress * 100))) : 0;
+
+  return (
+    <main className={styles.page} dir={isRtl ? "rtl" : "ltr"} lang={locale}>
+      <div className={styles.topline}>
+        <Link href="/dashboard">{isRtl ? "→" : "←"} {fa ? "داشبورد" : "Dashboard"}</Link>
+        <span>{fa ? "PRE-VISIT · داده ساختاریافته و قابل بازبینی" : "PRE-VISIT · structured, reviewable data"}</span>
+      </div>
+
+      <header className={styles.hero}>
+        <div>
+          <span>GLYMIZE CARE TEAM</span>
+          <h1>{fa ? "دستیار / پرستار" : "Assistant / nurse"}</h1>
+          <p>{fa ? "اطلاعات بیمار را پیش از ویزیت جمع‌آوری کنید، برگه آزمایش را با عکس یا PDF بخوانید و فقط داده‌های تأییدشده را برای پزشک آماده کنید." : "Collect pre-visit data, read lab sheets from a mobile photo or PDF, and hand only reviewed data to the physician."}</p>
+        </div>
+        <div className={styles.safetyBadge}>{fa ? "OCR ≠ تأیید بالینی" : "OCR ≠ clinical verification"}</div>
+      </header>
+
+      <section className={styles.card}>
+        <div className={styles.sectionTitle}><b>1</b><div><h2>{fa ? "شناسه بیمار" : "Patient identity"}</h2><p>{fa ? "نام و نام خانوادگی اختیاری است؛ کد بیمار کلید handoff است." : "Name is optional; the patient code is the handoff key."}</p></div></div>
+        <div className={styles.grid3}>
+          <label><span>{fa ? "نوع کد" : "Code type"}</span><select value={patientCodeKind} onChange={(event) => setPatientCodeKind(event.target.value as PatientCodeKind)}><option value="file_number">{fa ? "شماره پرونده" : "File number"}</option><option value="national_id">{fa ? "کد ملی" : "National ID"}</option><option value="other">{fa ? "کد دیگر" : "Other code"}</option></select></label>
+          <label><span>{fa ? "کد بیمار *" : "Patient code *"}</span><div className={styles.patientCodeAction}><input value={patientCode} onChange={(event) => { setPatientCode(event.target.value); setLoadedRevision(null); }} autoComplete="off" inputMode={patientCodeKind === "national_id" ? "numeric" : "text"} /><button type="button" disabled={busy} onClick={() => void loadExisting()}>{fa ? "باز کردن / ویرایش" : "Open / edit"}</button></div>{loadedRevision !== null && <small className={styles.revisionBadge}>{fa ? `نسخه بازشده: ${loadedRevision}` : `Loaded revision: ${loadedRevision}`}</small>}</label>
+          <div className={styles.nameGrid}><label><span>{fa ? "نام (اختیاری)" : "First name (optional)"}</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label><label><span>{fa ? "نام خانوادگی (اختیاری)" : "Last name (optional)"}</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} /></label></div>
+        </div>
+        {nationalIdWarning && <p className={styles.warning}>{fa ? "کد ملی فعلی checksum معتبر ندارد." : "The current national ID checksum is invalid."}</p>}
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.sectionTitle}><b>2</b><div><h2>{fa ? "عکس / PDF آزمایش و OCR فارسی" : "Lab photo / PDF + Persian OCR"}</h2><p>{fa ? "پردازش تصویر در مرورگر انجام می‌شود؛ نتیجه همیشه ابتدا تأییدنشده است." : "Image OCR runs in the browser; extracted fields always start unverified."}</p></div></div>
+        <div className={styles.uploadActions}>
+          <button type="button" disabled={busy} onClick={() => cameraRef.current?.click()}>📷 {fa ? "عکس با موبایل" : "Take photo"}</button>
+          <button type="button" disabled={busy} className={styles.secondary} onClick={() => fileRef.current?.click()}>PDF / JPG {fa ? "انتخاب فایل" : "Choose file"}</button>
+          <input ref={cameraRef} className={styles.hidden} type="file" accept="image/*" capture="environment" onChange={(event) => void processFile(event.target.files?.[0])} />
+          <input ref={fileRef} className={styles.hidden} type="file" accept="application/pdf,image/*" onChange={(event) => void processFile(event.target.files?.[0])} />
+        </div>
+        {ocrProgress && <div className={styles.progress}><div style={{ width: `${progressPercent}%` }} /><span>{progressPercent}% · {ocrProgress.message}</span></div>}
+        <p className={styles.privacy}>{fa ? "در حالت OCR مرورگری، تصویر برای سرویس OCR خارجی آپلود نمی‌شود؛ مدل‌های زبان فارسی/انگلیسی در اولین استفاده ممکن است دانلود شوند." : "Browser OCR does not upload the image to a third-party OCR service; Persian/English language models may download on first use."}</p>
+
+        {labs.length > 0 && <div className={styles.labTable}>
+          <div className={styles.labHeader}><span>{fa ? "آزمایش" : "Test"}</span><span>{fa ? "مقدار" : "Value"}</span><span>{fa ? "واحد" : "Unit"}</span><span>{fa ? "وضعیت" : "State"}</span></div>
+          {labs.map((lab) => <div className={styles.labRow} key={lab.id}>
+            <input value={lab.rawName} onChange={(event) => updateLab(lab.id, { rawName: event.target.value })} />
+            <input inputMode="decimal" value={lab.value ?? ""} onChange={(event) => updateLab(lab.id, { value: numberOrUndefined(event.target.value) })} />
+            <input value={lab.unit ?? ""} onChange={(event) => updateLab(lab.id, { unit: event.target.value })} />
+            <div className={styles.verifyActions}>
+              <button type="button" className={lab.verification === "confirmed" ? styles.confirmed : styles.smallButton} onClick={() => updateLab(lab.id, { verification: "confirmed" })}>✓</button>
+              <button type="button" className={lab.verification === "rejected" ? styles.rejected : styles.smallButton} onClick={() => updateLab(lab.id, { verification: "rejected" })}>×</button>
+              <small>{lab.verification === "confirmed" ? (fa ? "تأیید" : "confirmed") : lab.verification === "rejected" ? (fa ? "رد" : "rejected") : (fa ? "بازبینی" : "review")}</small>
+            </div>
+          </div>)}
+        </div>}
+        {ocrText && <details className={styles.ocrRaw}><summary>{fa ? "متن خام OCR" : "Raw OCR text"}</summary><textarea value={ocrText} onChange={(event) => setOcrText(event.target.value)} rows={10} /></details>}
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.sectionTitle}><b>3</b><div><h2>{fa ? "اطلاعات بالینی پایه" : "Basic clinical data"}</h2><p>{fa ? "این داده‌ها پس از اعمال توسط پزشک، فرم Type 2 را prefill می‌کنند." : "After physician review/apply, these values prefill the Type 2 form."}</p></div></div>
+        <div className={styles.grid5}>
+          <label><span>{fa ? "وزن kg" : "Weight kg"}</span><input inputMode="decimal" value={vitals.weightKg} onChange={(e) => updateVital("weightKg", e.target.value)} /></label>
+          <label><span>{fa ? "قد cm" : "Height cm"}</span><input inputMode="decimal" value={vitals.heightCm} onChange={(e) => updateVital("heightCm", e.target.value)} /></label>
+          <label><span>{fa ? "فشار سیستول" : "Systolic BP"}</span><input inputMode="numeric" value={vitals.systolicBp} onChange={(e) => updateVital("systolicBp", e.target.value)} /></label>
+          <label><span>{fa ? "فشار دیاستول" : "Diastolic BP"}</span><input inputMode="numeric" value={vitals.diastolicBp} onChange={(e) => updateVital("diastolicBp", e.target.value)} /></label>
+          <label><span>{fa ? "نبض" : "Pulse"}</span><input inputMode="numeric" value={vitals.pulseBpm} onChange={(e) => updateVital("pulseBpm", e.target.value)} /></label>
+        </div>
+        <div className={styles.flagGrid}>
+          {([
+            ["ascvd", fa ? "ASCVD" : "ASCVD"], ["heartFailure", fa ? "نارسایی قلبی" : "Heart failure"], ["ckd", fa ? "CKD" : "CKD"],
+            ["dialysis", fa ? "دیالیز" : "Dialysis"], ["diabeticFoot", fa ? "زخم پای دیابتی" : "Diabetic foot"], ["masldMash", "MASLD / MASH"], ["hypoglycemiaRisk", fa ? "ریسک هیپوگلیسمی" : "Hypoglycemia risk"],
+          ] as Array<[keyof PatientHandoffClinicalFlags, string]>).map(([key, label]) => <label className={flags[key] ? styles.flagSelected : styles.flag} key={key}><input type="checkbox" checked={Boolean(flags[key])} onChange={() => toggleFlag(key)} /><span>{label}</span></label>)}
+        </div>
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.sectionTitle}><b>4</b><div><h2>{fa ? "داروهای فعلی" : "Current medications"}</h2><p>{fa ? "هر دارو ابتدا در وضعیت بازبینی است؛ فقط ردیفی که پرستار با ✓ تأیید کند برای پزشک قابل Apply خواهد بود." : "Each medication starts in review state; only rows explicitly confirmed with ✓ can be applied by the physician."}</p></div></div>
+        <div className={styles.medList}>
+          {medications.map((item) => <div className={styles.medRow} key={item.id}>
+            <input placeholder={fa ? "نام ژنریک" : "Generic name"} value={item.genericName} onChange={(e) => updateMedication(item.id, { genericName: e.target.value })} />
+            <input inputMode="decimal" placeholder={fa ? "دوز" : "Dose"} value={item.doseAmount} onChange={(e) => updateMedication(item.id, { doseAmount: e.target.value })} />
+            <select value={item.doseUnit} onChange={(e) => updateMedication(item.id, { doseUnit: e.target.value })}><option>mg</option><option>unit</option><option>mcg</option></select>
+            <div className={styles.frequencyField}><input inputMode="text" placeholder={fa ? "BID یا 2" : "BID or 2"} value={item.frequencyPerDay} onChange={(e) => updateMedication(item.id, { frequencyPerDay: e.target.value })} />{item.frequencyPerDay.trim() && (() => { const parsed = parseMedicationFrequency(item.frequencyPerDay); return <small className={parsed.valid ? styles.frequencyOk : styles.frequencyWarning}>{parsed.valid && parsed.timesPerDay !== undefined ? `${parsed.code} = ${parsed.timesPerDay} ${fa ? "بار/روز" : "times/day"}` : (fa ? "فرکانس شناخته نشد؛ OD/BID/TID/QID یا عدد وارد کنید." : "Unrecognized frequency; enter OD/BID/TID/QID or a number.")}</small>; })()}</div>
+            <div className={styles.verifyActions}>
+              <button type="button" title={fa ? "تأیید دارو" : "Confirm medication"} className={item.verification === "confirmed" ? styles.confirmed : styles.smallButton} onClick={() => updateMedication(item.id, { verification: "confirmed" })}>✓</button>
+              <button type="button" title={fa ? "رد / عدم انتقال" : "Reject / exclude"} className={item.verification === "rejected" ? styles.rejected : styles.smallButton} onClick={() => updateMedication(item.id, { verification: "rejected" })}>×</button>
+              <small>{item.verification === "confirmed" ? (fa ? "تأیید" : "confirmed") : item.verification === "rejected" ? (fa ? "رد" : "rejected") : (fa ? "بازبینی" : "review")}</small>
+            </div>
+            <button type="button" className={styles.remove} onClick={() => setMedications((current) => current.filter((med) => med.id !== item.id))}>×</button>
+          </div>)}
+          <button type="button" className={styles.add} onClick={() => setMedications((current) => [...current, newMedication()])}>+ {fa ? "افزودن دارو" : "Add medication"}</button>
+        </div>
+        <label className={styles.notes}><span>{fa ? "یادداشت دستیار/پرستار" : "Assistant / nurse notes"}</span><textarea rows={4} value={nurseNotes} onChange={(e) => setNurseNotes(e.target.value)} /></label>
+      </section>
+
+      <section className={styles.handoffBar}>
+        <div><strong>{fa ? "آماده‌سازی برای پزشک" : "Prepare physician handoff"}</strong><p>{fa ? "فقط آزمایش‌هایی که با ✓ تأیید شده‌اند هنگام Apply به Type 2 منتقل می‌شوند." : "Only labs confirmed with ✓ are transferred when the physician applies this handoff to Type 2."}</p></div>
+        <button type="button" disabled={busy} onClick={() => void save()}>{busy ? (fa ? "در حال پردازش…" : "Working…") : (fa ? "ذخیره و آماده‌سازی" : "Save handoff")}</button>
+      </section>
+      {status && <div className={styles.status} role="status">{status}</div>}
+    </main>
+  );
+}

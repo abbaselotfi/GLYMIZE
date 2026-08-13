@@ -247,19 +247,19 @@ describe("GLYMIZE 30-case Type 2 clinical scenario validation", () => {
     expect(result.patient30DaysToman).toBeUndefined();
   });
 
-  // 29 — exact package arithmetic and percentage insurance.
-  it("29 calculates 30-day retail and patient cost from daily units, pack size, price, and coverage", () => {
+  // 29 — percentage alone is not enough to invent a patient bill.
+  it("29 calculates retail use but does not invent patient cost from percentage-only insurance", () => {
     const result = estimateType2Medication30DayCost({
       price: price(100_000),
       coverages: [coverage(20)],
       insuranceProvider: "social_security",
       plan: { dailyUnits: 2, unitsPerPackage: 30, unitLabel: "tablet" },
     });
-    expect(result.status).toBe("calculated");
+    expect(result.status).toBe("retail_only");
     expect(result.packagesFor30Days).toBe(2);
     expect(result.retail30DaysToman).toBe(200_000);
-    expect(result.patient30DaysToman).toBe(160_000);
-    expect(result.insurer30DaysToman).toBe(40_000);
+    expect(result.patient30DaysToman).toBeUndefined();
+    expect(result.insurer30DaysToman).toBeUndefined();
   });
 
   // 30 — explicit insurer source shares override percentage approximation.
@@ -274,4 +274,88 @@ describe("GLYMIZE 30-case Type 2 clinical scenario validation", () => {
     expect(result.patient30DaysToman).toBe(75_000);
     expect(result.insurer30DaysToman).toBe(285_000);
   });
+  it("31 calculates insurer share from a reference tariff instead of retail price", () => {
+    const result = estimateType2Medication30DayCost({
+      price: price(120_000),
+      coverages: [{ provider: "social_security", percent: 50, referencePriceToman: 80_000 }],
+      insuranceProvider: "social_security",
+      plan: { dailyUnits: 1, unitsPerPackage: 10 },
+    });
+    expect(result.status).toBe("calculated");
+    expect(result.packagesFor30Days).toBe(3);
+    expect(result.patient30DaysToman).toBe(240_000);
+    expect(result.insurer30DaysToman).toBe(120_000);
+  });
+
+  it("32 calculates a 30-day retail range for a generic with multiple NFI products", () => {
+    const result = estimateType2Medication30DayCost({
+      priceRange: { minToman: 100_000, medianToman: 150_000, maxToman: 200_000, productCount: 3, basis: "nfi_comparable_products" },
+      insuranceProvider: "social_security",
+      plan: { dailyUnits: 1, unitsPerPackage: 30 },
+    });
+    expect(result.status).toBe("calculated_range");
+    expect(result.retail30DaysMinToman).toBe(100_000);
+    expect(result.retail30DaysMaxToman).toBe(200_000);
+    expect(result.patient30DaysToman).toBeUndefined();
+  });
+
+  it("33 can reorder clinically acceptable scenarios by observed market price", () => {
+    const req = request({ factors: ["weight_priority"] });
+    const assessment = enrichedAssessment(req, {
+      semaglutide: { price: price(2_000_000) },
+      metformin: { price: price(100_000) },
+      empagliflozin: { price: price(500_000) },
+    });
+    const result = buildType2TreatmentScenarios({
+      assessment,
+      request: req,
+      insuranceProvider: "social_security",
+      sortMode: "patient_cost",
+      costingPlansByMedicationId: {
+        semaglutide: { dailyUnits: 1, unitsPerPackage: 30 },
+        metformin: { dailyUnits: 1, unitsPerPackage: 30 },
+        empagliflozin: { dailyUnits: 1, unitsPerPackage: 30 },
+      },
+    });
+    const observed = result
+      .map((scenario) => scenario.medications[0]?.price?.amountToman)
+      .filter((value): value is number => value !== undefined);
+    if (observed.length > 1) expect(observed[0]).toBe(Math.min(...observed));
+  });
+
+  it("34 keeps a multi-presentation generic market range display-only", () => {
+    const result = estimateType2Medication30DayCost({
+      priceRange: {
+        minToman: 100_000,
+        medianToman: 150_000,
+        maxToman: 220_000,
+        productCount: 12,
+        basis: "nfi_generic_market_range",
+        costComparable: false,
+        presentationCount: 4,
+      },
+      plan: { dailyUnits: 1, unitsPerPackage: 30 },
+    });
+    expect(result.status).toBe("per_package_only");
+    expect(result.retail30DaysMinToman).toBeUndefined();
+    expect(result.retail30DaysMaxToman).toBeUndefined();
+  });
+
+  it("35 excludes conditional insurance from financial calculation", () => {
+    const result = estimateType2Medication30DayCost({
+      price: price(100_000),
+      coverages: [{
+        provider: "health_insurance",
+        percent: 90,
+        runtimeEligibleForRanking: false,
+        conditions: "requires a qualifying clinical condition",
+      }],
+      insuranceProvider: "health_insurance",
+      plan: { dailyUnits: 1, unitsPerPackage: 30 },
+    });
+    expect(result.status).toBe("calculated");
+    expect(result.patient30DaysToman).toBe(100_000);
+    expect(result.insurer30DaysToman).toBe(0);
+  });
+
 });

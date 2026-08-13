@@ -197,7 +197,13 @@ export default function DrugDataUpdatesPage() {
       </section>
 
       <section className="panel">
-        <span className="eyebrow">Fallback import</span><h2>ورود دستی خروجی استاندارد Runner</h2>
+        <span className="eyebrow">Contract v2 · Primary</span><h2>Market v2 — مسیر اصلی داده</h2>
+        <p>Canonical v2 ابتدا از Safety Preflight عبور می‌کند. Runtime Index باید Full Clinical Market باشد و هیچ دارویی صرفاً به علت ATC، حوزه درمانی یا حجم فایل حذف نشود.</p>
+        <Link className="admin-link" href="/admin/data-updates/v2-preflight">اجرای Preflight فایل v2</Link>
+      </section>
+
+      <section className="panel">
+        <span className="eyebrow">Legacy v1 · Compatibility only</span><h2>ورود قدیمی Runner</h2>
         <label className="file-picker"><span>انتخاب فایل `glymize-drug-bundle.json`</span><input accept=".json,application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readBundleFile(file); }} type="file" /></label>
       </section>
 

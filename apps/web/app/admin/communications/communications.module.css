@@ -1,0 +1,46 @@
+.page {
+  width: min(1180px, calc(100% - 32px));
+  margin: 28px auto 72px;
+  direction: rtl;
+  display: grid;
+  gap: 20px;
+}
+.hero { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 28px; border: 1px solid var(--line, #d8e0e8); border-radius: 24px; background: var(--surface, #fff); }
+.hero span { font-size: 12px; letter-spacing: .08em; color: #557082; }
+.hero h1 { margin: 6px 0 8px; font-size: clamp(26px, 4vw, 40px); }
+.hero p { margin: 0; max-width: 760px; line-height: 1.9; color: #506474; }
+.hero button, .saveBar button, .card button { border: 0; border-radius: 12px; padding: 11px 16px; cursor: pointer; font: inherit; background: #163f5b; color: white; }
+.hero button:disabled, .saveBar button:disabled, .card button:disabled { opacity: .5; cursor: not-allowed; }
+.notice { padding: 12px 16px; border-radius: 14px; background: #edf7f3; color: #245c49; }
+.notice[data-error="true"] { background: #fff1f1; color: #8b2d2d; }
+.identityCard, .card, .policyCard, .saveBar { border: 1px solid var(--line, #d8e0e8); border-radius: 20px; background: var(--surface, #fff); padding: 22px; }
+.cardHeading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.cardHeading h2 { margin: 5px 0 0; font-size: 22px; }
+.badge { font-size: 11px; text-transform: uppercase; color: #5f7787; }
+.required, .connected, .missing { padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+.required, .connected { background: #e8f6ef; color: #1d6a4d; }
+.missing { background: #fff4e6; color: #8b5b1c; }
+.identityGrid, .policyCard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.identityGrid div, .policyCard div { border: 1px solid #e2e8ee; border-radius: 14px; padding: 14px; display: grid; gap: 6px; }
+.identityGrid small, .policyCard span { color: #718391; font-size: 12px; }
+.providers { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.card { display: grid; align-content: start; gap: 12px; }
+.toggleRow { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px 0; border-bottom: 1px solid #edf0f3; }
+.toggleRow span { display: grid; gap: 3px; }
+.toggleRow small { color: #718391; line-height: 1.55; }
+.toggleRow input { width: 20px; height: 20px; accent-color: #1d6a4d; }
+.disabled { opacity: .55; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 8px; }
+.fields label, .secretBox label { display: grid; gap: 6px; color: #526b7a; font-size: 13px; }
+.fields .full { grid-column: 1 / -1; }
+.fields input, .secretBox input, .inlineTest input { width: 100%; box-sizing: border-box; border: 1px solid #ced8df; border-radius: 11px; padding: 11px 12px; background: transparent; color: inherit; font: inherit; }
+.secretBox { margin-top: 8px; padding: 14px; border-radius: 14px; background: #f6f8fa; display: grid; gap: 10px; }
+.testRow, .inlineTest { display: flex; align-items: center; gap: 10px; }
+.inlineTest input { flex: 1; }
+.card .danger { background: transparent; color: #a03d3d; border: 1px solid #e6bcbc; }
+.testHint { flex: 1; color: #718391; font-size: 12px; }
+.policyCard { grid-template-columns: repeat(4, 1fr); }
+.saveBar { position: sticky; bottom: 14px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 12px 36px rgba(24, 47, 63, .12); }
+.saveBar p { margin: 0; color: #637886; font-size: 13px; }
+@media (max-width: 900px) { .providers { grid-template-columns: 1fr; } .policyCard { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 620px) { .page { width: min(100% - 20px, 1180px); margin-top: 14px; } .hero { flex-direction: column; padding: 20px; } .identityGrid, .policyCard, .fields { grid-template-columns: 1fr; } .fields .full { grid-column: auto; } .testRow, .inlineTest, .saveBar { align-items: stretch; flex-direction: column; } }

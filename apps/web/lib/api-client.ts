@@ -15,6 +15,7 @@ import type {
   MedicationClinicalDomain,
   MedicationMarketData,
   MedicationMarketDataInput,
+  MedicationPriceRange,
   MedicationTherapyGroup,
   NormalizedDrugImportBundle,
   NormalizedDrugImportRecord,
@@ -27,6 +28,13 @@ import { globalReferenceCatalogue, globalReferenceCatalogueSources } from "../..
 import { guidelineSources } from "../../api/src/guidelines/guideline-sources";
 import { getAdminSession, isAdminApiConfigured, publishAdminCatalog } from "./admin-auth";
 import { withBasePath } from "./base-path";
+import {
+  clinicianGenericDisplayPriceRange,
+  clinicianMarketPresentationData,
+  clinicianMarketPresentations,
+  isClinicianMarketPresentation,
+  loadClinicianMarketV2,
+} from "./clinician-market-v2";
 
 const remoteApiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
 const storageKey = "glymize-browser-catalog-v2";
@@ -53,6 +61,7 @@ export interface BrowserCatalogState {
   masterCandidates: MasterDrugCandidate[];
   masterRegistry: MasterDrugRegistryEntry[];
   customPresentations: ReferenceMedicationPresentation[];
+  marketOverrides: Record<string, { approved: boolean; approvedAt: string }>;
 }
 
 interface PublishedCatalogState extends BrowserCatalogState {
@@ -80,7 +89,8 @@ function emptyState(): BrowserCatalogState {
     updateRuns: [],
     masterCandidates: [],
     masterRegistry: [],
-    customPresentations: []
+    customPresentations: [],
+    marketOverrides: {}
   };
 }
 
@@ -97,7 +107,8 @@ function parseStoredState(value: string | null): { state: BrowserCatalogState; s
       updateRuns: Array.isArray(parsed.updateRuns) ? parsed.updateRuns : [],
       masterCandidates: Array.isArray(parsed.masterCandidates) ? parsed.masterCandidates : [],
       masterRegistry: Array.isArray(parsed.masterRegistry) ? parsed.masterRegistry : [],
-      customPresentations: Array.isArray(parsed.customPresentations) ? parsed.customPresentations : []
+      customPresentations: Array.isArray(parsed.customPresentations) ? parsed.customPresentations : [],
+      marketOverrides: parsed.marketOverrides ?? {}
     }, savedAt: raw.savedAt };
   } catch {
     return null;
@@ -108,6 +119,11 @@ async function ensureState() {
   if (stateLoaded || typeof window === "undefined") return;
   if (statePromise) return statePromise;
   statePromise = (async () => {
+    try {
+      await loadClinicianMarketV2();
+    } catch (error) {
+      console.warn("GLYMIZE clinician market v2 unavailable; retaining existing catalog only.", error);
+    }
     const localDraft = parseStoredState(window.localStorage.getItem(storageKey));
     try {
       const response = await fetch(`${withBasePath("/data/admin-catalog.json")}?t=${Date.now()}`, { cache: "no-store" });
@@ -123,7 +139,8 @@ async function ensureState() {
         updateRuns: published.updateRuns ?? [],
         masterCandidates: Array.isArray(published.masterCandidates) ? published.masterCandidates : [],
         masterRegistry: Array.isArray(published.masterRegistry) ? published.masterRegistry : [],
-        customPresentations: Array.isArray(published.customPresentations) ? published.customPresentations : []
+        customPresentations: Array.isArray(published.customPresentations) ? published.customPresentations : [],
+        marketOverrides: published.marketOverrides ?? {}
       };
       const localIsNewer = Boolean(localDraft?.savedAt && Date.parse(localDraft.savedAt) > Date.parse(published.updatedAt));
       stateCache = localIsNewer ? localDraft!.state : publishedState;
@@ -187,6 +204,40 @@ export function beginCatalogPublishBatch() {
 export function endCatalogPublishBatch() {
   publishBatchDepth = Math.max(0, publishBatchDepth - 1);
   if (publishBatchDepth === 0 && pendingPublishState) schedulePublish(pendingPublishState);
+}
+
+export async function buildCatalogDiagnosticSnapshot() {
+  await ensureState();
+  const items = listMedicationChecklist();
+  const records = items.map((item) => {
+    const qualityFlags: string[] = [];
+    if (item.marketVerification === "not_verified") qualityFlags.push("NOT_IN_CURRENT_NFI");
+    if (item.marketVerification === "admin_override") qualityFlags.push("ADMIN_MARKET_OVERRIDE");
+    if (!item.price && !item.priceRange) qualityFlags.push("PRICE_MISSING");
+    if (item.insuranceCoverages.some((coverage) =>
+      coverage.percent > 0 &&
+      coverage.patientShareToman === undefined &&
+      coverage.insurerShareToman === undefined &&
+      coverage.referencePriceToman === undefined
+    )) qualityFlags.push("INSURANCE_PERCENT_WITHOUT_REFERENCE_TARIFF");
+    if (item.insuranceCoverages.some((coverage) => !Number.isInteger(coverage.percent))) qualityFlags.push("SOURCE_PERCENT_HAS_DECIMALS");
+    return { ...item, qualityFlags };
+  });
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    source: "GLYMIZE published/browser medication catalogue",
+    summary: {
+      presentations: records.length,
+      visibleToClinicians: records.filter((item) => item.showInApp).length,
+      nfiVerified: records.filter((item) => item.marketVerification === "nfi_verified").length,
+      adminOverrides: records.filter((item) => item.marketVerification === "admin_override").length,
+      notVerified: records.filter((item) => item.marketVerification === "not_verified").length,
+      withPrice: records.filter((item) => item.price || item.priceRange).length,
+      withInsurance: records.filter((item) => item.insuranceCoverages.length > 0).length
+    },
+    records
+  };
 }
 
 function masterGenericKey(value: string) {
@@ -289,13 +340,60 @@ function masterReferencePresentations(state: BrowserCatalogState, basePresentati
     });
 }
 
+function isNfiSourceUrl(value?: string) {
+  return /irc\.fda\.gov\.ir\/nfi/i.test(value ?? "");
+}
+
+function nfiPriceRange(brands: MedicationBrand[]): MedicationPriceRange | undefined {
+  const values = brands
+    .filter((brand) => brand.sourceDiscovered && !brand.hiddenFromSource && isNfiSourceUrl(brand.sourceUrl))
+    .map((brand) => brand.price?.amountToman)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0)
+    .sort((left, right) => left - right);
+  if (!values.length) return undefined;
+  const middle = Math.floor(values.length / 2);
+  const medianToman = values.length % 2
+    ? values[middle]!
+    : Math.round((values[middle - 1]! + values[middle]!) / 2);
+  return {
+    minToman: values[0]!,
+    medianToman,
+    maxToman: values[values.length - 1]!,
+    productCount: values.length,
+    basis: "nfi_comparable_products"
+  };
+}
+
 function listMedicationChecklist(): MedicationChecklistItem[] {
   const state = readState();
-  const basePresentations = [...globalReferenceCatalogue, ...state.customPresentations];
+  const basePresentations = [...clinicianMarketPresentations(), ...globalReferenceCatalogue, ...state.customPresentations];
   const presentations = [...basePresentations, ...masterReferencePresentations(state, basePresentations)];
   return presentations.map((presentation) => {
     const market = state.marketData[presentation.id] ?? {};
     const master = findMasterForPresentation(presentation, state.masterRegistry);
+    const runtimeMarket = clinicianMarketPresentationData(presentation.id);
+    const brands = runtimeMarket?.brands ?? state.brands[presentation.id] ?? [];
+    const nfiVerified = Boolean(runtimeMarket) ||
+      presentation.reviewState === "validated_for_iran" ||
+      isNfiSourceUrl(market.sourceUrl) ||
+      brands.some((brand) => brand.sourceDiscovered && !brand.hiddenFromSource && isNfiSourceUrl(brand.sourceUrl));
+    const adminOverride = Boolean(state.marketOverrides[presentation.id]?.approved);
+    const marketVerification = nfiVerified ? "nfi_verified" as const : adminOverride ? "admin_override" as const : "not_verified" as const;
+    const showInApp = state.visibility[presentation.id] === false ? false : marketVerification !== "not_verified";
+    const priceRange = runtimeMarket?.priceRange ?? nfiPriceRange(brands);
+    const marketBadge = market.marketBadge ?? (marketVerification === "admin_override" ? {
+      key: "admin-market-override",
+      labelFa: "تأیید دستی ادمین · خارج از NFI فعلی",
+      labelEn: "Admin-approved · outside current NFI",
+      tone: "neutral" as const,
+      confirmedByAdmin: true
+    } : master && presentation.reviewState === "reference_only" ? {
+      key: "clinical-catalog",
+      labelFa: "Clinical Catalog · وضعیت بازار در انتظار NFI",
+      labelEn: "Clinical Catalog · Iran market pending",
+      tone: "neutral" as const,
+      confirmedByAdmin: false
+    } : undefined);
     return {
       referencePresentationId: presentation.id,
       genericName: presentation.genericName,
@@ -303,24 +401,20 @@ function listMedicationChecklist(): MedicationChecklistItem[] {
       administrationRoute: presentation.administrationRoute,
       dosageForm: presentation.dosageForm,
       strengthPresentation: presentation.strengthPresentation,
-      sourceUrl: market.sourceUrl ?? presentation.sourceUrl,
+      sourceUrl: runtimeMarket?.sourceUrl ?? market.sourceUrl ?? presentation.sourceUrl,
       reviewState: presentation.reviewState,
-      showInApp: state.visibility[presentation.id] ?? true,
-      insuranceCoverages: state.insurance[presentation.id] ?? [],
-      brands: state.brands[presentation.id] ?? [],
+      showInApp,
+      insuranceCoverages: runtimeMarket?.insuranceCoverages ?? state.insurance[presentation.id] ?? [],
+      brands,
       displayMode: market.displayMode ?? "generic_or_primary_brand",
       clinicalDomains: market.clinicalDomains ?? clinicalDomainsFromMaster(master),
       clinicalEffects: market.clinicalEffects ?? master?.clinicalEffects,
-      genericRegistryCode: market.genericRegistryCode,
+      genericRegistryCode: runtimeMarket?.genericRegistryCode ?? market.genericRegistryCode,
       price: market.price,
-      marketBadge: market.marketBadge ?? (master && presentation.reviewState === "reference_only" ? {
-        key: "clinical-catalog",
-        labelFa: "Clinical Catalog · وضعیت بازار در انتظار NFI",
-        labelEn: "Clinical Catalog · Iran market pending",
-        tone: "neutral" as const,
-        confirmedByAdmin: false
-      } : undefined),
-      sourceObservedAt: market.sourceObservedAt ?? master?.sourceObservedAt
+      priceRange,
+      marketBadge: runtimeMarket?.marketBadge ?? marketBadge,
+      sourceObservedAt: runtimeMarket?.sourceObservedAt ?? market.sourceObservedAt ?? master?.sourceObservedAt,
+      marketVerification
     } satisfies MedicationChecklistItem;
   });
 }
@@ -336,6 +430,10 @@ function normalizedTerms(value: string): string[] {
 function matchingReferences(medication: GenericMedication) {
   const medicationKey = masterGenericKey(medication.canonicalName);
   return listMedicationChecklist().filter((presentation) => masterGenericKey(presentation.genericName) === medicationKey);
+}
+
+function listClinicianGenerics() {
+  return listGenerics().filter((medication) => matchingReferences(medication).some((item) => item.showInApp));
 }
 
 function mergeInsuranceCoverages(coverages: InsuranceCoverage[]): InsuranceCoverage[] {
@@ -356,7 +454,7 @@ function coverageSourceChanged(manual: InsuranceCoverage, source?: InsuranceCove
 }
 
 function resolveMedicationDisplays(medication: GenericMedication) {
-  const references = matchingReferences(medication);
+  const references = matchingReferences(medication).filter((item) => item.showInApp);
   const genericCoverage = references.flatMap((item) => item.insuranceCoverages);
   const brands = references.flatMap((reference, referenceIndex) =>
     reference.brands.map((brand) => ({
@@ -367,7 +465,9 @@ function resolveMedicationDisplays(medication: GenericMedication) {
   )
     .filter(({ brand }) => brand.showInsteadOfGeneric && !brand.hiddenFromSource && brand.name.trim())
     .sort((left, right) => left.referenceIndex - right.referenceIndex || left.brand.priority - right.brand.priority);
-  const primaryReference = references[0];
+  const primaryReference = references.find((item) => isClinicianMarketPresentation(item.referencePresentationId)) ??
+    references.find((item) => item.marketVerification === "nfi_verified") ??
+    references[0];
   const displayMode = primaryReference?.displayMode ?? "generic_or_primary_brand";
   if (!brands.length || displayMode === "generic_with_selected_brands") {
     return [{
@@ -380,6 +480,7 @@ function resolveMedicationDisplays(medication: GenericMedication) {
       insuranceCoverages: mergeInsuranceCoverages(genericCoverage),
       genericRegistryCode: primaryReference?.genericRegistryCode,
       price: primaryReference?.price,
+      priceRange: clinicianGenericDisplayPriceRange(primaryReference?.genericName ?? medication.canonicalName) ?? primaryReference?.priceRange,
       marketBadge: primaryReference?.marketBadge
     }];
   }
@@ -393,14 +494,14 @@ function resolveMedicationDisplays(medication: GenericMedication) {
     genericRegistryCode: brand.genericRegistryCode ?? primaryReference?.genericRegistryCode,
     brandRegistryCode: brand.brandRegistryCode,
     price: brand.price ?? primaryReference?.price,
+    priceRange: undefined,
     marketBadge: brand.marketBadge ?? primaryReference?.marketBadge
   }));
 }
 
 function type2Assessment(request: Type2ConsiderationRequest): Type2AssessmentResult {
-  const visible = listGenerics()
-    .filter((medication) => medication.catalogStatus !== "admin_added" || medication.clinicalEngineEnabled === true)
-    .filter((medication) => matchingReferences(medication).some((item) => item.showInApp));
+  const visible = listClinicianGenerics()
+    .filter((medication) => medication.catalogStatus !== "admin_added" || medication.clinicalEngineEnabled === true);
   const presentations = Object.fromEntries(visible.map((medication) => [medication.id, resolveMedicationDisplays(medication)]));
   const insuranceCoverageByMedicationId = Object.fromEntries(visible.map((medication) => [
     medication.id,
@@ -439,9 +540,17 @@ function requestBody(init?: RequestInit) {
 }
 
 function updateVisibility(referencePresentationId: string, showInApp: boolean) {
-  if (!checklistItem(referencePresentationId)) return undefined;
+  const current = checklistItem(referencePresentationId);
+  if (!current) return undefined;
   const state = readState();
   state.visibility = { ...state.visibility, [referencePresentationId]: showInApp };
+  const marketOverrides = { ...state.marketOverrides };
+  if (showInApp && current.marketVerification === "not_verified") {
+    marketOverrides[referencePresentationId] = { approved: true, approvedAt: new Date().toISOString() };
+  } else if (!showInApp && current.marketVerification === "admin_override") {
+    delete marketOverrides[referencePresentationId];
+  }
+  state.marketOverrides = marketOverrides;
   saveState(state);
   return checklistItem(referencePresentationId);
 }
@@ -1108,7 +1217,7 @@ async function browserApiFetch(path: string, init?: RequestInit): Promise<Respon
   const pathname = path.split("?")[0]!;
   const body = requestBody(init);
 
-  if (method === "GET" && pathname === "/v1/catalog/generics") return json(listGenerics());
+  if (method === "GET" && pathname === "/v1/catalog/generics") return json(listClinicianGenerics());
   if (method === "GET" && pathname === "/v1/protocols/type-2") return json(type2ProtocolSeed);
   if (method === "GET" && pathname === "/v1/admin/guidelines") return json(guidelineSources);
   if (method === "GET" && pathname === "/v1/admin/catalog/medication-checklist") return json(listMedicationChecklist());
@@ -1261,6 +1370,16 @@ async function browserApiFetch(path: string, init?: RequestInit): Promise<Respon
   return json({ message: "مسیر محلی شناخته نشد." }, 404);
 }
 
+function isBrowserOwnedCatalogRoute(path: string) {
+  const pathname = path.split("?")[0]!;
+  return pathname.startsWith("/v1/catalog/") ||
+    pathname.startsWith("/v1/admin/catalog/") ||
+    pathname.startsWith("/v1/admin/notifications") ||
+    pathname === "/v1/protocols/type-2" ||
+    pathname.startsWith("/v1/admin/preview/type-2-considerations");
+}
+
 export function apiFetch(path: string, init?: RequestInit) {
+  if (isBrowserOwnedCatalogRoute(path)) return browserApiFetch(path, init);
   return remoteApiUrl ? fetch(`${remoteApiUrl}${path}`, init) : browserApiFetch(path, init);
 }

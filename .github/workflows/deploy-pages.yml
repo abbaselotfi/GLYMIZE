@@ -63,6 +63,7 @@ jobs:
       - name: Build static application
         env:
           GITHUB_PAGES: "true"
+          GITHUB_PAGES_CUSTOM_DOMAIN: ${{ vars.GITHUB_PAGES_CUSTOM_DOMAIN }}
           NEXT_PUBLIC_ADMIN_API_URL: ${{ vars.NEXT_PUBLIC_ADMIN_API_URL }}
         run: pnpm --filter @glymize/web... build
 

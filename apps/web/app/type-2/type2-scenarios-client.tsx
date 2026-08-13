@@ -13,12 +13,16 @@ import type {
   Type2DecisionFactor,
   Type2RoutePreference,
 } from "@glymize/contracts";
+import type { PatientHandoffRecord } from "@glymize/contracts";
 import {
   buildType2TreatmentScenarios,
   type Type2CostingPlan,
+  type Type2ScenarioSortMode,
 } from "@glymize/clinical-engine/scenario-engine";
 import { apiFetch } from "../../lib/api-client";
+import { formatCoveragePercent } from "../../lib/medication-market";
 import MedicationMarketDetails from "../components/medication-market-details";
+import PatientHandoffLookup from "../components/patient-handoff-lookup";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import base from "./type2-v2.module.css";
 import styles from "./type2-scenarios.module.css";
@@ -72,6 +76,13 @@ const COSTS: Array<{ value: Type2CostPreference; fa: string; en: string }> = [
   { value: "insured_only", fa: "فقط دارای پوشش بیمه", en: "Covered medicines only" },
 ];
 
+const SCENARIO_SORTS: Array<{ value: Type2ScenarioSortMode; fa: string; en: string }> = [
+  { value: "balanced", fa: "متعادل — پیشنهاد پیش‌فرض GLYMIZE", en: "Balanced — GLYMIZE default" },
+  { value: "clinical", fa: "بیشترین تناسب علمی", en: "Highest clinical fit" },
+  { value: "patient_cost", fa: "کمترین هزینه برای بیمار", en: "Lowest patient cost" },
+  { value: "insurance_access", fa: "بهترین پوشش بیمه و دسترسی", en: "Best insurance and access" },
+];
+
 function numberOrUndefined(value: string) {
   if (!value.trim()) return undefined;
   const parsed = Number(value);
@@ -94,6 +105,12 @@ function toman(value?: number, locale: "fa" | "en" = "fa") {
   return new Intl.NumberFormat(locale === "fa" ? "fa-IR" : "en-US", { maximumFractionDigits: 0 }).format(value);
 }
 
+function tomanRange(min?: number, max?: number, locale: "fa" | "en" = "fa") {
+  if (min === undefined || max === undefined) return "—";
+  if (min === max) return toman(min, locale);
+  return `${toman(min, locale)} – ${toman(max, locale)}`;
+}
+
 export default function Type2ScenariosClient() {
   const { locale, isRtl } = useGlymizeLocale();
   const fa = locale === "fa";
@@ -109,6 +126,7 @@ export default function Type2ScenariosClient() {
   const [costPreference, setCostPreference] = useState<Type2CostPreference>("moderate");
   const [routePreference, setRoutePreference] = useState<Type2RoutePreference>("oral_and_injectable");
   const [insuranceProvider, setInsuranceProvider] = useState<InsuranceProvider>("social_security");
+  const [scenarioSortMode, setScenarioSortMode] = useState<Type2ScenarioSortMode>("balanced");
   const [hyperglycemiaSymptoms, setHyperglycemiaSymptoms] = useState(false);
   const [catabolicFeatures, setCatabolicFeatures] = useState(false);
   const [assessment, setAssessment] = useState<Type2AssessmentResult | null>(null);
@@ -137,9 +155,10 @@ export default function Type2ScenariosClient() {
       request: submittedRequest,
       insuranceProvider,
       costingPlansByMedicationId: costPlans,
+      sortMode: scenarioSortMode,
       maxScenarios: 3,
     });
-  }, [assessment, submittedRequest, insuranceProvider, costPlans]);
+  }, [assessment, submittedRequest, insuranceProvider, costPlans, scenarioSortMode]);
 
   function setFactor(key: Type2DecisionFactor) {
     setFactors((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
@@ -204,6 +223,53 @@ export default function Type2ScenariosClient() {
     };
   }
 
+  function applyPatientHandoff(record: PatientHandoffRecord) {
+    const confirmedLabs = record.labs.filter((item) => item.verification === "confirmed");
+    const labValue = (key: string) => confirmedLabs.find((item) => item.canonicalKey === key)?.value;
+    const hba1c = labValue("hba1c");
+    const eGfr = labValue("egfr");
+    const uacr = labValue("uacr");
+
+    if (hba1c !== undefined) setCurrentHba1c(String(hba1c));
+    setContext((current) => ({
+      ...current,
+      eGfr: eGfr !== undefined ? String(eGfr) : current.eGfr,
+      uacr: uacr !== undefined ? String(uacr) : current.uacr,
+      dialysis: record.clinicalFlags.dialysis ?? current.dialysis,
+      weight: record.vitals.weightKg !== undefined ? String(record.vitals.weightKg) : current.weight,
+      height: record.vitals.heightCm !== undefined ? String(record.vitals.heightCm) : current.height,
+    }));
+
+    const incomingFactors: Type2DecisionFactor[] = [];
+    if (record.clinicalFlags.ascvd) incomingFactors.push("ascvd");
+    if (record.clinicalFlags.heartFailure) incomingFactors.push("heart_failure");
+    if (record.clinicalFlags.ckd || record.clinicalFlags.dialysis) incomingFactors.push("ckd");
+    if (record.clinicalFlags.diabeticFoot) incomingFactors.push("diabetic_foot");
+    if (record.clinicalFlags.masldMash) incomingFactors.push("masld_mash");
+    if (record.clinicalFlags.hypoglycemiaRisk) incomingFactors.push("hypoglycemia_risk");
+    setFactors((current) => [...new Set([...current, ...incomingFactors])]);
+
+    const confirmedMedications = record.medications.filter((item) => item.verification === "confirmed");
+    if (confirmedMedications.length) {
+      setMedications(confirmedMedications.map((item) => ({
+        id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        genericMedicationId: item.genericMedicationId,
+        genericName: item.genericName,
+        doseAmount: item.doseAmount !== undefined ? String(item.doseAmount) : "",
+        doseUnit: item.doseUnit ?? "mg",
+        frequencyPerDay: item.frequencyPerDay !== undefined ? String(item.frequencyPerDay) : "",
+        status: item.status ?? "active",
+      })));
+    }
+
+    setAssessment(null);
+    setSubmittedRequest(null);
+    setCostPlans({});
+    setStatus(fa
+      ? "داده‌های تأییدشده handoff روی فرم اعمال شد. قبل از ساخت سناریوها، مقادیر را مرور کنید."
+      : "Confirmed handoff data was applied. Review the fields before generating scenarios.");
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     const current = Number(currentHba1c);
@@ -258,6 +324,8 @@ export default function Type2ScenariosClient() {
         </div>
         <div className={styles.heroMetric}><b>30</b><span>{fa ? "سناریوی اعتبارسنجی" : "validation cases"}</span></div>
       </header>
+
+      <PatientHandoffLookup onApply={applyPatientHandoff} />
 
       <div className={styles.workspace}>
         <form className={styles.form} onSubmit={submit}>
@@ -319,6 +387,8 @@ export default function Type2ScenariosClient() {
           <section className={styles.section}>
             <SectionTitle n="3" title={fa ? "بازار، بیمه و ترجیح بیمار" : "Market, insurance, and patient preference"} hint={fa ? "هزینه بعد از ایمنی و تناسب بالینی وارد تصمیم می‌شود." : "Cost is applied after safety and clinical fit."} />
             <div className={styles.choiceGrid}>{COSTS.map((item) => <label className={costPreference === item.value ? styles.choiceActive : styles.choice} key={item.value}><input type="radio" name="cost" checked={costPreference === item.value} onChange={() => { setCostPreference(item.value); setAssessment(null); }} /><span>{fa ? item.fa : item.en}</span></label>)}</div>
+            <div className={styles.subhead}><div><b>{fa ? "اولویت مرتب‌سازی سناریوها" : "Scenario ordering priority"}</b><small>{fa ? "ایمنی و اندیکاسیون همیشه Hard Gate باقی می‌مانند؛ این انتخاب فقط ترتیب گزینه‌های بالینی قابل قبول را تغییر می‌دهد." : "Safety and indication remain hard gates; this only reorders clinically acceptable scenarios."}</small></div></div>
+            <div className={styles.choiceGrid}>{SCENARIO_SORTS.map((item) => <label className={scenarioSortMode === item.value ? styles.choiceActive : styles.choice} key={item.value}><input type="radio" name="scenario-sort" checked={scenarioSortMode === item.value} onChange={() => setScenarioSortMode(item.value)} /><span>{fa ? item.fa : item.en}</span></label>)}</div>
             <div className={styles.twoCols}>
               <label className={styles.selectField}><span>{fa ? "بیمه بیمار برای محاسبه هزینه" : "Patient insurer for cost estimate"}</span><select value={insuranceProvider} onChange={(event) => setInsuranceProvider(event.target.value as InsuranceProvider)}>{INSURERS.map((item) => <option value={item.value} key={item.value}>{fa ? item.fa : item.en}</option>)}</select></label>
               <label className={styles.selectField}><span>{fa ? "مسیر مصرف" : "Route preference"}</span><select value={routePreference} onChange={(event) => { setRoutePreference(event.target.value as Type2RoutePreference); setAssessment(null); }}><option value="oral_and_injectable">{fa ? "خوراکی و تزریقی" : "Oral and injectable"}</option><option value="oral_only">{fa ? "فقط خوراکی" : "Oral only"}</option></select></label>
@@ -367,8 +437,8 @@ export default function Type2ScenariosClient() {
             const plan = costPlans[medication.genericMedicationId] ?? {};
             return <section className={styles.scenarioMed} key={medication.cardId ?? medication.genericMedicationId}>
               <div className={styles.medTop}><div><b>{medication.displayName ?? medication.persianName}</b>{medication.selectedBrandName && <small>{fa ? "ژنریک" : "Generic"}: {medication.persianName}</small>}<small>{medication.therapeuticClass}</small></div><span>{medication.priorityScore}/100</span></div>
-              <div className={styles.insuranceRow}>{medication.insuranceCoverages.length ? medication.insuranceCoverages.map((entry) => <span key={entry.provider}>✓ {INSURERS.find((item) => item.value === entry.provider)?.[fa ? "fa" : "en"] ?? entry.provider}: {entry.percent}%</span>) : <span>{fa ? "پوشش بیمه ثبت نشده" : "No recorded coverage"}</span>}</div>
-              <MedicationMarketDetails brandRegistryCode={medication.brandRegistryCode} coverages={medication.insuranceCoverages} genericRegistryCode={medication.genericRegistryCode} locale={locale} marketBadge={medication.marketBadge} price={medication.price} selectedBrands={medication.selectedBrands} />
+              <div className={styles.insuranceRow}>{medication.insuranceCoverages.length ? medication.insuranceCoverages.map((entry) => <span key={entry.provider}>✓ {INSURERS.find((item) => item.value === entry.provider)?.[fa ? "fa" : "en"] ?? entry.provider}: {formatCoveragePercent(entry.percent, locale)}%</span>) : <span>{fa ? "پوشش بیمه ثبت نشده" : "No recorded coverage"}</span>}</div>
+              <MedicationMarketDetails brandRegistryCode={medication.brandRegistryCode} coverages={medication.insuranceCoverages} genericRegistryCode={medication.genericRegistryCode} locale={locale} marketBadge={medication.marketBadge} price={medication.price} priceRange={medication.priceRange} selectedBrands={medication.selectedBrands} />
 
               <div className={styles.costBox}>
                 <div className={styles.costTitle}><div><b>{fa ? "برآورد هزینه ۳۰روزه" : "30-day cost estimate"}</b><small>{fa ? "این ورودی‌ها برای هزینه‌اند، نه پیشنهاد دوز." : "These inputs are for costing, not dose recommendation."}</small></div><span>{estimate?.status === "calculated" ? "✓" : "…"}</span></div>
@@ -377,7 +447,12 @@ export default function Type2ScenariosClient() {
                   <label><span>{fa ? "واحد در بسته" : "Units/package"}</span><input type="number" min="0" step="1" value={plan.unitsPerPackage ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], unitsPerPackage: numberOrUndefined(event.target.value), unitLabel: fa ? "واحد" : "unit" } }))} placeholder="30" /></label>
                 </div>
                 <div className={styles.costNumbers}>
-                  <div><small>{fa ? "قیمت هر بسته" : "Retail/package"}</small><b>{toman(estimate?.retailPerPackageToman, locale)} {fa ? "تومان" : "Toman"}</b></div>
+                  <div><small>{fa ? "قیمت هر بسته" : "Retail/package"}</small><b>{estimate?.retailPerPackageMinToman !== undefined
+                    ? `${tomanRange(estimate.retailPerPackageMinToman, estimate.retailPerPackageMaxToman, locale)} ${fa ? "تومان" : "Toman"}`
+                    : `${toman(estimate?.retailPerPackageToman, locale)}${estimate?.retailPerPackageToman !== undefined ? ` ${fa ? "تومان" : "Toman"}` : ""}`}</b></div>
+                  <div><small>{fa ? "خرده‌فروشی / ۳۰ روز" : "Retail / 30 days"}</small><b>{estimate?.retail30DaysMinToman !== undefined
+                    ? `${tomanRange(estimate.retail30DaysMinToman, estimate.retail30DaysMaxToman, locale)} ${fa ? "تومان" : "Toman"}`
+                    : `${toman(estimate?.retail30DaysToman, locale)}${estimate?.retail30DaysToman !== undefined ? ` ${fa ? "تومان" : "Toman"}` : ""}`}</b></div>
                   <div><small>{fa ? "پرداخت بیمار / ۳۰ روز" : "Patient / 30 days"}</small><b>{toman(estimate?.patient30DaysToman, locale)} {estimate?.patient30DaysToman !== undefined ? (fa ? "تومان" : "Toman") : ""}</b></div>
                   <div><small>{fa ? "سهم بیمه / ۳۰ روز" : "Insurer / 30 days"}</small><b>{toman(estimate?.insurer30DaysToman, locale)} {estimate?.insurer30DaysToman !== undefined ? (fa ? "تومان" : "Toman") : ""}</b></div>
                 </div>

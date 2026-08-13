@@ -8,6 +8,9 @@ interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   SESSION_SECRET: string;
+  AI_CONFIG_KV: KVNamespace;
+  AI_CONFIG_MASTER_KEY: string;
+  AI_RUNTIME_SHARED_SECRET: string;
 }
 
 interface OAuthState {
@@ -116,7 +119,7 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
   return origin === env.ADMIN_ORIGIN ? {
     "access-control-allow-origin": origin,
     "access-control-allow-headers": "authorization, content-type",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "access-control-max-age": "86400",
     vary: "Origin"
   } : {};
@@ -278,6 +281,754 @@ function utf8Base64(value: string) {
   return encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=");
 }
 
+type AiProvider = "workers_ai" | "openai_compatible";
+type AiRole = "primary" | "fallback" | "compare";
+type AiReasoningEffort = "none" | "low" | "medium" | "high";
+
+interface AiModelConfig {
+  id: string;
+  name: string;
+  provider: AiProvider;
+  enabled: boolean;
+  role: AiRole;
+  priority: number;
+  accountId?: string;
+  gatewayId?: string;
+  baseUrl?: string;
+  modelId: string;
+  reasoningEffort: AiReasoningEffort;
+  maxCompletionTokens: number;
+  timeoutMs: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AiModelPublic extends AiModelConfig {
+  tokenConfigured: boolean;
+}
+
+const AI_MODELS_KEY = "ai:models:v1";
+const AI_SECRET_PREFIX = "ai:secret:v1:";
+
+function validPublicHttpsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.toLocaleLowerCase();
+    if (
+      host === "localhost" ||
+      host === "::1" ||
+      host.endsWith(".local") ||
+      host.startsWith("127.") ||
+      host.startsWith("10.") ||
+      host.startsWith("192.168.") ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+      host === "0.0.0.0"
+    ) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validAiModel(config: AiModelConfig) {
+  if (!/^[a-z0-9][a-z0-9_-]{2,79}$/i.test(config.id)) return false;
+  if (!config.name || config.name.length > 120) return false;
+  if (!["workers_ai", "openai_compatible"].includes(config.provider)) return false;
+  if (!["primary", "fallback", "compare"].includes(config.role)) return false;
+  if (!["none", "low", "medium", "high"].includes(config.reasoningEffort)) return false;
+  if (!Number.isSafeInteger(config.priority) || config.priority < 1 || config.priority > 99) return false;
+  if (!Number.isSafeInteger(config.maxCompletionTokens) || config.maxCompletionTokens < 64 || config.maxCompletionTokens > 8192) return false;
+  if (!Number.isSafeInteger(config.timeoutMs) || config.timeoutMs < 5_000 || config.timeoutMs > 120_000) return false;
+  if (!config.modelId || config.modelId.length > 240) return false;
+  if (config.provider === "workers_ai") {
+    if (!config.accountId || !/^[a-f0-9]{32}$/i.test(config.accountId)) return false;
+    if (config.gatewayId && !/^[a-z0-9][a-z0-9_-]{1,79}$/i.test(config.gatewayId)) return false;
+  }
+  if (config.provider === "openai_compatible") {
+    if (!config.baseUrl || !validPublicHttpsUrl(config.baseUrl)) return false;
+  }
+  return true;
+}
+
+async function aiEncryptionKey(secret: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`GLYMIZE-AI-CONFIG:${secret}`)
+  );
+  return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function encryptAiToken(token: string, masterSecret: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await aiEncryptionKey(masterSecret);
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(token)
+  ));
+  const packed = new Uint8Array(iv.length + ciphertext.length);
+  packed.set(iv);
+  packed.set(ciphertext, iv.length);
+  return base64UrlEncode(packed);
+}
+
+async function decryptAiToken(value: string, masterSecret: string) {
+  try {
+    const packed = base64UrlDecode(value);
+    if (packed.length < 29) return null;
+    const iv = packed.slice(0, 12);
+    const ciphertext = packed.slice(12);
+    const key = await aiEncryptionKey(masterSecret);
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+    return new TextDecoder().decode(plaintext);
+  } catch {
+    return null;
+  }
+}
+
+async function readAiModels(env: Env): Promise<AiModelConfig[]> {
+  const raw = await env.AI_CONFIG_KV.get(AI_MODELS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is AiModelConfig => Boolean(item) && typeof item === "object" && validAiModel(item as AiModelConfig));
+  } catch {
+    return [];
+  }
+}
+
+async function writeAiModels(env: Env, models: AiModelConfig[]) {
+  await env.AI_CONFIG_KV.put(AI_MODELS_KEY, JSON.stringify(models));
+}
+
+async function publicAiModel(env: Env, model: AiModelConfig): Promise<AiModelPublic> {
+  const tokenConfigured = Boolean(await env.AI_CONFIG_KV.get(`${AI_SECRET_PREFIX}${model.id}`));
+  return { ...model, tokenConfigured };
+}
+
+async function listAiModels(env: Env) {
+  const models = await readAiModels(env);
+  return Promise.all(models.sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name)).map((model) => publicAiModel(env, model)));
+}
+
+function aiModelFromInput(value: unknown, existing?: AiModelConfig): { model: AiModelConfig; token?: string } | null {
+  if (!value || typeof value !== "object") return null;
+  const body = value as Record<string, unknown>;
+  const now = new Date().toISOString();
+  const id = existing?.id ?? (typeof body.id === "string" && /^[a-z0-9][a-z0-9_-]{2,79}$/i.test(body.id)
+    ? body.id
+    : `ai-${crypto.randomUUID()}`);
+  const provider = String(body.provider ?? existing?.provider ?? "workers_ai") as AiProvider;
+  const model: AiModelConfig = {
+    id,
+    name: String(body.name ?? existing?.name ?? "AI model").trim(),
+    provider,
+    enabled: body.enabled === undefined ? existing?.enabled ?? true : Boolean(body.enabled),
+    role: String(body.role ?? existing?.role ?? "fallback") as AiRole,
+    priority: Number(body.priority ?? existing?.priority ?? 1),
+    accountId: String(body.accountId ?? existing?.accountId ?? "").trim() || undefined,
+    gatewayId: String(body.gatewayId ?? existing?.gatewayId ?? "").trim() || undefined,
+    baseUrl: String(body.baseUrl ?? existing?.baseUrl ?? "").trim().replace(/\/$/, "") || undefined,
+    modelId: String(body.modelId ?? existing?.modelId ?? "").trim(),
+    reasoningEffort: String(body.reasoningEffort ?? existing?.reasoningEffort ?? "low") as AiReasoningEffort,
+    maxCompletionTokens: Number(body.maxCompletionTokens ?? existing?.maxCompletionTokens ?? 1000),
+    timeoutMs: Number(body.timeoutMs ?? existing?.timeoutMs ?? 45_000),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+  if (!validAiModel(model)) return null;
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  if (token.length > 4096) return null;
+  return { model, ...(token ? { token } : {}) };
+}
+
+async function saveAiModel(request: Request, env: Env, modelId?: string) {
+  const raw = await request.text();
+  if (raw.length > 20_000) return json(request, env, { error: "ai_config_too_large" }, 413);
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return json(request, env, { error: "invalid_json" }, 400);
+  }
+  const models = await readAiModels(env);
+  const existing = modelId ? models.find((item) => item.id === modelId) : undefined;
+  if (modelId && !existing) return json(request, env, { error: "ai_model_not_found" }, 404);
+  if (!modelId && models.length >= 12) return json(request, env, { error: "ai_model_limit_reached" }, 409);
+  const parsed = aiModelFromInput(body, existing);
+  if (!parsed) return json(request, env, { error: "invalid_ai_model" }, 422);
+
+  const nextModels = existing
+    ? models.map((item) => item.id === existing.id ? parsed.model : item)
+    : [...models, parsed.model];
+
+  await writeAiModels(env, nextModels);
+  if (parsed.token) {
+    const encrypted = await encryptAiToken(parsed.token, env.AI_CONFIG_MASTER_KEY);
+    await env.AI_CONFIG_KV.put(`${AI_SECRET_PREFIX}${parsed.model.id}`, encrypted);
+  }
+  return json(request, env, await publicAiModel(env, parsed.model), existing ? 200 : 201);
+}
+
+async function deleteAiModel(request: Request, env: Env, modelId: string) {
+  const models = await readAiModels(env);
+  if (!models.some((item) => item.id === modelId)) return json(request, env, { error: "ai_model_not_found" }, 404);
+  await writeAiModels(env, models.filter((item) => item.id !== modelId));
+  await env.AI_CONFIG_KV.delete(`${AI_SECRET_PREFIX}${modelId}`);
+  return json(request, env, { deleted: true });
+}
+
+async function loadAiToken(env: Env, modelId: string) {
+  const encrypted = await env.AI_CONFIG_KV.get(`${AI_SECRET_PREFIX}${modelId}`);
+  if (!encrypted) return null;
+  return decryptAiToken(encrypted, env.AI_CONFIG_MASTER_KEY);
+}
+
+interface AiChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+function validAiMessages(value: unknown): value is AiChatMessage[] {
+  return Array.isArray(value) &&
+    value.length >= 1 &&
+    value.length <= 24 &&
+    value.every((message) =>
+      message &&
+      typeof message === "object" &&
+      ["system", "user", "assistant"].includes(String((message as Record<string, unknown>).role)) &&
+      typeof (message as Record<string, unknown>).content === "string" &&
+      String((message as Record<string, unknown>).content).length <= 40_000
+    );
+}
+
+async function invokeAiModel(
+  config: AiModelConfig,
+  token: string,
+  messages: AiChatMessage[],
+  overrides?: { temperature?: number; maxCompletionTokens?: number }
+) {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const endpoint = config.provider === "workers_ai"
+      ? `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/v1/chat/completions`
+      : `${config.baseUrl}/chat/completions`;
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json"
+    };
+    if (config.provider === "workers_ai") {
+      if (config.gatewayId) headers["cf-aig-gateway-id"] = config.gatewayId;
+      headers["cf-aig-collect-log-payload"] = "false";
+    }
+    const requestedMax = overrides?.maxCompletionTokens;
+    const maxCompletionTokens = requestedMax
+      ? Math.max(64, Math.min(requestedMax, config.maxCompletionTokens))
+      : config.maxCompletionTokens;
+    const body: Record<string, unknown> = {
+      model: config.modelId,
+      messages,
+      temperature: typeof overrides?.temperature === "number" ? Math.max(0, Math.min(overrides.temperature, 1)) : 0.1,
+      max_completion_tokens: maxCompletionTokens
+    };
+    if (config.reasoningEffort !== "none") body.reasoning_effort = config.reasoningEffort;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(() => null) as {
+      choices?: Array<{ message?: { content?: string | null }; finish_reason?: string | null }>;
+      usage?: Record<string, unknown>;
+      error?: unknown;
+    } | null;
+    const content = payload?.choices?.[0]?.message?.content?.trim() ?? "";
+    return {
+      ok: response.ok && Boolean(content),
+      httpStatus: response.status,
+      latencyMs: Date.now() - startedAt,
+      content,
+      finishReason: payload?.choices?.[0]?.finish_reason ?? null,
+      usage: payload?.usage ?? null
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      httpStatus: 0,
+      latencyMs: Date.now() - startedAt,
+      content: "",
+      finishReason: null,
+      usage: null,
+      error: error instanceof Error ? error.name : "ai_request_failed"
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function testAiModel(request: Request, env: Env, modelId: string) {
+  const models = await readAiModels(env);
+  const model = models.find((item) => item.id === modelId);
+  if (!model) return json(request, env, { error: "ai_model_not_found" }, 404);
+  const token = await loadAiToken(env, model.id);
+  if (!token) return json(request, env, { error: "ai_token_not_configured" }, 409);
+  const result = await invokeAiModel(model, token, [
+    { role: "system", content: "This is a connectivity health check. Return only OK." },
+    { role: "user", content: "OK" }
+  ], { temperature: 0, maxCompletionTokens: Math.min(model.maxCompletionTokens, 1200) });
+  return json(request, env, {
+    healthy: result.ok,
+    modelId: model.id,
+    provider: model.provider,
+    configuredModel: model.modelId,
+    httpStatus: result.httpStatus,
+    latencyMs: result.latencyMs,
+    usage: result.usage
+  }, result.ok ? 200 : 502);
+}
+
+async function secureSecretEqual(left: string, right: string) {
+  if (!left || !right) return false;
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(left)),
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(right))
+  ]);
+  const av = new Uint8Array(a);
+  const bv = new Uint8Array(b);
+  let diff = 0;
+  for (let index = 0; index < av.length; index += 1) diff |= av[index]! ^ bv[index]!;
+  return diff === 0;
+}
+
+async function runtimeAiChat(request: Request, env: Env) {
+  const suppliedSecret = bearerToken(request);
+  if (!(await secureSecretEqual(suppliedSecret, env.AI_RUNTIME_SHARED_SECRET))) {
+    return json(request, env, { error: "ai_runtime_auth_required" }, 401);
+  }
+  const raw = await request.text();
+  if (raw.length > 150_000) return json(request, env, { error: "ai_request_too_large" }, 413);
+  let body: { messages?: unknown; temperature?: unknown; max_completion_tokens?: unknown };
+  try {
+    body = JSON.parse(raw) as typeof body;
+  } catch {
+    return json(request, env, { error: "invalid_json" }, 400);
+  }
+  if (!validAiMessages(body.messages)) return json(request, env, { error: "invalid_ai_messages" }, 422);
+  const temperature = typeof body.temperature === "number" ? body.temperature : 0.1;
+  const maxCompletionTokens = typeof body.max_completion_tokens === "number"
+    ? Math.floor(body.max_completion_tokens)
+    : undefined;
+
+  const models = (await readAiModels(env))
+    .filter((model) => model.enabled && model.role !== "compare")
+    .sort((a, b) => {
+      const roleRank = (value: AiRole) => value === "primary" ? 0 : value === "fallback" ? 1 : 2;
+      return roleRank(a.role) - roleRank(b.role) || a.priority - b.priority;
+    });
+
+  for (const model of models) {
+    const token = await loadAiToken(env, model.id);
+    if (!token) continue;
+    const result = await invokeAiModel(model, token, body.messages, { temperature, maxCompletionTokens });
+    if (!result.ok) continue;
+    return json(request, env, {
+      id: `glymize-ai-${crypto.randomUUID()}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model: model.modelId,
+      provider: model.provider,
+      selectedModelId: model.id,
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: result.content },
+        finish_reason: result.finishReason ?? "stop"
+      }],
+      usage: result.usage
+    });
+  }
+  return json(request, env, { error: "all_ai_backends_failed" }, 502);
+}
+
+
+type CommunicationsSmsConfig = {
+  provider: "sms_ir";
+  enabled: boolean;
+  registrationOtp: boolean;
+  loginOtp: boolean;
+  passwordReset: boolean;
+  assistantInvitation: boolean;
+  lineNumber: string;
+  otpTemplateId?: number;
+  otpParameterName: string;
+};
+
+type CommunicationsEmailConfig = {
+  provider: "resend";
+  enabled: boolean;
+  registrationVerification: boolean;
+  passwordReset: boolean;
+  assistantInvitation: boolean;
+  fromAddress: string;
+};
+
+type CommunicationsConfig = {
+  version: 1;
+  sms: CommunicationsSmsConfig;
+  email: CommunicationsEmailConfig;
+  updatedAt: string;
+};
+
+const COMMUNICATIONS_CONFIG_KEY = "communications:config:v1";
+const COMMUNICATIONS_SMS_SECRET_KEY = "communications:secret:v1:sms_ir";
+const COMMUNICATIONS_EMAIL_SECRET_KEY = "communications:secret:v1:resend";
+
+function defaultCommunicationsConfig(): CommunicationsConfig {
+  return {
+    version: 1,
+    sms: {
+      provider: "sms_ir",
+      enabled: false,
+      registrationOtp: false,
+      loginOtp: false,
+      passwordReset: false,
+      assistantInvitation: false,
+      lineNumber: "",
+      otpTemplateId: undefined,
+      otpParameterName: "Code"
+    },
+    email: {
+      provider: "resend",
+      enabled: false,
+      registrationVerification: false,
+      passwordReset: false,
+      assistantInvitation: false,
+      fromAddress: "GLYMIZE <info@glymize.ir>"
+    },
+    updatedAt: new Date(0).toISOString()
+  };
+}
+
+async function communicationsEncryptionKey(masterSecret: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`GLYMIZE-COMMUNICATIONS-CONFIG:${masterSecret}`)
+  );
+  return crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function encryptCommunicationsSecret(value: string, masterSecret: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await communicationsEncryptionKey(masterSecret);
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(value)
+  ));
+  const packed = new Uint8Array(iv.length + ciphertext.length);
+  packed.set(iv);
+  packed.set(ciphertext, iv.length);
+  return base64UrlEncode(packed);
+}
+
+async function decryptCommunicationsSecret(value: string, masterSecret: string) {
+  try {
+    const packed = base64UrlDecode(value);
+    if (packed.length < 29) return null;
+    const iv = packed.slice(0, 12);
+    const ciphertext = packed.slice(12);
+    const key = await communicationsEncryptionKey(masterSecret);
+    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+    return new TextDecoder().decode(plaintext);
+  } catch {
+    return null;
+  }
+}
+
+async function readCommunicationsConfig(env: Env): Promise<CommunicationsConfig> {
+  const raw = await env.AI_CONFIG_KV.get(COMMUNICATIONS_CONFIG_KEY);
+  if (!raw) return defaultCommunicationsConfig();
+  try {
+    const value = JSON.parse(raw) as Partial<CommunicationsConfig>;
+    if (value.version !== 1 || !value.sms || !value.email) return defaultCommunicationsConfig();
+    return {
+      version: 1,
+      sms: {
+        ...defaultCommunicationsConfig().sms,
+        ...value.sms,
+        provider: "sms_ir"
+      },
+      email: {
+        ...defaultCommunicationsConfig().email,
+        ...value.email,
+        provider: "resend"
+      },
+      updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date(0).toISOString()
+    };
+  } catch {
+    return defaultCommunicationsConfig();
+  }
+}
+
+async function writeCommunicationsConfig(env: Env, config: CommunicationsConfig) {
+  await env.AI_CONFIG_KV.put(COMMUNICATIONS_CONFIG_KEY, JSON.stringify(config));
+}
+
+async function loadCommunicationsSecret(env: Env, key: string) {
+  const encrypted = await env.AI_CONFIG_KV.get(key);
+  if (!encrypted) return null;
+  return decryptCommunicationsSecret(encrypted, env.AI_CONFIG_MASTER_KEY);
+}
+
+async function publicCommunicationsConfig(env: Env, config?: CommunicationsConfig) {
+  const current = config ?? await readCommunicationsConfig(env);
+  const [smsApiKeyConfigured, emailApiKeyConfigured] = await Promise.all([
+    env.AI_CONFIG_KV.get(COMMUNICATIONS_SMS_SECRET_KEY).then(Boolean),
+    env.AI_CONFIG_KV.get(COMMUNICATIONS_EMAIL_SECRET_KEY).then(Boolean)
+  ]);
+  const smsRequired = current.sms.enabled && current.sms.registrationOtp;
+  const emailRequired = current.email.enabled && current.email.registrationVerification;
+  return {
+    ...current,
+    physicianIdentity: {
+      provider: "irimc",
+      required: true,
+      matchMode: "exact",
+      priority: 1,
+      bypassAllowedOnMismatch: false
+    },
+    sms: { ...current.sms, apiKeyConfigured: smsApiKeyConfigured },
+    email: { ...current.email, apiKeyConfigured: emailApiKeyConfigured },
+    effectiveRegistration: {
+      medicalCouncilRequired: true,
+      smsRequired,
+      emailRequired,
+      contactVerificationRequired: smsRequired || emailRequired
+    }
+  };
+}
+
+function validOptionalBoolean(value: unknown) {
+  return value === undefined || typeof value === "boolean";
+}
+
+function validFromAddress(value: string) {
+  return value.length >= 5 && value.length <= 180 && value.includes("@") && !/[\r\n]/.test(value);
+}
+
+async function updateCommunicationsConfig(request: Request, env: Env) {
+  const raw = await request.text();
+  if (raw.length > 20_000) return json(request, env, { error: "communications_config_too_large" }, 413);
+  let body: { sms?: Record<string, unknown>; email?: Record<string, unknown> };
+  try {
+    body = JSON.parse(raw) as typeof body;
+  } catch {
+    return json(request, env, { error: "invalid_json" }, 400);
+  }
+
+  const current = await readCommunicationsConfig(env);
+  const next: CommunicationsConfig = structuredClone(current);
+  const sms = body.sms;
+  if (sms) {
+    for (const key of ["enabled", "registrationOtp", "loginOtp", "passwordReset", "assistantInvitation"] as const) {
+      if (!validOptionalBoolean(sms[key])) return json(request, env, { error: `invalid_sms_${key}` }, 422);
+      if (typeof sms[key] === "boolean") next.sms[key] = sms[key] as boolean;
+    }
+    if (sms.lineNumber !== undefined) {
+      const lineNumber = String(sms.lineNumber).trim();
+      if (lineNumber && !/^\d{5,20}$/.test(lineNumber)) return json(request, env, { error: "invalid_sms_line_number" }, 422);
+      next.sms.lineNumber = lineNumber;
+    }
+    if (sms.otpTemplateId !== undefined) {
+      const templateId = sms.otpTemplateId === null || sms.otpTemplateId === "" ? undefined : Number(sms.otpTemplateId);
+      if (templateId !== undefined && (!Number.isSafeInteger(templateId) || templateId < 1 || templateId > 2_147_483_647)) {
+        return json(request, env, { error: "invalid_sms_otp_template_id" }, 422);
+      }
+      next.sms.otpTemplateId = templateId;
+    }
+    if (sms.otpParameterName !== undefined) {
+      const name = String(sms.otpParameterName).trim();
+      if (!/^[A-Za-z0-9_]{1,50}$/.test(name)) return json(request, env, { error: "invalid_sms_otp_parameter_name" }, 422);
+      next.sms.otpParameterName = name;
+    }
+  }
+
+  const email = body.email;
+  if (email) {
+    for (const key of ["enabled", "registrationVerification", "passwordReset", "assistantInvitation"] as const) {
+      if (!validOptionalBoolean(email[key])) return json(request, env, { error: `invalid_email_${key}` }, 422);
+      if (typeof email[key] === "boolean") next.email[key] = email[key] as boolean;
+    }
+    if (email.fromAddress !== undefined) {
+      const fromAddress = String(email.fromAddress).trim();
+      if (!validFromAddress(fromAddress)) return json(request, env, { error: "invalid_email_from_address" }, 422);
+      next.email.fromAddress = fromAddress;
+    }
+  }
+
+  next.updatedAt = new Date().toISOString();
+  await writeCommunicationsConfig(env, next);
+  return json(request, env, await publicCommunicationsConfig(env, next));
+}
+
+async function saveCommunicationsSecret(request: Request, env: Env, kind: "sms" | "email") {
+  const raw = await request.text();
+  if (raw.length > 10_000) return json(request, env, { error: "secret_payload_too_large" }, 413);
+  let body: { apiKey?: unknown };
+  try {
+    body = JSON.parse(raw) as typeof body;
+  } catch {
+    return json(request, env, { error: "invalid_json" }, 400);
+  }
+  const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+  if (apiKey.length < 12 || apiKey.length > 4096 || /[\r\n]/.test(apiKey)) {
+    return json(request, env, { error: "invalid_api_key" }, 422);
+  }
+  const encrypted = await encryptCommunicationsSecret(apiKey, env.AI_CONFIG_MASTER_KEY);
+  const key = kind === "sms" ? COMMUNICATIONS_SMS_SECRET_KEY : COMMUNICATIONS_EMAIL_SECRET_KEY;
+  await env.AI_CONFIG_KV.put(key, encrypted);
+  return json(request, env, { configured: true, provider: kind === "sms" ? "sms_ir" : "resend" });
+}
+
+async function deleteCommunicationsSecret(request: Request, env: Env, kind: "sms" | "email") {
+  const key = kind === "sms" ? COMMUNICATIONS_SMS_SECRET_KEY : COMMUNICATIONS_EMAIL_SECRET_KEY;
+  await env.AI_CONFIG_KV.delete(key);
+  return json(request, env, { configured: false, provider: kind === "sms" ? "sms_ir" : "resend" });
+}
+
+async function testSmsConnection(request: Request, env: Env) {
+  const apiKey = await loadCommunicationsSecret(env, COMMUNICATIONS_SMS_SECRET_KEY);
+  if (!apiKey) return json(request, env, { error: "sms_api_key_not_configured" }, 409);
+  const startedAt = Date.now();
+  try {
+    const response = await fetch("https://api.sms.ir/v1/credit", {
+      method: "GET",
+      headers: {
+        "X-API-KEY": apiKey,
+        Accept: "application/json"
+      }
+    });
+    const payload = await response.json().catch(() => null) as { data?: unknown; message?: unknown } | null;
+    return json(request, env, {
+      healthy: response.ok,
+      provider: "sms_ir",
+      httpStatus: response.status,
+      latencyMs: Date.now() - startedAt,
+      credit: response.ok ? payload?.data ?? null : null,
+      message: response.ok ? "SMS.ir API reachable." : String(payload?.message ?? "SMS.ir API rejected the request.")
+    }, response.ok ? 200 : 502);
+  } catch {
+    return json(request, env, {
+      healthy: false,
+      provider: "sms_ir",
+      httpStatus: 0,
+      latencyMs: Date.now() - startedAt,
+      error: "sms_connection_failed"
+    }, 502);
+  }
+}
+
+function normalizeIranMobile(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (/^09\d{9}$/.test(digits)) return digits;
+  if (/^989\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
+  if (/^00989\d{9}$/.test(digits)) return `0${digits.slice(4)}`;
+  return null;
+}
+
+function randomSixDigitCode() {
+  const bytes = crypto.getRandomValues(new Uint32Array(1));
+  return String(100000 + (bytes[0]! % 900000));
+}
+
+async function sendTestSms(request: Request, env: Env) {
+  const apiKey = await loadCommunicationsSecret(env, COMMUNICATIONS_SMS_SECRET_KEY);
+  if (!apiKey) return json(request, env, { error: "sms_api_key_not_configured" }, 409);
+  const config = await readCommunicationsConfig(env);
+  if (!config.sms.otpTemplateId) return json(request, env, { error: "sms_otp_template_not_configured" }, 409);
+
+  let body: { mobile?: unknown };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json(request, env, { error: "invalid_json" }, 400);
+  }
+  const mobile = normalizeIranMobile(String(body.mobile ?? ""));
+  if (!mobile) return json(request, env, { error: "invalid_iran_mobile" }, 422);
+
+  const response = await fetch("https://api.sms.ir/v1/send/verify/", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      mobile,
+      templateId: config.sms.otpTemplateId,
+      parameters: [{
+        name: config.sms.otpParameterName,
+        value: randomSixDigitCode()
+      }]
+    })
+  });
+  const payload = await response.json().catch(() => null) as { data?: unknown; message?: unknown } | null;
+  if (!response.ok) {
+    return json(request, env, { error: "sms_test_send_failed", httpStatus: response.status, message: payload?.message ?? null }, 502);
+  }
+  return json(request, env, { sent: true, provider: "sms_ir", mobile, result: payload?.data ?? null });
+}
+
+function validEmailRecipient(value: string) {
+  return value.length <= 180 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+async function sendTestEmail(request: Request, env: Env) {
+  const apiKey = await loadCommunicationsSecret(env, COMMUNICATIONS_EMAIL_SECRET_KEY);
+  if (!apiKey) return json(request, env, { error: "email_api_key_not_configured" }, 409);
+  const config = await readCommunicationsConfig(env);
+
+  let body: { to?: unknown };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json(request, env, { error: "invalid_json" }, 400);
+  }
+  const to = String(body.to ?? "").trim();
+  if (!validEmailRecipient(to)) return json(request, env, { error: "invalid_email_recipient" }, 422);
+
+  const idempotencyKey = `glymize-admin-test-${crypto.randomUUID()}`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "User-Agent": "GLYMIZE-Admin-Worker/1.0",
+      "Idempotency-Key": idempotencyKey
+    },
+    body: JSON.stringify({
+      from: config.email.fromAddress,
+      to: [to],
+      subject: "GLYMIZE · Email API test",
+      text: `GLYMIZE email provider test succeeded at ${new Date().toISOString()}.`
+    })
+  });
+  const payload = await response.json().catch(() => null) as { id?: string; message?: string; name?: string } | null;
+  if (!response.ok || !payload?.id) {
+    return json(request, env, {
+      error: "email_test_send_failed",
+      httpStatus: response.status,
+      message: payload?.message ?? payload?.name ?? null
+    }, 502);
+  }
+  return json(request, env, { sent: true, provider: "resend", to, id: payload.id });
+}
+
 async function startAuthentication(request: Request, env: Env) {
   const url = new URL(request.url);
   const returnTo = validatedReturnTo(url.searchParams.get("return_to"), env);
@@ -407,14 +1158,60 @@ export default {
     }
     if (request.method === "GET" && url.pathname === "/auth/start") return startAuthentication(request, env);
     if (request.method === "GET" && url.pathname === "/auth/callback") return completeAuthentication(request, env);
+    if (request.method === "POST" && url.pathname === "/ai/runtime/chat/completions") {
+      return runtimeAiChat(request, env);
+    }
 
     const session = await requireAdmin(request, env);
     if (!session) return json(request, env, { error: "admin_auth_required" }, 401);
     if (request.method === "GET" && url.pathname === "/session") {
       return json(request, env, { login: session.login, expiresAt: new Date(session.expiresAt).toISOString() });
     }
+    if (request.method === "GET" && url.pathname === "/communications/config") {
+      return json(request, env, await publicCommunicationsConfig(env));
+    }
+    if (request.method === "PATCH" && url.pathname === "/communications/config") {
+      return updateCommunicationsConfig(request, env);
+    }
+    if (request.method === "POST" && url.pathname === "/communications/sms/secret") {
+      return saveCommunicationsSecret(request, env, "sms");
+    }
+    if (request.method === "DELETE" && url.pathname === "/communications/sms/secret") {
+      return deleteCommunicationsSecret(request, env, "sms");
+    }
+    if (request.method === "POST" && url.pathname === "/communications/sms/test") {
+      return testSmsConnection(request, env);
+    }
+    if (request.method === "POST" && url.pathname === "/communications/sms/send-test") {
+      return sendTestSms(request, env);
+    }
+    if (request.method === "POST" && url.pathname === "/communications/email/secret") {
+      return saveCommunicationsSecret(request, env, "email");
+    }
+    if (request.method === "DELETE" && url.pathname === "/communications/email/secret") {
+      return deleteCommunicationsSecret(request, env, "email");
+    }
+    if (request.method === "POST" && url.pathname === "/communications/email/send-test") {
+      return sendTestEmail(request, env);
+    }
     if (request.method === "POST" && url.pathname === "/catalog/publish") {
       return publishCatalog(request, env, session);
+    }
+    if (request.method === "GET" && url.pathname === "/ai/models") {
+      return json(request, env, await listAiModels(env));
+    }
+    if (request.method === "POST" && url.pathname === "/ai/models") {
+      return saveAiModel(request, env);
+    }
+    const aiTestMatch = url.pathname.match(/^\/ai\/models\/([^/]+)\/test$/);
+    if (request.method === "POST" && aiTestMatch) {
+      return testAiModel(request, env, decodeURIComponent(aiTestMatch[1]!));
+    }
+    const aiModelMatch = url.pathname.match(/^\/ai\/models\/([^/]+)$/);
+    if (aiModelMatch) {
+      const modelId = decodeURIComponent(aiModelMatch[1]!);
+      if (request.method === "PATCH") return saveAiModel(request, env, modelId);
+      if (request.method === "DELETE") return deleteAiModel(request, env, modelId);
     }
     return json(request, env, { error: "not_found" }, 404);
   }

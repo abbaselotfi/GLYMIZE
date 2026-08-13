@@ -14,3 +14,8 @@ __pycache__/
 tools/iran-drug-runner/input/
 tools/iran-drug-runner/runs/
 tools/iran-drug-runner/output/
+
+# GLYMIZE local patient-handoff preview data / secrets
+apps/api/.local-data/
+.glymize-local-secrets.ps1
+.local-patch-backups/

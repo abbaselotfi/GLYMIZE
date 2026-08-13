@@ -1,5 +1,5 @@
-import FutureWorkspace from "../components/future-workspace";
+import InsulinToolsClient from "./insulin-tools-client";
 
 export default function InsulinToolsPage() {
-  return <FutureWorkspace kind="insulin" />;
+  return <InsulinToolsClient />;
 }

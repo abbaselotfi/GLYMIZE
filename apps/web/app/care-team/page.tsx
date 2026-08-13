@@ -1,5 +1,5 @@
-import FutureWorkspace from "../components/future-workspace";
+import CareTeamClient from "./care-team-client";
 
 export default function CareTeamPage() {
-  return <FutureWorkspace kind="care_team" />;
+  return <CareTeamClient />;
 }

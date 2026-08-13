@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 import { withBasePath } from "../lib/base-path";
 import AppShell from "./components/app-shell";
@@ -9,8 +9,7 @@ import "./dark-readability.css";
 
 export const metadata: Metadata = {
   title: "GLYMIZE | Diabetes Prescribing Intelligence",
-  description:
-    "A bilingual clinical decision-support platform for diabetes prescribing.",
+  description: "A bilingual clinical decision-support platform for diabetes prescribing.",
   manifest: withBasePath("/manifest.webmanifest"),
   appleWebApp: {
     capable: true,
@@ -24,9 +23,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f8fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d1719" },
+  ],
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="fa" dir="rtl" data-glymize-theme="clinical" data-glymize-mode="light">
       <body>

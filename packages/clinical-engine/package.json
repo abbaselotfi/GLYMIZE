@@ -12,6 +12,14 @@
     "./scenario-engine": {
       "types": "./dist/scenario-engine.d.ts",
       "default": "./dist/scenario-engine.js"
+    },
+    "./insulin-conversion": {
+      "types": "./dist/insulin-conversion.d.ts",
+      "default": "./dist/insulin-conversion.js"
+    },
+    "./lab-text-parser": {
+      "types": "./dist/lab-text-parser.d.ts",
+      "default": "./dist/lab-text-parser.js"
     }
   },
   "scripts": {

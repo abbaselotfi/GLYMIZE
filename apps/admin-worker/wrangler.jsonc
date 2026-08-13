@@ -1,21 +1,30 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "shiny-block-9d4a",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-07-29",
-  "vars": {
-    "ADMIN_ORIGIN": "https://abbaselotfi.github.io",
-    "ADMIN_PATH_PREFIX": "/GLYMIZE/admin",
-    "ALLOWED_GITHUB_LOGIN": "abbaselotfi",
-    "GITHUB_REPOSITORY": "abbaselotfi/GLYMIZE",
-    "GITHUB_BRANCH": "main",
-    "CATALOG_PATH": "apps/web/public/data/admin-catalog.json"
-  },
-  "secrets": {
-    "required": [
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "shiny-block-9d4a",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-07-29",
+	"vars": {
+		"ADMIN_ORIGIN": "https://abbaselotfi.github.io",
+		"ADMIN_PATH_PREFIX": "/GLYMIZE/admin",
+		"ALLOWED_GITHUB_LOGIN": "abbaselotfi",
+		"GITHUB_REPOSITORY": "abbaselotfi/GLYMIZE",
+		"GITHUB_BRANCH": "main",
+		"CATALOG_PATH": "apps/web/public/data/admin-catalog.json"
+	},
+	"secrets": {
+		"required": [
       "GITHUB_CLIENT_ID",
       "GITHUB_CLIENT_SECRET",
-      "SESSION_SECRET"
+      "SESSION_SECRET",
+      "AI_CONFIG_MASTER_KEY",
+      "AI_RUNTIME_SHARED_SECRET"
     ]
-  }
+	},
+	"kv_namespaces": [
+		{
+			"binding": "AI_CONFIG_KV",
+			"id": "3af3075ba52e4c0ea3f6a0035d35e97b",
+			"remote": true
+		}
+	]
 }

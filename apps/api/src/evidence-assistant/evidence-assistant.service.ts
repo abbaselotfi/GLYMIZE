@@ -241,7 +241,7 @@ export class EvidenceAssistantService {
       body: JSON.stringify({
         model,
         temperature: 0.1,
-        max_tokens: 700,
+        max_completion_tokens: 1000,
         messages: [
           { role: "system", content: system },
           { role: "user", content: `Clinician question: ${input.question}\n\nApproved evidence:\n${evidenceText}` },

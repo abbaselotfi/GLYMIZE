@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
 allowBuilds:
+  tesseract.js: false
   esbuild: true
   sharp: true
   workerd: true

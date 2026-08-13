@@ -3,13 +3,15 @@ import type {
   InsuranceCoverage,
   InsuranceProvider,
   MedicationPrice,
+  MedicationPriceRange,
   Type2AssessmentResult,
   Type2ConsiderationRequest,
   Type2MedicationConsideration,
 } from "@glymize/contracts";
 
 export type Type2ScenarioKind = "clinical_best" | "access_balanced" | "alternative" | "maintain_monitor";
-export type Type2MonthlyCostStatus = "calculated" | "per_package_only" | "price_missing" | "dose_or_pack_missing";
+export type Type2ScenarioSortMode = "balanced" | "clinical" | "patient_cost" | "insurance_access";
+export type Type2MonthlyCostStatus = "calculated" | "calculated_range" | "retail_only" | "per_package_only" | "price_missing" | "dose_or_pack_missing";
 
 export interface Type2CostingPlan {
   dailyUnits?: number;
@@ -21,10 +23,15 @@ export interface Type2MonthlyCostEstimate {
   status: Type2MonthlyCostStatus;
   days: 30;
   retailPerPackageToman?: number;
+  retailPerPackageMinToman?: number;
+  retailPerPackageMedianToman?: number;
+  retailPerPackageMaxToman?: number;
   patientPerPackageToman?: number;
   insurerPerPackageToman?: number;
   packagesFor30Days?: number;
   retail30DaysToman?: number;
+  retail30DaysMinToman?: number;
+  retail30DaysMaxToman?: number;
   patient30DaysToman?: number;
   insurer30DaysToman?: number;
   coveragePercent?: number;
@@ -57,6 +64,7 @@ export interface Type2ScenarioBuildInput {
   request: Type2ConsiderationRequest;
   insuranceProvider?: InsuranceProvider;
   costingPlansByMedicationId?: Record<string, Type2CostingPlan>;
+  sortMode?: Type2ScenarioSortMode;
   maxScenarios?: 1 | 2 | 3;
 }
 
@@ -150,32 +158,88 @@ function effectiveRetailPrice(price?: MedicationPrice) {
  */
 export function estimateType2Medication30DayCost(input: {
   price?: MedicationPrice;
+  priceRange?: MedicationPriceRange;
   coverages?: InsuranceCoverage[];
   insuranceProvider?: InsuranceProvider;
   plan?: Type2CostingPlan;
 }): Type2MonthlyCostEstimate {
   const retail = effectiveRetailPrice(input.price);
+  const range = retail === undefined ? input.priceRange : undefined;
   const coverage = input.insuranceProvider
-    ? (input.coverages ?? []).find((entry) => entry.provider === input.insuranceProvider)
+    ? (input.coverages ?? []).find((entry) => entry.provider === input.insuranceProvider && entry.runtimeEligibleForRanking !== false)
     : undefined;
 
-  if (retail === undefined) {
+  if (retail === undefined && !range) {
     return {
       status: "price_missing",
       days: 30,
       insuranceProvider: input.insuranceProvider,
       coveragePercent: coverage?.percent,
-      calculationBasis: "قیمت معتبر برای این فرآورده ثبت نشده است؛ هزینه ماهانه محاسبه نشد.",
+      calculationBasis: "قیمت معتبر NFI برای این فرآورده ثبت نشده است؛ هزینه ماهانه محاسبه نشد.",
     };
   }
 
-  const patientPerPackage = coverage?.patientShareToman ?? Math.max(0, Math.round(retail * (1 - (coverage?.percent ?? 0) / 100)));
-  const insurerPerPackage = coverage?.insurerShareToman ?? Math.max(0, retail - patientPerPackage);
+  if (range) {
+    const base = {
+      days: 30 as const,
+      retailPerPackageMinToman: range.minToman,
+      retailPerPackageMedianToman: range.medianToman,
+      retailPerPackageMaxToman: range.maxToman,
+      coveragePercent: coverage?.percent,
+      insuranceProvider: input.insuranceProvider,
+    };
+    if (range.costComparable === false) {
+      return {
+        ...base,
+        status: "per_package_only",
+        calculationBasis: "این بازه برای نمایش قیمت بازار ژنریک است و چند Presentation متفاوت را پوشش می‌دهد؛ برای محاسبه ۳۰روزه باید فرآورده/قدرت/بسته مشخص شود.",
+      };
+    }
+    const dailyUnits = input.plan?.dailyUnits;
+    const unitsPerPackage = input.plan?.unitsPerPackage;
+    if (!(dailyUnits && dailyUnits > 0 && unitsPerPackage && unitsPerPackage > 0)) {
+      return {
+        ...base,
+        status: input.plan ? "dose_or_pack_missing" : "per_package_only",
+        calculationBasis: `بازه قیمت از ${range.productCount} فرآورده NFI قابل‌مقایسه ساخته شده است؛ برای هزینه ۳۰روزه دوز/واحد روزانه و تعداد واحد در بسته لازم است.`,
+      };
+    }
+    const packages = Math.ceil((dailyUnits * 30) / unitsPerPackage);
+    return {
+      ...base,
+      status: "calculated_range",
+      packagesFor30Days: packages,
+      retail30DaysMinToman: packages * range.minToman,
+      retail30DaysMaxToman: packages * range.maxToman,
+      calculationBasis: "هزینه خرده‌فروشی ۳۰روزه به‌صورت بازه از قیمت فرآورده‌های NFI محاسبه شده است؛ سهم دقیق بیمار نیازمند انتخاب فرآورده و تعرفه/سهم ریالی معتبر بیمه است.",
+    };
+  }
+
+  const financial = (() => {
+    if (!coverage || coverage.percent <= 0) {
+      return { patient: retail!, insurer: 0, exact: true, basis: "بدون پوشش مثبت برای بیمه انتخاب‌شده؛ هزینه بیمار برابر قیمت خرده‌فروشی در نظر گرفته شد." };
+    }
+    if (coverage.patientShareToman !== undefined) {
+      const patient = Math.max(0, coverage.patientShareToman);
+      const insurer = coverage.insurerShareToman ?? Math.max(0, retail! - patient);
+      return { patient, insurer, exact: true, basis: "سهم ریالی بیمار/سازمان از داده بیمه استفاده شد." };
+    }
+    if (coverage.insurerShareToman !== undefined) {
+      const insurer = Math.max(0, coverage.insurerShareToman);
+      return { patient: Math.max(0, retail! - insurer), insurer, exact: true, basis: "سهم ریالی سازمان از داده بیمه استفاده شد." };
+    }
+    if (coverage.referencePriceToman !== undefined) {
+      const insurer = Math.max(0, Math.round(coverage.referencePriceToman * coverage.percent / 100));
+      return { patient: Math.max(0, retail! - insurer), insurer, exact: true, basis: "سهم سازمان از درصد پوشش × تعرفه مرجع بیمه محاسبه شد." };
+    }
+    return { patient: undefined, insurer: undefined, exact: false, basis: "فقط درصد پوشش موجود است؛ بدون تعرفه مرجع یا سهم ریالی، مبلغ بیمار/بیمه ساخته نمی‌شود." };
+  })();
+
   const base = {
     days: 30 as const,
     retailPerPackageToman: retail,
-    patientPerPackageToman: patientPerPackage,
-    insurerPerPackageToman: insurerPerPackage,
+    patientPerPackageToman: financial.patient,
+    insurerPerPackageToman: financial.insurer,
     coveragePercent: coverage?.percent,
     insuranceProvider: input.insuranceProvider,
   };
@@ -184,7 +248,7 @@ export function estimateType2Medication30DayCost(input: {
     return {
       ...base,
       status: "per_package_only",
-      calculationBasis: "قیمت و سهم بیمه برای هر بسته مشخص است؛ برای هزینه ۳۰روزه، دوز/واحد روزانه و تعداد واحد در بسته لازم است.",
+      calculationBasis: `${financial.basis} برای هزینه ۳۰روزه، دوز/واحد روزانه و تعداد واحد در بسته لازم است.`,
     };
   }
 
@@ -201,12 +265,12 @@ export function estimateType2Medication30DayCost(input: {
   const packages = Math.ceil((dailyUnits * 30) / unitsPerPackage);
   return {
     ...base,
-    status: "calculated",
+    status: financial.exact ? "calculated" : "retail_only",
     packagesFor30Days: packages,
-    retail30DaysToman: packages * retail,
-    patient30DaysToman: packages * patientPerPackage,
-    insurer30DaysToman: packages * insurerPerPackage,
-    calculationBasis: `${dailyUnits} ${input.plan.unitLabel ?? "واحد"}/روز × ۳۰ روز ÷ ${unitsPerPackage} ${input.plan.unitLabel ?? "واحد"}/بسته؛ تعداد بسته رو به بالا گرد شده است.`,
+    retail30DaysToman: packages * retail!,
+    patient30DaysToman: financial.patient === undefined ? undefined : packages * financial.patient,
+    insurer30DaysToman: financial.insurer === undefined ? undefined : packages * financial.insurer,
+    calculationBasis: `${dailyUnits} ${input.plan.unitLabel ?? "واحد"}/روز × ۳۰ روز ÷ ${unitsPerPackage} ${input.plan.unitLabel ?? "واحد"}/بسته؛ ${financial.basis}`,
   };
 }
 
@@ -335,8 +399,8 @@ function makeScenario(
     id: `${kind}:${medications.map((item) => item.cardId ?? item.genericMedicationId).join("+")}`,
     rank,
     kind,
-    titleFa: rank === 1 ? "سناریوی پیشنهادی اول" : rank === 2 ? "سناریوی متعادل علم/دسترسی" : "سناریوی جایگزین",
-    titleEn: rank === 1 ? "Preferred scenario" : rank === 2 ? "Clinical/access balance" : "Alternative scenario",
+    titleFa: kind === "clinical_best" ? "سناریوی با بیشترین تناسب بالینی" : kind === "access_balanced" ? "سناریوی متعادل علم/دسترسی" : "سناریوی جایگزین",
+    titleEn: kind === "clinical_best" ? "Best clinical-fit scenario" : kind === "access_balanced" ? "Clinical/access balance" : "Alternative scenario",
     summaryFa: `${actionFa} ${namesFa}`,
     summaryEn: `${actionEn} ${namesEn}`,
     medicationIds: medications.map((item) => item.genericMedicationId),
@@ -349,6 +413,7 @@ function makeScenario(
     parallelCareEn: parallel.en,
     cost30Days: medications.map((item) => estimateType2Medication30DayCost({
       price: item.price,
+      priceRange: item.priceRange,
       coverages: item.insuranceCoverages,
       insuranceProvider,
       plan: plans?.[item.genericMedicationId],
@@ -378,6 +443,56 @@ function maintenanceScenario(request: Type2ConsiderationRequest): Type2Treatment
     cost30Days: [],
     urgentReview: false,
   };
+}
+
+function scenarioMarketCost(scenario: Type2TreatmentScenario) {
+  const patientValues = scenario.cost30Days
+    .map((estimate) => estimate.patient30DaysToman)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (patientValues.length) return Math.min(...patientValues);
+
+  const retailValues = scenario.cost30Days
+    .map((estimate) => estimate.retail30DaysToman)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return retailValues.length ? Math.min(...retailValues) : Number.POSITIVE_INFINITY;
+}
+
+function scenarioClinicalScore(scenario: Type2TreatmentScenario, request: Type2ConsiderationRequest) {
+  if (!scenario.medications.length) return 0;
+  return scenario.medications.reduce((sum, item) => sum + adjustedClinicalScore(item, request), 0) / scenario.medications.length;
+}
+
+function scenarioCoverageScore(scenario: Type2TreatmentScenario, provider?: InsuranceProvider) {
+  return scenario.medications.reduce((best, item) => {
+    const selected = provider
+      ? coverageFor(item, provider)?.percent ?? 0
+      : item.insuranceCoverages
+          .filter((entry) => entry.runtimeEligibleForRanking !== false)
+          .reduce((value, entry) => Math.max(value, entry.percent), 0);
+    return Math.max(best, selected);
+  }, 0);
+}
+
+function orderScenarios(
+  scenarios: Type2TreatmentScenario[],
+  mode: Type2ScenarioSortMode,
+  request: Type2ConsiderationRequest,
+  provider?: InsuranceProvider,
+) {
+  if (mode === "balanced") return scenarios;
+  const ordered = [...scenarios].sort((left, right) => {
+    if (mode === "clinical") {
+      return scenarioClinicalScore(right, request) - scenarioClinicalScore(left, request);
+    }
+    if (mode === "patient_cost") {
+      return scenarioMarketCost(left) - scenarioMarketCost(right) ||
+        scenarioClinicalScore(right, request) - scenarioClinicalScore(left, request);
+    }
+    return scenarioCoverageScore(right, provider) - scenarioCoverageScore(left, provider) ||
+      scenarioMarketCost(left) - scenarioMarketCost(right) ||
+      scenarioClinicalScore(right, request) - scenarioClinicalScore(left, request);
+  });
+  return ordered.map((scenario, index) => ({ ...scenario, rank: (index + 1) as 1 | 2 | 3 }));
 }
 
 /**
@@ -440,7 +555,7 @@ export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Ty
     if (alternative) scenarios.push(makeScenario(3, "alternative", alternative, [alternative], request, input.insuranceProvider, input.costingPlansByMedicationId));
   }
 
-  return scenarios.slice(0, maxScenarios);
+  return orderScenarios(scenarios.slice(0, maxScenarios), input.sortMode ?? "balanced", request, input.insuranceProvider);
 }
 
 export function currentMedicationDailyUnits(current: CurrentMedicationInput | undefined, unitStrength?: number) {

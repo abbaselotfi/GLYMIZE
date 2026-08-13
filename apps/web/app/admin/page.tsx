@@ -158,6 +158,14 @@ export default function AdminPage() {
           <span className={styles.actionIcon}>Rx</span>
           <span><strong>Master Registry و داروها</strong><small>WorldDrug، طبقه‌بندی ژنریک‌های جدید و ورود کنترل‌شده به فهرست بازار</small></span>
         </Link>
+        <Link className={styles.quickAction} href="/admin/ai-models">
+          <span className={styles.actionIcon}>AI</span>
+          <span><strong>AI و مدل‌ها</strong><small>Primary، fallback، Gateway، Token امن و تست اتصال</small></span>
+        </Link>
+        <Link className={styles.quickAction} href="/admin/communications">
+          <span className={styles.actionIcon}>OTP</span>
+          <span><strong>ارتباطات و احراز هویت</strong><small>نظام پزشکی، SMS.ir، Email، API Key امن و OTP</small></span>
+        </Link>
         <Link className={styles.quickAction} href="/type-2/preview">
           <span className={styles.actionIcon}>T2</span>
           <span><strong>پیش‌نمایش خروجی Type 2</strong><small>کنترل نتیجه بالینی پیش از انتشار تغییرات</small></span>

@@ -30,7 +30,7 @@ const COPY = {
     foundation: "فونداسیون آماده",
     planned: "در حال آماده‌سازی",
     safetyTitle: "مرز ایمنی نسخه فعلی",
-    safetyBody: "محاسبه دوز/تیتراسیون انسولین و ذخیره اطلاعات هویتی بیمار تا تکمیل Ruleهای تاییدشده، RBAC و لایه امنیتی فعال نمی‌شوند.",
+    safetyBody: "خروجی ابزار انسولین نقطه شروع برای بازبینی پزشک است و handoff بیمار فقط با تأیید صریح پرستار و Apply پزشک وارد مسیر Type 2 می‌شود؛ نسخه محلی برای داده مصنوعی است.",
     evidenceTitle: "پایه علمی فعال در موتور",
     evidenceHint: "فقط منابعی در این بخش نمایش داده می‌شوند که Rule یا مسیر بالینی مشخصی در موتور GLYMIZE را تغذیه می‌کنند.",
     guideline: "Guideline",
@@ -51,7 +51,7 @@ const COPY = {
     foundation: "Foundation ready",
     planned: "In preparation",
     safetyTitle: "Current safety boundary",
-    safetyBody: "Insulin dosing/titration and identifiable patient-data persistence remain disabled until approved rules, RBAC, and the security layer are complete.",
+    safetyBody: "Insulin output is a clinician-reviewed starting point, and patient handoff enters Type 2 only after explicit nurse confirmation and physician Apply; the local RC is for synthetic data.",
     evidenceTitle: "Evidence actively used by the engine",
     evidenceHint: "Only sources that feed a defined GLYMIZE clinical rule or pathway are shown here.",
     guideline: "Guideline",
@@ -100,10 +100,10 @@ const WORKSPACE_TOOLS: Tool[] = [
     icon: "IU",
     title: { fa: "محاسبه و مدیریت انسولین", en: "Insulin tools" },
     description: {
-      fa: "تبدیل Basal/Premix/Prandial/FRC و سپس تیتراسیون؛ منطق تاییدشده Insulin-Converter به این بخش منتقل می‌شود.",
-      en: "Basal, premix, prandial, and FRC conversion followed by titration; validated converter logic will be ported here.",
+      fa: "تبدیل Basal/Premix/Prandial/FRC با قواعد جهت‌دار، جمع دوز روزانه، guardrailهای ایمنی و خروجی قابل بازبینی پزشک.",
+      en: "Basal, premix, prandial, and FRC conversion with direction-specific rules, total-dose reconciliation, safety gates, and clinician review.",
     },
-    status: "foundation",
+    status: "available",
   },
   {
     href: "/care-team",
@@ -113,7 +113,7 @@ const WORKSPACE_TOOLS: Tool[] = [
       fa: "آماده‌سازی پیش از ویزیت، ورود آزمایش‌ها و داروها، اسکن با دوربین و OCR با مرحله Review قبل از تحویل به پزشک.",
       en: "Pre-visit preparation, labs and medications, camera/PDF OCR, and review before physician handoff.",
     },
-    status: "planned",
+    status: "available",
   },
 ];
 

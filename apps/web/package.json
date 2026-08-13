@@ -12,9 +12,11 @@
     "@glymize/clinical-engine": "workspace:*",
     "@glymize/contracts": "workspace:*",
     "next": "16.2.12",
+    "pdfjs-dist": "6.1.200",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "read-excel-file": "9.3.5"
+    "read-excel-file": "9.3.5",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@types/react": "19.2.17",

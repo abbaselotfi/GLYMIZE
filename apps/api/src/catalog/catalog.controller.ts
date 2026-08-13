@@ -1,10 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Query } from "@nestjs/common";
 import type { AdminNotification, CatalogImportRequest, CreateAdminNotificationInput, CreateMedicationBrandInput, GenericMedicationInput, MedicationMarketDataInput, Type2ConsiderationRequest, UpdateMedicationBrandInput, UpdateMedicationInsuranceInput, UpdateMedicationVisibilityInput } from "@glymize/contracts";
 import { CatalogService } from "./catalog.service.js";
 
 @Controller("v1")
 export class CatalogController {
-  constructor(private readonly catalogService: CatalogService) {}
+  constructor(@Inject(CatalogService) private readonly catalogService: CatalogService) {}
 
   @Get("catalog/generics")
   generics(@Query("therapyGroup") therapyGroup?: string) {
