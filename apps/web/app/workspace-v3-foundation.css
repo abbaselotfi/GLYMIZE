@@ -63,6 +63,8 @@ html[data-glymize-mode="dark"] .glymize-internal-shell .page-content :where(inpu
 @media (max-width:760px) {
   .glymize-internal-shell { --g3-card-pad:16px; --g3-section-gap:12px; }
   .glymize-internal-shell .page-content :where(button,input,select,textarea,a[role="button"]) { min-height:44px; }
+  .glymize-internal-shell .topbar-title strong{font-size:0!important;max-width:88px!important;overflow:visible!important;text-overflow:clip!important;white-space:nowrap!important}
+  .glymize-internal-shell .topbar-title strong::before{content:"GLYMIZE";font-size:13px;line-height:1;letter-spacing:.04em;font-weight:900;color:var(--glymize-ink)}
 }
 
 @media (prefers-reduced-motion: reduce) {
