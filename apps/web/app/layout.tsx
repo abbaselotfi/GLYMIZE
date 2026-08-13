@@ -9,6 +9,7 @@ import "./dark-readability.css";
 import "./design-system-v2.css";
 import "./design-system-v2-a11y.css";
 import "./design-system-v2-legacy.css";
+import "./design-system-v2-smoke-fixes.css";
 
 export const metadata: Metadata = {
   title: "GLYMIZE | Diabetes Prescribing Intelligence",
