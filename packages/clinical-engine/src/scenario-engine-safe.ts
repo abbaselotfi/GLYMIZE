@@ -2,7 +2,7 @@ import type { Type2ConsiderationRequest } from "@glymize/contracts";
 import {
   buildType2TreatmentScenarios as buildBaseScenarios,
   currentMedicationDailyUnits,
-  estimateType2Medication30DayCost,
+  estimateType2Medication30DayCost as estimateBase30DayCost,
   type Type2CostingPlan,
   type Type2MonthlyCostEstimate,
   type Type2MonthlyCostStatus,
@@ -12,7 +12,7 @@ import {
   type Type2TreatmentScenario as BaseTreatmentScenario,
 } from "./scenario-engine.js";
 
-export { currentMedicationDailyUnits, estimateType2Medication30DayCost };
+export { currentMedicationDailyUnits };
 export type {
   Type2CostingPlan,
   Type2MonthlyCostEstimate,
@@ -23,6 +23,30 @@ export type {
 
 export type Type2ScenarioKind = BaseScenarioKind | "access_constrained";
 export type Type2TreatmentScenario = Omit<BaseTreatmentScenario, "kind"> & { kind: Type2ScenarioKind };
+type Type2CostingInput = Parameters<typeof estimateBase30DayCost>[0];
+
+function boundedCost(estimate: Type2MonthlyCostEstimate): Type2MonthlyCostEstimate {
+  const retail = estimate.retailPerPackageToman;
+  if (retail === undefined) return estimate;
+  const patient = estimate.patientPerPackageToman === undefined
+    ? undefined
+    : Math.min(retail, Math.max(0, estimate.patientPerPackageToman));
+  const insurer = estimate.insurerPerPackageToman === undefined
+    ? undefined
+    : Math.min(Math.max(0, retail - (patient ?? 0)), Math.max(0, estimate.insurerPerPackageToman));
+  const packages = estimate.packagesFor30Days;
+  return {
+    ...estimate,
+    patientPerPackageToman: patient,
+    insurerPerPackageToman: insurer,
+    patient30DaysToman: packages !== undefined && patient !== undefined ? packages * patient : estimate.patient30DaysToman,
+    insurer30DaysToman: packages !== undefined && insurer !== undefined ? packages * insurer : estimate.insurer30DaysToman,
+  };
+}
+
+export function estimateType2Medication30DayCost(input: Type2CostingInput): Type2MonthlyCostEstimate {
+  return boundedCost(estimateBase30DayCost(input));
+}
 
 function hasIndependentOutcomeIndication(request: Type2ConsiderationRequest) {
   return request.factors.some((factor) => ["ascvd", "heart_failure", "ckd", "masld_mash"].includes(factor)) ||
@@ -61,29 +85,25 @@ function accessConstrainedScenario(input: Type2ScenarioBuildInput, base: BaseTre
     rationaleEn: insuranceOnly
       ? ["Lack of insurance coverage does not remove clinical indication; access constraints must remain separate from treatment need."]
       : ["No eligible option under the current constraints does not remove clinical need; review the route/access constraints and care pathway."],
-    tradeoffsFa: [
-      insuranceOnly
-        ? "پوشش بیمه/فرآورده، امکان مسیر جایگزین یا تغییر فیلتر هزینه باید توسط پزشک بازبینی شود؛ سیستم داروی بدون پوشش را به‌صورت خودکار جایگزین نمی‌کند."
-        : "مسیر تجویز، منع مصرف‌ها و محدودیت‌های انتخاب‌شده باید توسط پزشک بازبینی شوند؛ سیستم محدودیت کاربر را خودکار دور نمی‌زند.",
-    ],
-    tradeoffsEn: [
-      insuranceOnly
-        ? "Review coverage, product availability, alternative access, or the cost filter; the system does not silently substitute an uninsured drug."
-        : "Review route, contraindications, and selected constraints; the system does not silently bypass clinician/patient constraints.",
-    ],
+    tradeoffsFa: [insuranceOnly
+      ? "پوشش بیمه/فرآورده، امکان مسیر جایگزین یا تغییر فیلتر هزینه باید توسط پزشک بازبینی شود؛ سیستم داروی بدون پوشش را به‌صورت خودکار جایگزین نمی‌کند."
+      : "مسیر تجویز، منع مصرف‌ها و محدودیت‌های انتخاب‌شده باید توسط پزشک بازبینی شوند؛ سیستم محدودیت کاربر را خودکار دور نمی‌زند."],
+    tradeoffsEn: [insuranceOnly
+      ? "Review coverage, product availability, alternative access, or the cost filter; the system does not silently substitute an uninsured drug."
+      : "Review route, contraindications, and selected constraints; the system does not silently bypass clinician/patient constraints."],
     cost30Days: [],
     urgentReview: urgent,
   };
 }
 
+function boundScenarioCosts(scenario: Type2TreatmentScenario): Type2TreatmentScenario {
+  return { ...scenario, cost30Days: scenario.cost30Days.map(boundedCost) };
+}
+
 export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Type2TreatmentScenario[] {
-  const scenarios = buildBaseScenarios(input);
-  if (
-    scenarios.length === 1 &&
-    scenarios[0]?.kind === "maintain_monitor" &&
-    stillNeedsClinicalAction(input)
-  ) {
-    return [accessConstrainedScenario(input, scenarios[0])];
+  const scenarios: Type2TreatmentScenario[] = buildBaseScenarios(input);
+  if (scenarios.length === 1 && scenarios[0]?.kind === "maintain_monitor" && stillNeedsClinicalAction(input)) {
+    return [boundScenarioCosts(accessConstrainedScenario(input, scenarios[0]))];
   }
-  return scenarios;
+  return scenarios.map(boundScenarioCosts);
 }
