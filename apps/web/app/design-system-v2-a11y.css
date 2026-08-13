@@ -1,0 +1,111 @@
+/* GLYMIZE Design System v2 — dark mode, contrast and accessibility hardening */
+
+.glymize-internal-shell button:disabled,
+.glymize-internal-shell input:disabled,
+.glymize-internal-shell select:disabled,
+.glymize-internal-shell textarea:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
+.glymize-internal-shell a:focus-visible,
+.glymize-internal-shell button:focus-visible,
+.glymize-internal-shell input:focus-visible,
+.glymize-internal-shell select:focus-visible,
+.glymize-internal-shell textarea:focus-visible,
+.glymize-internal-shell summary:focus-visible {
+  outline: 3px solid var(--glymize-focus) !important;
+  outline-offset: 3px !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [data-tone="success"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="available"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="confirmed"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="protocolStatus"] {
+  border-color: #2d5b49 !important;
+  background: #173329 !important;
+  color: #8dd9b5 !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="foundation"] {
+  border-color: #31546a !important;
+  background: #192f3a !important;
+  color: #9bc9e3 !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="planned"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="warning"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="frcSafety"] {
+  border-color: #66553c !important;
+  background: #352c1d !important;
+  color: #e5c784 !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="rejected"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="critical"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="error"] {
+  border-color: #70403f !important;
+  background: #382322 !important;
+  color: #efaaa5 !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="message"] {
+  border-color: #2d5b49 !important;
+  background: #173329 !important;
+  color: #8dd9b5 !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="layoutChoice"][data-active="true"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="flagSelected"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="choiceActive"] {
+  border-color: var(--glymize-accent-500) !important;
+  background: var(--glymize-accent-soft) !important;
+  color: var(--glymize-ink) !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="resultHeader"] {
+  color: #fff;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="resultHeader"] span,
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="resultHeader"] small,
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="resultHeader"] strong {
+  color: #fff !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="summaryRail"],
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="submitBar"] {
+  border-color: #315058 !important;
+  background: #10272d !important;
+  color: #f1f7f7 !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="summaryRail"] small,
+html[data-glymize-mode="dark"] .glymize-internal-shell [class*="submitBar"] p {
+  color: #c1d2d5 !important;
+}
+
+@media (prefers-contrast: more) {
+  .glymize-internal-shell {
+    --glymize-line: color-mix(in srgb, var(--glymize-ink) 34%, transparent);
+  }
+  .glymize-internal-shell .nav-item.active,
+  .glymize-internal-shell button,
+  .glymize-internal-shell input,
+  .glymize-internal-shell select,
+  .glymize-internal-shell textarea {
+    border-width: 2px;
+  }
+}
+
+@media (forced-colors: active) {
+  .glymize-internal-shell .nav-item.active,
+  .glymize-internal-shell .shell-mobile-nav a.active {
+    border: 2px solid Highlight;
+  }
+  .glymize-internal-shell .brand-mark,
+  .glymize-internal-shell [class*="sectionTitle"] > b,
+  .glymize-internal-shell [class*="rank"] {
+    forced-color-adjust: none;
+  }
+}
