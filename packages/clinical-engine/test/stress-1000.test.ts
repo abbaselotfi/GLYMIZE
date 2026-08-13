@@ -13,15 +13,41 @@ function pick<T>(r:()=>number,items:readonly T[]):T{return items[Math.floor(r()*
 
 function makeCase(index:number){
   const r=rng(910247+index*3571),provider=pick(r,providers);
-  const request:Type2ConsiderationRequest={currentHba1c:6+r()*5,targetHba1c:7,factors:[],costPreference:r()<.5?"insured_only":"no_constraint",routePreference:"oral_and_injectable"};
+  const request:Type2ConsiderationRequest={
+    currentHba1c:6+r()*5,targetHba1c:7,factors:[],
+    costPreference:r()<.5?"insured_only":"no_constraint",routePreference:"oral_and_injectable",
+    hyperglycemiaSymptoms:r()<.06,catabolicFeatures:r()<.03,
+  };
   const assessment=buildType2Assessment(medicines,request);
   const enriched={...assessment,medications:assessment.medications.map((item):Type2MedicationConsideration=>({...item,price:{amountToman:10000+Math.round(r()*90000),priceKind:"consumer_retail"},insuranceCoverages:r()<.5?[{provider,percent:50,referencePriceToman:50000,runtimeEligibleForRanking:true}]:[]}))};
   return{request,assessment:enriched,scenarios:buildType2TreatmentScenarios({assessment:enriched,request,insuranceProvider:provider,maxScenarios:3})};
 }
 
 describe("GLYMIZE randomized 1000-case scenario acceptance",()=>{
-  it("keeps scenario contracts stable across randomized inputs",()=>{
-    expect(typeof buildType2TreatmentScenarios).toBe("function");
-    expect(makeCase(0).scenarios.length).toBeGreaterThan(0);
-  });
+  it("keeps clinical need, access filtering, urgent state and financial values separate",()=>{
+    const summary={cases:1000,maintenance:0,accessConstrained:0,insuredOnly:0,urgent:0,costEstimates:0};
+    for(let index=0;index<1000;index++){
+      const {request,assessment,scenarios}=makeCase(index);
+      expect(scenarios.length).toBeGreaterThan(0);
+      expect(scenarios.length).toBeLessThanOrEqual(3);
+      expect(new Set(scenarios.map(item=>item.id)).size).toBe(scenarios.length);
+      scenarios.forEach((scenario,position)=>{
+        expect(scenario.rank).toBe(position+1);
+        expect(new Set(scenario.medicationIds).size).toBe(scenario.medicationIds.length);
+        scenario.cost30Days.forEach(cost=>{
+          summary.costEstimates++;
+          for(const value of [cost.retailPerPackageToman,cost.patientPerPackageToman,cost.insurerPerPackageToman,cost.retail30DaysToman,cost.patient30DaysToman,cost.insurer30DaysToman])if(value!==undefined)expect(value).toBeGreaterThanOrEqual(0);
+        });
+      });
+      const activeNeed=assessment.recommendation.hba1cGap>0||assessment.recommendation.urgentReview;
+      if(scenarios[0]?.kind==="maintain_monitor"){summary.maintenance++;expect(activeNeed).toBe(false)}
+      if(scenarios[0]?.kind==="access_constrained"){summary.accessConstrained++;expect(activeNeed).toBe(true);expect(scenarios[0].medicationIds).toEqual([])}
+      if(assessment.recommendation.urgentReview){summary.urgent++;expect(scenarios.some(item=>item.urgentReview)).toBe(true);expect(scenarios[0]?.kind).not.toBe("maintain_monitor")}
+      if(request.costPreference==="insured_only"){
+        summary.insuredOnly++;
+        for(const scenario of scenarios)for(const medication of scenario.medications)expect(medication.insuranceCoverages.some(item=>item.percent>0)).toBe(true);
+      }
+    }
+    console.log("GLYMIZE_STRESS_1000_ACCEPTANCE",JSON.stringify(summary));
+  },30000);
 });
