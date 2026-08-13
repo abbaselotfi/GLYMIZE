@@ -1,7 +1,7 @@
 # GLYMIZE UX / Layout Vision — Future Design Review
 
-**Status:** Design direction / future review  
-**Implementation timing:** After the clinical engine, Market/Costing, patient inputs, AI, Assistant, Auth/Communications, Care Team and core workflows are functionally stable.  
+**Status:** Design direction / future review
+**Implementation timing:** After the clinical engine, Market/Costing, patient inputs, AI, Assistant, Auth/Communications, Care Team and core workflows are functionally stable.
 **Current decision:** Do not perform a full redesign now. Only fix usability blockers such as unreadably small secondary text and overly dark hover/active button states.
 
 ---
@@ -671,4 +671,3 @@ Mobile Adaptive Cards:
 
 Focused Workflow:
 - avatar belongs to shell/account chrome, not the clinical step content.
-
