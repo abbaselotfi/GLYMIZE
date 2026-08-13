@@ -1,1 +1,2 @@
 /* GLYMIZE UI/UX v2 browser-smoke fixes. */
+.glymize-internal-shell button:not(:disabled):hover{background:var(--glymize-accent-soft-strong)!important;color:var(--glymize-accent-700)!important}
