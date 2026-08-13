@@ -154,3 +154,15 @@
   .toolCard { min-height: 200px; }
   .evidenceChip { width: 100%; justify-content: space-between; }
 }
+
+/* GLYMIZE_MARKET_V23_TRUST_METRICS */
+.dataSection{margin-top:34px;padding-top:28px;border-top:1px solid var(--glymize-line,var(--line))}
+.dataGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.dataGrid article{display:flex;min-height:92px;flex-direction:column;justify-content:center;padding:14px;border:1px solid var(--glymize-line,var(--line));border-radius:13px;background:var(--glymize-surface,#fff);box-shadow:0 4px 14px rgba(24,61,62,.035)}
+.dataGrid b{font-size:22px;line-height:1.2;color:var(--glymize-ink,var(--ink))}
+.dataGrid span{margin-top:7px;color:var(--muted);font-size:12px;line-height:1.55}
+.dataMeta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:12px;line-height:1.7}
+.dataMeta a{font-weight:800;text-decoration:none}
+.dataMeta a:hover{text-decoration:underline}
+@media(max-width:880px){.dataGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.dataGrid{grid-template-columns:1fr 1fr}.dataGrid b{font-size:19px}.dataGrid span,.dataMeta{font-size:12px}}

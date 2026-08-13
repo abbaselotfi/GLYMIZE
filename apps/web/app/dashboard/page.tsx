@@ -2,11 +2,23 @@
 
 import { engineEvidenceSources } from "@glymize/clinical-engine";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { withBasePath } from "../../lib/base-path";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import styles from "./dashboard.module.css";
 
 type Locale = "fa" | "en";
 type Status = "available" | "foundation" | "planned";
+
+type MarketDashboardMeta = {
+  sourceGeneratedAt?: string;
+  dashboardMetrics?: {
+    productCount?: number;
+    genericCount?: number;
+    verifiedPresentationCount?: number;
+    insuranceRecordCount?: number;
+  };
+};
 
 type Tool = {
   href: string;
@@ -30,13 +42,21 @@ const COPY = {
     foundation: "فونداسیون آماده",
     planned: "در حال آماده‌سازی",
     safetyTitle: "مرز ایمنی نسخه فعلی",
-    safetyBody: "محاسبه دوز/تیتراسیون انسولین و ذخیره اطلاعات هویتی بیمار تا تکمیل Ruleهای تاییدشده، RBAC و لایه امنیتی فعال نمی‌شوند.",
+    safetyBody: "خروجی ابزار انسولین نقطه شروع برای بازبینی پزشک است و handoff بیمار فقط با تأیید صریح پرستار و Apply پزشک وارد مسیر Type 2 می‌شود؛ نسخه محلی برای داده مصنوعی است.",
     evidenceTitle: "پایه علمی فعال در موتور",
     evidenceHint: "فقط منابعی در این بخش نمایش داده می‌شوند که Rule یا مسیر بالینی مشخصی در موتور GLYMIZE را تغذیه می‌کنند.",
     guideline: "Guideline",
     consensus: "Consensus",
     regulatory: "Regulatory",
     evidenceNote: "به‌روزرسانی منبع به‌تنهایی Rule بالینی را تغییر نمی‌دهد؛ نسخه جدید ابتدا باید بازبینی و تایید شود.",
+    dataTitle: "پوشش داده فعال GLYMIZE",
+    dataHint: "آمار آخرین Full Clinical Market؛ برای شفافیت دامنه داده، نه به‌عنوان ادعای کیفیت بالینی.",
+    marketProducts: "فرآورده بازار",
+    generics: "ژنریک",
+    verifiedPresentations: "Presentation تأییدشده NFI",
+    insuranceRecords: "رکورد بیمه",
+    lastUpdated: "آخرین همگام‌سازی داده",
+    contact: "گزارش خطای داده / ارتباط با GLYMIZE",
   },
   en: {
     eyebrow: "GLYMIZE Clinical Workspace",
@@ -51,13 +71,21 @@ const COPY = {
     foundation: "Foundation ready",
     planned: "In preparation",
     safetyTitle: "Current safety boundary",
-    safetyBody: "Insulin dosing/titration and identifiable patient-data persistence remain disabled until approved rules, RBAC, and the security layer are complete.",
+    safetyBody: "Insulin output is a clinician-reviewed starting point, and patient handoff enters Type 2 only after explicit nurse confirmation and physician Apply; the local RC is for synthetic data.",
     evidenceTitle: "Evidence actively used by the engine",
     evidenceHint: "Only sources that feed a defined GLYMIZE clinical rule or pathway are shown here.",
     guideline: "Guideline",
     consensus: "Consensus",
     regulatory: "Regulatory",
     evidenceNote: "A source update never changes a clinical rule automatically; new versions require review and approval first.",
+    dataTitle: "Active GLYMIZE data coverage",
+    dataHint: "Metrics from the latest Full Clinical Market, shown for scope transparency rather than as a clinical-quality claim.",
+    marketProducts: "Market products",
+    generics: "Generics",
+    verifiedPresentations: "NFI-verified presentations",
+    insuranceRecords: "Insurance records",
+    lastUpdated: "Last data sync",
+    contact: "Report a data issue / contact GLYMIZE",
   },
 } as const;
 
@@ -100,10 +128,10 @@ const WORKSPACE_TOOLS: Tool[] = [
     icon: "IU",
     title: { fa: "محاسبه و مدیریت انسولین", en: "Insulin tools" },
     description: {
-      fa: "تبدیل Basal/Premix/Prandial/FRC و سپس تیتراسیون؛ منطق تاییدشده Insulin-Converter به این بخش منتقل می‌شود.",
-      en: "Basal, premix, prandial, and FRC conversion followed by titration; validated converter logic will be ported here.",
+      fa: "تبدیل Basal/Premix/Prandial/FRC با قواعد جهت‌دار، جمع دوز روزانه، guardrailهای ایمنی و خروجی قابل بازبینی پزشک.",
+      en: "Basal, premix, prandial, and FRC conversion with direction-specific rules, total-dose reconciliation, safety gates, and clinician review.",
     },
-    status: "foundation",
+    status: "available",
   },
   {
     href: "/care-team",
@@ -113,7 +141,7 @@ const WORKSPACE_TOOLS: Tool[] = [
       fa: "آماده‌سازی پیش از ویزیت، ورود آزمایش‌ها و داروها، اسکن با دوربین و OCR با مرحله Review قبل از تحویل به پزشک.",
       en: "Pre-visit preparation, labs and medications, camera/PDF OCR, and review before physician handoff.",
     },
-    status: "planned",
+    status: "available",
   },
 ];
 
@@ -142,6 +170,27 @@ function ToolCard({ tool, locale }: { tool: Tool; locale: Locale }) {
 export default function DashboardPage() {
   const { locale, isRtl } = useGlymizeLocale();
   const copy = COPY[locale];
+  const [marketMeta, setMarketMeta] = useState<MarketDashboardMeta | null>(null);
+
+  useEffect(() => {
+    void fetch(
+      `${withBasePath("/data/glymize-clinician-market-v2.meta.json")}?t=${Date.now()}`,
+      { cache: "no-store" },
+    )
+      .then((response) => response.ok ? response.json() as Promise<MarketDashboardMeta> : null)
+      .then(setMarketMeta)
+      .catch(() => setMarketMeta(null));
+  }, []);
+
+  const dataMetrics = marketMeta?.dashboardMetrics;
+  const lastUpdated = marketMeta?.sourceGeneratedAt
+    ? new Intl.DateTimeFormat(locale === "fa" ? "fa-IR" : "en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(new Date(marketMeta.sourceGeneratedAt))
+    : "—";
+
   return (
     <main className={styles.page} dir={isRtl ? "rtl" : "ltr"} lang={locale}>
       <header className={styles.hero}>
@@ -173,6 +222,24 @@ export default function DashboardPage() {
       <section className={styles.safety}>
         <span aria-hidden="true">✓</span>
         <div><strong>{copy.safetyTitle}</strong><p>{copy.safetyBody}</p></div>
+      </section>
+
+
+      <section className={styles.dataSection} aria-labelledby="market-data-title">
+        <div className={styles.sectionHeading}>
+          <h2 id="market-data-title">{copy.dataTitle}</h2>
+          <p>{copy.dataHint}</p>
+        </div>
+        <div className={styles.dataGrid}>
+          <article><b>{dataMetrics?.productCount?.toLocaleString(locale === "fa" ? "fa-IR" : "en-US") ?? "—"}</b><span>{copy.marketProducts}</span></article>
+          <article><b>{dataMetrics?.genericCount?.toLocaleString(locale === "fa" ? "fa-IR" : "en-US") ?? "—"}</b><span>{copy.generics}</span></article>
+          <article><b>{dataMetrics?.verifiedPresentationCount?.toLocaleString(locale === "fa" ? "fa-IR" : "en-US") ?? "—"}</b><span>{copy.verifiedPresentations}</span></article>
+          <article><b>{dataMetrics?.insuranceRecordCount?.toLocaleString(locale === "fa" ? "fa-IR" : "en-US") ?? "—"}</b><span>{copy.insuranceRecords}</span></article>
+        </div>
+        <div className={styles.dataMeta}>
+          <span>{copy.lastUpdated}: <b>{lastUpdated}</b></span>
+          <span>{copy.contact}: <a href="mailto:info@glymize.ir?subject=GLYMIZE%20Data%20or%20Clinical%20Feedback">info@glymize.ir</a></span>
+        </div>
       </section>
 
       <section className={styles.evidenceSection} aria-labelledby="engine-evidence-title">

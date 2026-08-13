@@ -8,6 +8,7 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.WEB_ORIGIN ? process.env.WEB_ORIGIN.split(",") : ["http://localhost:3000"],
     methods: ["GET", "POST", "PATCH"],
+    allowedHeaders: ["content-type", "x-glymize-handoff-token"],
     credentials: false
   });
   // A container deployment sets HOST=0.0.0.0. Loopback is the safe local default.

@@ -337,6 +337,18 @@ export interface ReferenceCatalogSource {
   sourceFile: string;
 }
 
+export type MedicationMarketVerification = "nfi_verified" | "admin_override" | "not_verified";
+
+export interface MedicationPriceRange {
+  minToman: number;
+  medianToman: number;
+  maxToman: number;
+  productCount: number;
+  basis: "nfi_comparable_products" | "nfi_generic_market_range";
+  costComparable?: boolean;
+  presentationCount?: number;
+}
+
 /** Admin-only display configuration. It never approves a medicine clinically. */
 export interface MedicationChecklistItem {
   referencePresentationId: string;
@@ -357,6 +369,8 @@ export interface MedicationChecklistItem {
   price?: MedicationPrice;
   marketBadge?: MedicationMarketBadge;
   sourceObservedAt?: string;
+  marketVerification?: MedicationMarketVerification;
+  priceRange?: MedicationPriceRange;
 }
 
 export interface UpdateMedicationVisibilityInput {
@@ -382,6 +396,14 @@ export interface InsuranceCoverage {
   effectiveAt?: string;
   sourceUrl?: string;
   sourceReference?: string;
+  sourcePercent?: number;
+  sourcePercentKind?: "insurer_share" | "patient_share" | "coverage" | "unknown";
+  sourcePercentBasis?: "retail_price" | "reference_tariff" | "price_without_subsidy" | "with_subsidy" | "with_currency_subsidy" | "unknown";
+  normalizedPercentDerived?: boolean;
+  sourcePatientSharePercent?: number;
+  conditions?: string;
+  serviceGroup?: string;
+  runtimeEligibleForRanking?: boolean;
 }
 
 export type MedicationPriceKind = "consumer_retail" | "insurance_reference" | "unknown";
@@ -437,6 +459,10 @@ export interface MedicationBrand {
   sourceObservedAt?: string;
   hiddenFromSource?: boolean;
   marketBadge?: MedicationMarketBadge;
+  marketProductId?: string;
+  marketPackageRaw?: string;
+  marketUnitsPerPackage?: number;
+  marketUnitType?: string;
 }
 export interface CreateMedicationBrandInput {
   name?: string;
@@ -690,6 +716,7 @@ export interface Type2MedicationConsideration {
   genericRegistryCode?: string;
   brandRegistryCode?: string;
   price?: MedicationPrice;
+  priceRange?: MedicationPriceRange;
   marketBadge?: MedicationMarketBadge;
   outputStatus: "information_only" | "requires_approved_protocol";
 }
@@ -714,3 +741,5 @@ export interface Type2AssessmentResult {
   recommendation: Type2PathwayRecommendation;
   medications: Type2MedicationConsideration[];
 }
+
+export * from "./patient-handoff.js";

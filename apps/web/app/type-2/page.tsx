@@ -1,5 +1,5 @@
-import Type2V2Client from "./type2-v2-client";
+import Type2ScenariosClient from "./type2-scenarios-client";
 
 export default function Type2Page() {
-  return <Type2V2Client />;
+  return <Type2ScenariosClient />;
 }

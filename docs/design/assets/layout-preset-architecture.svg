@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980">
+  <defs>
+    <style>
+      .bg{fill:#f7fbfc}.panel{fill:#fff;stroke:#cfe3e8;stroke-width:2}.title{font:700 30px Arial,sans-serif;fill:#0b3653}
+      .h{font:700 22px Arial,sans-serif;fill:#0a405b}.t{font:400 18px Arial,sans-serif;fill:#375765}
+      .small{font:400 15px Arial,sans-serif;fill:#5b7480}.accent{fill:#e6f7f4;stroke:#27a89b;stroke-width:2}
+      .dark{fill:#0b4566}.darkt{font:700 20px Arial,sans-serif;fill:#fff}.line{stroke:#6ba8b2;stroke-width:3;fill:none;marker-end:url(#arrow)}
+      .tag{fill:#eef8f7;stroke:#9bcfc8;stroke-width:1.5}.tagt{font:700 16px Arial,sans-serif;fill:#23766f}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#6ba8b2"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1600" height="980"/>
+  <text x="70" y="70" class="title">GLYMIZE — Adaptive Workspace Architecture</text>
+  <text x="70" y="108" class="t">One clinical engine, one component system, multiple physician-selectable layout presets</text>
+
+  <rect x="70" y="155" rx="24" ry="24" width="430" height="180" class="panel"/>
+  <text x="100" y="205" class="h">Clinical / Data Core</text>
+  <text x="100" y="245" class="t">Clinical Engine · Market · Insurance · AI</text>
+  <text x="100" y="278" class="t">Patient Context · Care Team · Evidence</text>
+  <rect x="100" y="295" rx="14" width="340" height="28" class="tag"/>
+  <text x="118" y="316" class="tagt">Never duplicated per layout</text>
+
+  <rect x="585" y="155" rx="24" ry="24" width="430" height="180" class="panel"/>
+  <text x="615" y="205" class="h">Shared Design System</text>
+  <text x="615" y="245" class="t">Cards · Forms · Alerts · Costing · Evidence</text>
+  <text x="615" y="278" class="t">Typography · Tokens · Accessibility · RTL/LTR</text>
+  <rect x="615" y="295" rx="14" width="340" height="28" class="tag"/>
+  <text x="633" y="316" class="tagt">Same components, different shells</text>
+
+  <path d="M500,245 C540,245 545,245 585,245" class="line"/>
+
+  <rect x="1110" y="155" rx="24" ry="24" width="420" height="180" class="panel"/>
+  <text x="1140" y="205" class="h">Physician Preference</text>
+  <text x="1140" y="245" class="t">Auto · Command Center · Focused</text>
+  <text x="1140" y="278" class="t">Compact Cards · Density · Sidebar</text>
+  <rect x="1140" y="295" rx="14" width="330" height="28" class="tag"/>
+  <text x="1158" y="316" class="tagt">Stored in profile</text>
+
+  <path d="M1015,245 C1055,245 1065,245 1110,245" class="line"/>
+
+  <text x="70" y="410" class="h">Recommended Auto behavior</text>
+
+  <rect x="70" y="455" rx="28" ry="28" width="440" height="275" class="panel"/>
+  <text x="105" y="505" class="h">Desktop / Laptop</text>
+  <text x="105" y="545" class="t">Concept A — Clinical Command Center</text>
+  <text x="105" y="585" class="small">• Dense but calm overview</text>
+  <text x="105" y="617" class="small">• Patient summary + scenarios + market + evidence</text>
+  <text x="105" y="649" class="small">• Persistent navigation and high scanability</text>
+  <rect x="105" y="680" rx="14" width="320" height="34" class="accent"/>
+  <text x="124" y="704" class="tagt">Preferred desktop shell</text>
+
+  <rect x="580" y="455" rx="28" ry="28" width="440" height="275" class="panel"/>
+  <text x="615" y="505" class="h">Tablet</text>
+  <text x="615" y="545" class="t">Adaptive Hybrid</text>
+  <text x="615" y="585" class="small">• Landscape → compact Command Center</text>
+  <text x="615" y="617" class="small">• Portrait → expanded adaptive cards</text>
+  <text x="615" y="649" class="small">• Touch-first targets and collapsible rail</text>
+  <rect x="615" y="680" rx="14" width="320" height="34" class="accent"/>
+  <text x="634" y="704" class="tagt">Context-aware transition</text>
+
+  <rect x="1090" y="455" rx="28" ry="28" width="440" height="275" class="panel"/>
+  <text x="1125" y="505" class="h">Phone</text>
+  <text x="1125" y="545" class="t">Concept C — Adaptive Cards</text>
+  <text x="1125" y="585" class="small">• Patient → risks → recommendation → actions</text>
+  <text x="1125" y="617" class="small">• Bottom navigation instead of desktop sidebar</text>
+  <text x="1125" y="649" class="small">• Progressive disclosure for cost/evidence</text>
+  <rect x="1125" y="680" rx="14" width="320" height="34" class="accent"/>
+  <text x="1144" y="704" class="tagt">Preferred mobile shell</text>
+
+  <path d="M795,335 L795,420" class="line"/>
+  <path d="M795,420 C430,420 300,430 290,455" class="line"/>
+  <path d="M795,420 L800,455" class="line"/>
+  <path d="M795,420 C1160,420 1300,430 1310,455" class="line"/>
+
+  <rect x="70" y="790" rx="22" ry="22" width="1460" height="120" class="dark"/>
+  <text x="105" y="835" class="darkt">Commercial / Product Media rule</text>
+  <text x="105" y="870" class="small" fill="#d8edf3">Generic-first clinical recommendation. Originator/market brands are secondary. Sponsored product presence must be clearly labeled and must never change clinical eligibility, safety gates, evidence, score, or ranking.</text>
+</svg>

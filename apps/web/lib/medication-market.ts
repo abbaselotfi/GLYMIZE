@@ -45,3 +45,11 @@ export function groupInsuranceCodes(coverages: InsuranceCoverage[], field: "gene
 export function coverageHasFinancialBreakdown(coverage: InsuranceCoverage) {
   return coverage.insurerShareToman !== undefined || coverage.patientShareToman !== undefined || coverage.referencePriceToman !== undefined;
 }
+
+export function formatCoveragePercent(percent: number, locale: "fa" | "en" = "fa") {
+  if (!Number.isFinite(percent)) return "—";
+  return new Intl.NumberFormat(locale === "fa" ? "fa-IR" : "en-US", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: Number.isInteger(percent) ? 0 : 1
+  }).format(percent);
+}

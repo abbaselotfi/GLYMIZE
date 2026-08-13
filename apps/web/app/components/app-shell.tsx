@@ -61,7 +61,8 @@ const COPY = {
     subtitle: "تصمیم‌یار دیابت برای پزشک",
     brandSubtitle: "فضای کار بالینی",
     installable: "نسخهٔ قابل نصب GLYMIZE",
-    privacy: "اطلاعات بیمار ذخیره نمی‌شود",
+    privacy: "داده بیمار فقط در مسیر handoff کنترل‌شده ذخیره می‌شود",
+    contact: "ارتباط با GLYMIZE",
     menu: "نمایش منو",
     close: "بستن منو",
   },
@@ -71,7 +72,8 @@ const COPY = {
     subtitle: "Decision support for diabetes prescribing",
     brandSubtitle: "Clinical workspace",
     installable: "Installable GLYMIZE version",
-    privacy: "Patient information is not stored",
+    privacy: "Patient data is stored only in the controlled handoff pathway",
+    contact: "Contact GLYMIZE",
     menu: "Open navigation",
     close: "Close navigation",
   },
@@ -132,6 +134,13 @@ export default function AppShell({
           <div>
             <strong>{copy.installable}</strong>
             <small>{copy.privacy}</small>
+            <a
+              className="support-email"
+              href="mailto:info@glymize.ir?subject=GLYMIZE%20Feedback"
+              title={copy.contact}
+            >
+              info@glymize.ir
+            </a>
           </div>
         </div>
       </aside>

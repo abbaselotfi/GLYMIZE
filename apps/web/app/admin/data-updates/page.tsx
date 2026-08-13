@@ -197,7 +197,13 @@ export default function DrugDataUpdatesPage() {
       </section>
 
       <section className="panel">
-        <span className="eyebrow">Fallback import</span><h2>ورود دستی خروجی استاندارد Runner</h2>
+        <span className="eyebrow">Contract v2.3 · Primary import</span><h2>Market v2.3 — ورود، بهینه‌سازی و نصب Runtime</h2>
+        <p>فایل Runtime جدید را مستقیم Validate کنید، Package/Costing Gateها را ببینید و نسخه بهینه مرورگر را بدون حذف هیچ Product بسازید. Canonical برای Deep Audit اختیاری باقی می‌ماند.</p>
+        <Link className="admin-link" href="/admin/data-updates/v2-preflight">باز کردن Import / Preflight v2.3</Link>
+      </section>
+
+      <section className="panel">
+        <span className="eyebrow">Legacy v1 · Compatibility only</span><h2>ورود قدیمی Runner</h2>
         <label className="file-picker"><span>انتخاب فایل `glymize-drug-bundle.json`</span><input accept=".json,application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readBundleFile(file); }} type="file" /></label>
       </section>
 

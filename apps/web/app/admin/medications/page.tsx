@@ -5,7 +5,7 @@ import type { InsuranceProvider, MedicationBrand, MedicationChecklistItem, Medic
 import { medicationClinicalDomains } from "@glymize/contracts";
 import { useEffect, useMemo, useState } from "react";
 import { readSheet } from "read-excel-file/browser";
-import { apiFetch, beginCatalogPublishBatch, endCatalogPublishBatch } from "../../../lib/api-client";
+import { apiFetch, beginCatalogPublishBatch, buildCatalogDiagnosticSnapshot, endCatalogPublishBatch } from "../../../lib/api-client";
 import { withBasePath } from "../../../lib/base-path";
 const clinicalDomainLabels: Record<MedicationClinicalDomain, string> = {
   diabetes: "دیابت", cardiovascular: "قلب و عروق", kidney: "کلیه", liver: "کبد", obesity: "چاقی",
@@ -95,6 +95,24 @@ export default function MedicationSelectionPage() {
   const [syncVisibility, setSyncVisibility] = useState(true);
   const [replaceBrands, setReplaceBrands] = useState(true);
   const [message, setMessage] = useState("در حال بارگذاری کاتالوگ…");
+
+  async function downloadDiagnosticExport() {
+    try {
+      const snapshot = await buildCatalogDiagnosticSnapshot();
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `glymize-drug-insurance-diagnostic-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setMessage("خروجی تشخیصی دارو، قیمت، NFI و بیمه ساخته شد.");
+    } catch {
+      setMessage("ساخت خروجی تشخیصی انجام نشد.");
+    }
+  }
 
   async function refresh() {
     const response = await apiFetch("/v1/admin/catalog/medication-checklist");
@@ -346,7 +364,7 @@ export default function MedicationSelectionPage() {
 
   return <main>
     <Link className="back-button" href="/admin">→ بازگشت به پنل مدیریت</Link>
-    <header className="page-heading"><div><span className="eyebrow">Medication visibility & insurance</span><h1>انتخاب دارو و پوشش بیمه</h1><p>کد، قیمت و پوشش هر بیمه مستقل ثبت می‌شود؛ تمام قیمت‌های نمایشی با واحد تومان هستند.</p></div><div className="page-heading-actions"><Link className="admin-link" href="/admin/data-updates">استخراج و به‌روزرسانی منابع</Link><span className="version-badge">{items.filter((item) => item.showInApp).length} فعال از {items.length || 104}</span></div></header>
+    <header className="page-heading"><div><span className="eyebrow">Medication visibility & insurance</span><h1>انتخاب دارو و پوشش بیمه</h1><p>کد، قیمت و پوشش هر بیمه مستقل ثبت می‌شود؛ تمام قیمت‌های نمایشی با واحد تومان هستند.</p></div><div className="page-heading-actions"><button className="secondary" onClick={() => void downloadDiagnosticExport()} type="button">خروجی تشخیصی دیتابیس</button><Link className="admin-link" href="/admin/data-updates">استخراج و به‌روزرسانی منابع</Link><span className="version-badge">{items.filter((item) => item.showInApp).length} فعال از {items.length || 104}</span></div></header>
     <section className="import-card">
       <div className="import-heading"><div><span className="eyebrow">Excel Import</span><h2>ورود اطلاعات دارویی از فایل استاندارد</h2><p>فایل ابتدا بررسی می‌شود و تا زدن دکمهٔ ثبت، تغییری انجام نمی‌گیرد. ستون بیمهٔ خالی، اطلاعات بیمهٔ قبلی را دست‌نخورده نگه می‌دارد.</p></div><a className="secondary import-template-link" download="glymize-medication-import-template.xlsx" href={withBasePath("/diayar-medication-import-template.xlsx")}>دانلود قالب خالی</a></div>
       <div className="import-controls">
@@ -368,7 +386,7 @@ export default function MedicationSelectionPage() {
       const draft = draftFor(item);
       return <article className={item.showInApp ? "medication-admin-row selected" : "medication-admin-row"} id={item.referencePresentationId} key={item.referencePresentationId}>
         <label className="compact-check"><input checked={item.showInApp} onChange={(event) => void setVisibility(item, event.target.checked)} type="checkbox" /><span>نمایش</span></label>
-        <div className="medication-copy"><strong>{item.genericName}</strong><small>{item.dosageForm} · {item.strengthPresentation}</small><small>حوزه‌ها: {(item.clinicalDomains ?? []).map((domain) => clinicalDomainLabels[domain]).join(" · ") || "بدون حوزهٔ تخصیص‌یافته"}</small></div>
+        <div className="medication-copy"><strong>{item.genericName}</strong><small>{item.dosageForm} · {item.strengthPresentation}</small><small>وضعیت بازار: {item.marketVerification === "nfi_verified" ? "NFI تأییدشده ✓" : item.marketVerification === "admin_override" ? "تأیید دستی ادمین · خارج NFI فعلی" : "در NFI فعلی یافت نشد · پیش‌فرض مخفی"}</small><small>حوزه‌ها: {(item.clinicalDomains ?? []).map((domain) => clinicalDomainLabels[domain]).join(" · ") || "بدون حوزهٔ تخصیص‌یافته"}</small></div>
         <label className="compact-check"><input checked={draft.enabled} onChange={(event) => void setInsuranceEnabled(item, event.target.checked)} type="checkbox" /><span>بیمه</span></label>
         <select disabled={!draft.enabled} onChange={(event) => setDraft(item, { provider: event.target.value as InsuranceProvider })} value={draft.provider}>{Object.entries(providerLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <label className="coverage-input"><input disabled={!draft.enabled} max="100" min="0" onChange={(event) => setDraft(item, { percent: event.target.value })} placeholder="مثلاً ۷۰" type="number" value={draft.percent} /><span>٪</span></label>

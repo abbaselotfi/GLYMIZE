@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const isGitHubPages = process.env.GITHUB_PAGES === "true";
 const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "GLYMIZE";
-const basePath = isGitHubPages ? `/${repositoryName}` : "";
+const useCustomDomain = process.env.GITHUB_PAGES_CUSTOM_DOMAIN === "true";
+const basePath = isGitHubPages && !useCustomDomain ? `/${repositoryName}` : "";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@glymize/contracts", "@glymize/clinical-engine"],
