@@ -10,6 +10,9 @@ import "./design-system-v2.css";
 import "./design-system-v2-a11y.css";
 import "./design-system-v2-legacy.css";
 import "./design-system-v2-smoke-fixes.css";
+import "./design-tokens-v3-core.css";
+import "./design-tokens-v3-semantic.css";
+import "./design-tokens-v3-dark.css";
 import "./redesign-v3-entry.css";
 
 export const metadata: Metadata = {
