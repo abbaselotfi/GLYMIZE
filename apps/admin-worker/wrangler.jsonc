@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "shiny-block-9d4a",
-	"main": "src/index.ts",
+	"main": "src/platform-index.ts",
 	"compatibility_date": "2026-07-29",
 	"vars": {
 		"ADMIN_ORIGIN": "https://abbaselotfi.github.io",
@@ -17,7 +17,8 @@
       "GITHUB_CLIENT_SECRET",
       "SESSION_SECRET",
       "AI_CONFIG_MASTER_KEY",
-      "AI_RUNTIME_SHARED_SECRET"
+      "AI_RUNTIME_SHARED_SECRET",
+      "CLINICAL_DATA_MASTER_KEY"
     ]
 	},
 	"kv_namespaces": [
@@ -25,6 +26,14 @@
 			"binding": "AI_CONFIG_KV",
 			"id": "3af3075ba52e4c0ea3f6a0035d35e97b",
 			"remote": true
+		}
+	]
+	,"d1_databases": [
+		{
+			"binding": "GLYMIZE_DB",
+			"database_name": "glymize-runtime",
+			"database_id": "ba073c8d-4925-4dab-a39c-6fa0f592cf1f",
+			"migrations_dir": "migrations"
 		}
 	]
 }

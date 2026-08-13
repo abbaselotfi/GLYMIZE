@@ -5,9 +5,7 @@ import type {
   PatientHandoffRecord,
   PatientHandoffUpsertInput,
 } from "@glymize/contracts";
-
-const remoteApiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-const handoffToken = process.env.NEXT_PUBLIC_PATIENT_HANDOFF_TOKEN ?? "";
+import { runtimeFetch } from "./runtime-client";
 
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
@@ -34,53 +32,32 @@ export function validateIranianNationalId(value: string) {
   return Number(code[9]) === expected;
 }
 
-function requireLocalPreviewApi() {
-  if (!remoteApiUrl || !handoffToken) throw new Error("HANDOFF_API_NOT_CONFIGURED");
-  return remoteApiUrl;
-}
-
-function apiHeaders() {
-  return {
-    "content-type": "application/json",
-    "x-glymize-handoff-token": handoffToken,
-  };
+function handoffError(status: number, fallback: string) {
+  if (status === 401) return "HANDOFF_AUTH_REQUIRED";
+  if (status === 403) return "HANDOFF_PERMISSION_DENIED";
+  if (status === 409) return "AMBIGUOUS_PATIENT_CODE";
+  if (status === 422 || status === 400) return "HANDOFF_INPUT_INVALID";
+  if (status === 503) return "HANDOFF_BACKEND_NOT_CONFIGURED";
+  return fallback;
 }
 
 export async function savePatientHandoff(input: PatientHandoffUpsertInput): Promise<PatientHandoffRecord> {
-  const apiUrl = requireLocalPreviewApi();
-  const response = await fetch(`${apiUrl}/v1/patient-handoff/upsert`, {
+  const response = await runtimeFetch("/v1/patient-handoff/upsert", {
     method: "POST",
-    headers: apiHeaders(),
     body: JSON.stringify(input),
   });
-  if (!response.ok) {
-    const code = response.status === 401
-      ? "HANDOFF_UNAUTHORIZED"
-      : response.status === 400
-        ? "HANDOFF_INPUT_INVALID"
-        : "HANDOFF_SAVE_FAILED";
-    throw new Error(code);
-  }
+  if (!response.ok) throw new Error(handoffError(response.status, "HANDOFF_SAVE_FAILED"));
   return response.json() as Promise<PatientHandoffRecord>;
 }
 
 export async function lookupPatientHandoff(patientCode: string): Promise<PatientHandoffLookupResult> {
   const normalized = normalizePatientCode(patientCode);
   if (!normalized) return { found: false };
-  const apiUrl = requireLocalPreviewApi();
-  const response = await fetch(`${apiUrl}/v1/patient-handoff/lookup`, {
+  const response = await runtimeFetch("/v1/patient-handoff/lookup", {
     method: "POST",
-    headers: apiHeaders(),
     body: JSON.stringify({ patientCode }),
   });
   if (response.status === 404) return { found: false };
-  if (!response.ok) {
-    const code = response.status === 401
-      ? "HANDOFF_UNAUTHORIZED"
-      : response.status === 409
-        ? "AMBIGUOUS_PATIENT_CODE"
-        : "HANDOFF_LOOKUP_FAILED";
-    throw new Error(code);
-  }
+  if (!response.ok) throw new Error(handoffError(response.status, "HANDOFF_LOOKUP_FAILED"));
   return response.json() as Promise<PatientHandoffLookupResult>;
 }
