@@ -96,12 +96,12 @@ function accessConstrainedScenario(input: Type2ScenarioBuildInput, base: BaseTre
   };
 }
 
-function boundScenarioCosts(scenario: Type2TreatmentScenario): Type2TreatmentScenario {
+function boundScenarioCosts(scenario: BaseTreatmentScenario | Type2TreatmentScenario): Type2TreatmentScenario {
   return { ...scenario, cost30Days: scenario.cost30Days.map(boundedCost) };
 }
 
 export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Type2TreatmentScenario[] {
-  const scenarios: Type2TreatmentScenario[] = buildBaseScenarios(input);
+  const scenarios = buildBaseScenarios(input);
   if (scenarios.length === 1 && scenarios[0]?.kind === "maintain_monitor" && stillNeedsClinicalAction(input)) {
     return [boundScenarioCosts(accessConstrainedScenario(input, scenarios[0]))];
   }
