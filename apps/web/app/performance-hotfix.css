@@ -1,0 +1,29 @@
+/* Mobile performance guardrails for data-dense GLYMIZE surfaces. */
+
+/* The medication admin can contain hundreds of controls. Let the browser skip
+   layout/paint work for rows that are far outside the viewport. */
+.medication-admin-row,
+.brand-branch {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 520px;
+}
+
+@media (max-width: 760px) {
+  /* Live blur on sticky/fixed layers is expensive on Android GPUs and is not
+     required for hierarchy on a phone-sized canvas. */
+  .glymize-internal-shell .global-topbar.glymize-shared-topbar,
+  .glymize-internal-shell .sidebar,
+  .update-toast,
+  [class*="saveBar"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .medication-admin-row {
+    contain-intrinsic-size: auto 860px;
+  }
+
+  .brand-branch {
+    contain-intrinsic-size: auto 560px;
+  }
+}
