@@ -33,30 +33,52 @@ html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] .pag
   --t2-shadow: 0 16px 40px rgba(0,0,0,.24);
 }
 
+/* Surfaces: no light-only white cards survive in dark mode. */
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="section"],
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="scenarioCard"],
-.glymize-internal-shell[data-route="type-2"] .page-content [class*="engineDetails"] {
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="engineDetails"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="costBox"] {
+  border-color: var(--t2-line) !important;
+  background: var(--t2-surface) !important;
+  color: var(--t2-ink) !important;
+  box-shadow: var(--t2-shadow);
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="hero"] {
+  border-color: var(--t2-line) !important;
+  background: linear-gradient(135deg,color-mix(in srgb,var(--t2-accent-soft) 56%,var(--t2-surface)) 0%,var(--t2-surface) 66%) !important;
   color: var(--t2-ink) !important;
 }
 
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="heroMetric"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="currentMed"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="scenarioMed"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="contextBox"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="costNumbers"] > div,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="explainGrid"] > div {
+  border-color: var(--t2-line) !important;
+  background: var(--t2-surface-soft) !important;
+  color: var(--t2-ink) !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="emptyLine"] {
+  border-color: color-mix(in srgb,var(--t2-accent) 30%,var(--t2-line)) !important;
+  background: var(--t2-surface-soft) !important;
+  color: var(--t2-muted) !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+}
+
+/* Clinical typography hierarchy. */
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="sectionTitle"] h2,
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="subhead"] b,
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="factor"] b,
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="choice"] span,
-.glymize-internal-shell[data-route="type-2"] .page-content [class*="medTop"] b {
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="medTop"] b,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="resultHeader"] h2,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="scenarioHead"] h3 {
   color: var(--t2-ink) !important;
   font-weight: 800 !important;
-}
-
-.glymize-internal-shell[data-route="type-2"] .page-content [class*="sectionTitle"] p,
-.glymize-internal-shell[data-route="type-2"] .page-content [class*="subhead"] small,
-.glymize-internal-shell[data-route="type-2"] .page-content [class*="factor"] small,
-.glymize-internal-shell[data-route="type-2"] .page-content [class*="medTop"] small,
-.glymize-internal-shell[data-route="type-2"] .page-content [class*="costBox"] small {
-  color: var(--t2-muted) !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  line-height: 1.65 !important;
 }
 
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="sectionTitle"] h2 {
@@ -64,6 +86,29 @@ html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] .pag
   line-height: 1.4 !important;
 }
 
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="sectionTitle"] p,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="subhead"] small,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="factor"] small,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="medTop"] small,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="costBox"] small,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="resultHeader"] p,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="explainGrid"] li,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="parallel"] li {
+  color: var(--t2-muted) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.7 !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="field"] > span,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="selectField"] > span,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="costInputs"] label > span {
+  color: var(--t2-ink) !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+}
+
+/* Section 2 contract: 4 desktop / 2 tablet / 1 phone. */
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="factorGrid"] {
   grid-template-columns: repeat(4,minmax(0,1fr)) !important;
   gap: 10px !important;
@@ -88,6 +133,7 @@ html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] .pag
   background: var(--t2-accent-soft) !important;
 }
 
+/* Choice/radio cards and form controls. */
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="choice"] {
   min-height: 48px;
   border-color: var(--t2-line) !important;
@@ -103,6 +149,12 @@ html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] .pag
   color: var(--t2-ink) !important;
 }
 
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="choiceActive"] {
+  border-color: var(--t2-accent) !important;
+  background: var(--t2-accent-soft) !important;
+  color: var(--t2-ink) !important;
+}
+
 .glymize-internal-shell[data-route="type-2"] .page-content input,
 .glymize-internal-shell[data-route="type-2"] .page-content select {
   color: var(--t2-ink) !important;
@@ -112,8 +164,56 @@ html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] .pag
   font-weight: 650 !important;
 }
 
+.glymize-internal-shell[data-route="type-2"] .page-content input::placeholder {
+  color: color-mix(in srgb,var(--t2-muted) 74%,transparent) !important;
+}
+
+/* Warning, success, and rail surfaces also follow the active mode. */
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="alertChecks"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="parallel"] {
+  border-color: color-mix(in srgb,var(--t2-warning) 30%,var(--t2-line)) !important;
+  background: var(--t2-warning-bg) !important;
+  color: var(--t2-ink) !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="insuranceRow"] span {
+  background: var(--t2-success-bg) !important;
+  color: var(--t2-success) !important;
+  font-size: 11.5px !important;
+  font-weight: 750 !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="summaryRail"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="submitBar"] {
+  background: var(--t2-rail) !important;
+  color: #f3fbfb !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="summaryRail"] h2,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="summaryRail"] b {
+  color: #f3fbfb !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="summaryRail"] small,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="guardrail"],
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="submitBar"] p {
+  color: var(--t2-rail-muted) !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+}
+
+/* Hover behavior: brighter, not muddy/darker. */
 .glymize-internal-shell[data-route="type-2"] .page-content button:not(:disabled):hover {
   filter: brightness(1.08);
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="subhead"] button:hover,
+.glymize-internal-shell[data-route="type-2"] .page-content [class*="submitBar"] button:hover {
+  background: var(--glymize-accent-500) !important;
+  border-color: var(--glymize-accent-500) !important;
+  color: #fff !important;
+  filter: none;
+  transform: translateY(-1px);
 }
 
 .glymize-internal-shell[data-route="type-2"] .page-content [class*="remove"]:hover {
