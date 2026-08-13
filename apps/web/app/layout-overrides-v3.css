@@ -1,0 +1,51 @@
+/* Adaptive layout presets for the redesigned clinical workspace. */
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] .page-content,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] .page-content {
+  max-width: 1560px;
+}
+
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] .page-content {
+  max-width: 1180px;
+}
+
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="workspace"] {
+  grid-template-columns: minmax(0,1fr) 280px !important;
+  gap: 16px !important;
+}
+
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="factorGrid"] {
+  grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+}
+
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="heroMetric"] {
+  display: none !important;
+}
+
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] .page-content {
+  max-width: 1320px;
+  padding-top: 22px;
+}
+
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="section"] {
+  border-radius: 18px !important;
+}
+
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="factorGrid"] {
+  grid-template-columns: repeat(3,minmax(0,1fr)) !important;
+}
+
+@media (max-width:1180px) {
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="factorGrid"] {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+}
+
+@media (max-width:760px) {
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] .page-content,
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] .page-content {
+    padding-inline: 12px;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="factorGrid"] {
+    grid-template-columns: 1fr !important;
+  }
+}
