@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "shiny-block-9d4a",
-	"main": "src/platform-index.ts",
+	"main": "src/platform-v3.ts",
 	"compatibility_date": "2026-07-29",
 	"vars": {
 		"ADMIN_ORIGIN": "https://abbaselotfi.github.io",
