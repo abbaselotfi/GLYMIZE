@@ -14,6 +14,9 @@ import "./design-tokens-v3-core.css";
 import "./design-tokens-v3-semantic.css";
 import "./design-tokens-v3-dark.css";
 import "./redesign-v3-entry.css";
+import "./type-2/type2-command-center-v3.css";
+import "./type-2/type2-focused-workflow-v3.css";
+import "./type-2/type2-adaptive-cards-v3.css";
 
 export const metadata: Metadata = {
   title: "GLYMIZE | Diabetes Prescribing Intelligence",
