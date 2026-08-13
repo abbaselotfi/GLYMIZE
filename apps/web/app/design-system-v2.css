@@ -1,0 +1,448 @@
+/* GLYMIZE Design System v2 — adaptive clinical workspace */
+
+.glymize-internal-shell {
+  --ds-sidebar: 272px;
+  --ds-topbar: 72px;
+  --ds-content-max: 1480px;
+  --ds-reading: 780px;
+  --ds-radius-sm: 10px;
+  --ds-radius: 14px;
+  --ds-radius-lg: 20px;
+  --ds-radius-xl: 26px;
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+  --ds-space-10: 40px;
+  --ds-shadow-1: 0 8px 24px rgba(20, 58, 61, .045);
+  --ds-shadow-2: 0 16px 44px rgba(20, 58, 61, .075);
+  --ds-success-bg: #e9f6ef;
+  --ds-success: #17684a;
+  --ds-warning-bg: #fff6e6;
+  --ds-warning: #7d591d;
+  --ds-danger-bg: #fff0ef;
+  --ds-danger: #9b403c;
+  --ds-info-bg: #edf6fb;
+  --ds-info: #315f7e;
+  min-height: 100dvh;
+  background: var(--glymize-canvas);
+  color: var(--glymize-ink);
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell {
+  --ds-success-bg: #173329;
+  --ds-success: #83d5ad;
+  --ds-warning-bg: #352c1d;
+  --ds-warning: #e3c27d;
+  --ds-danger-bg: #382322;
+  --ds-danger: #efaaa5;
+  --ds-info-bg: #192f3a;
+  --ds-info: #8bc7e8;
+}
+
+.glymize-internal-shell,
+.glymize-internal-shell button,
+.glymize-internal-shell input,
+.glymize-internal-shell select,
+.glymize-internal-shell textarea {
+  font-size: 14px;
+}
+
+.glymize-internal-shell button,
+.glymize-internal-shell [role="button"],
+.glymize-internal-shell input:not([type="checkbox"]):not([type="radio"]),
+.glymize-internal-shell select {
+  min-height: 44px;
+}
+
+.glymize-internal-shell input,
+.glymize-internal-shell select,
+.glymize-internal-shell textarea {
+  border-color: var(--glymize-line) !important;
+  background: var(--glymize-surface) !important;
+  color: var(--glymize-ink) !important;
+}
+
+.glymize-internal-shell input:focus,
+.glymize-internal-shell select:focus,
+.glymize-internal-shell textarea:focus {
+  border-color: var(--glymize-accent-500) !important;
+  box-shadow: 0 0 0 3px var(--glymize-accent-soft) !important;
+}
+
+.glymize-internal-shell .content-shell {
+  min-width: 0;
+  background:
+    radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--glymize-accent-soft) 52%, transparent) 0, transparent 28rem),
+    var(--glymize-canvas);
+}
+
+.glymize-internal-shell .sidebar {
+  width: var(--ds-sidebar);
+  padding: 24px 18px max(24px, env(safe-area-inset-bottom));
+  border-inline-end: 1px solid var(--glymize-line);
+  background: color-mix(in srgb, var(--glymize-surface) 96%, var(--glymize-accent-soft));
+  box-shadow: 8px 0 28px rgba(20, 58, 61, .025);
+}
+
+.glymize-internal-shell .brand {
+  min-height: 56px;
+  padding: 7px 8px;
+  border-radius: var(--ds-radius);
+}
+
+.glymize-internal-shell .brand:hover {
+  background: var(--glymize-accent-soft);
+}
+
+.glymize-internal-shell .brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  box-shadow: 0 8px 20px rgba(7, 94, 88, .18);
+}
+
+.glymize-internal-shell .brand strong {
+  font-size: 17px;
+  letter-spacing: .04em;
+}
+
+.glymize-internal-shell .brand small {
+  margin-top: 2px;
+  color: var(--glymize-muted);
+  font-size: 11.5px;
+}
+
+.glymize-internal-shell .main-nav {
+  display: grid;
+  gap: 5px;
+  margin-top: 24px;
+}
+
+.glymize-internal-shell .nav-section-label {
+  margin: 18px 10px 6px;
+  color: var(--glymize-muted);
+  font-size: 10.5px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.glymize-internal-shell .nav-section-label:first-child { margin-top: 0; }
+
+.glymize-internal-shell .nav-item {
+  min-height: 46px;
+  gap: 11px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--glymize-muted);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+.glymize-internal-shell .nav-item > span:first-child {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--glymize-surface-soft);
+  color: var(--glymize-muted);
+  font-size: 10px;
+  font-weight: 900;
+  direction: ltr;
+}
+
+.glymize-internal-shell .nav-item:hover {
+  transform: translateX(1px);
+  border-color: color-mix(in srgb, var(--glymize-accent-500) 34%, var(--glymize-line));
+  background: var(--glymize-accent-soft);
+  color: var(--glymize-accent-700);
+}
+
+.glymize-internal-shell[dir="rtl"] .nav-item:hover { transform: translateX(-1px); }
+
+.glymize-internal-shell .nav-item.active {
+  border-color: color-mix(in srgb, var(--glymize-accent-500) 46%, var(--glymize-line));
+  background: var(--glymize-accent-soft);
+  color: var(--glymize-accent-700);
+  box-shadow: inset 3px 0 0 var(--glymize-accent-600);
+}
+
+.glymize-internal-shell[dir="rtl"] .nav-item.active {
+  box-shadow: inset -3px 0 0 var(--glymize-accent-600);
+}
+
+.glymize-internal-shell .nav-item.active > span:first-child {
+  background: var(--glymize-accent-600);
+  color: #fff;
+}
+
+.glymize-internal-shell .sidebar-note {
+  border: 1px solid var(--glymize-line);
+  border-radius: var(--ds-radius);
+  background: var(--glymize-surface-soft);
+  padding: 13px;
+}
+
+.glymize-internal-shell .sidebar-note strong { font-size: 12px; }
+.glymize-internal-shell .sidebar-note small { font-size: 11.5px !important; line-height: 1.6; }
+
+.glymize-internal-shell .global-topbar.glymize-shared-topbar {
+  height: var(--ds-topbar);
+  min-height: var(--ds-topbar);
+  padding: 0 clamp(18px, 2.5vw, 38px);
+  border-bottom: 1px solid var(--glymize-line);
+  background: color-mix(in srgb, var(--glymize-topbar) 92%, transparent);
+  box-shadow: 0 8px 28px rgba(20, 58, 61, .035);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+.glymize-internal-shell .topbar-title strong {
+  color: var(--glymize-ink);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.glymize-internal-shell .topbar-title span {
+  margin-top: 3px;
+  color: var(--glymize-muted);
+  font-size: 11.5px;
+}
+
+.glymize-internal-shell .workspace-mode-badge {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--glymize-line);
+  border-radius: 999px;
+  background: var(--glymize-surface-soft);
+  color: var(--glymize-muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.glymize-internal-shell .workspace-mode-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--glymize-accent-500);
+}
+
+.glymize-internal-shell .page-content {
+  width: 100%;
+  max-width: var(--ds-content-max);
+  margin: 0 auto;
+  padding: 30px clamp(18px, 2.6vw, 40px) 72px;
+}
+
+.glymize-internal-shell .page-content small { font-size: 12.5px; }
+.glymize-internal-shell .page-content article p,
+.glymize-internal-shell .page-content section > p,
+.glymize-internal-shell .page-content section > div > p {
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+
+.glymize-internal-shell .clinical-surface {
+  border: 1px solid var(--glymize-line);
+  border-radius: var(--ds-radius-lg);
+  background: var(--glymize-surface);
+  box-shadow: var(--ds-shadow-1);
+}
+
+.glymize-internal-shell[data-layout-preset="focused_workflow"] {
+  --ds-sidebar: 222px;
+  --ds-content-max: 1160px;
+}
+
+.glymize-internal-shell[data-layout-preset="focused_workflow"] .sidebar-note,
+.glymize-internal-shell[data-layout-preset="focused_workflow"] .topbar-title span {
+  display: none;
+}
+
+.glymize-internal-shell[data-layout-preset="compact_cards"] {
+  --ds-sidebar: 238px;
+  --ds-content-max: 1320px;
+}
+
+.glymize-internal-shell[data-layout-preset="compact_cards"] .page-content {
+  padding-top: 22px;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content {
+  max-width: 1560px;
+}
+
+.glymize-internal-shell[data-route="type-2"] [class*="factorGrid"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.glymize-internal-shell[data-route="type-2"] [class*="factor"] {
+  min-height: 76px;
+}
+
+.glymize-internal-shell[data-route="type-2"] [class*="factor"] small,
+.glymize-internal-shell[data-route="type-2"] [class*="scenarioMed"] small,
+.glymize-internal-shell[data-route="type-2"] [class*="summaryRail"] small,
+.glymize-internal-shell[data-route="type-2"] [class*="costBox"] small {
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] [class*="insuranceRow"] span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] [class*="summaryRail"] {
+  top: calc(var(--ds-topbar) + 18px) !important;
+}
+
+.glymize-internal-shell[data-route="type-2"] [class*="scenarioCard"]:first-child {
+  border-color: color-mix(in srgb, var(--glymize-accent-500) 58%, var(--glymize-line)) !important;
+  box-shadow: var(--ds-shadow-2) !important;
+}
+
+.glymize-internal-shell[data-route="admin"] .page-content {
+  max-width: 1500px;
+}
+
+.glymize-internal-shell[data-route="admin"] button,
+.glymize-internal-shell[data-route="admin"] a {
+  touch-action: manipulation;
+}
+
+.shell-mobile-nav { display: none; }
+
+@media (max-width: 1180px) {
+  .glymize-internal-shell[data-route="type-2"] [class*="factorGrid"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .glymize-internal-shell { --ds-sidebar: 250px; }
+  .glymize-internal-shell .page-content { padding-inline: 20px; }
+}
+
+@media (max-width: 760px) {
+  .glymize-internal-shell {
+    --ds-topbar: 62px;
+    --ds-content-max: 100%;
+  }
+
+  .glymize-internal-shell .sidebar {
+    width: min(86vw, 320px);
+    padding-inline: 16px;
+    box-shadow: 22px 0 70px rgba(0, 0, 0, .18);
+  }
+
+  .glymize-internal-shell .global-topbar.glymize-shared-topbar {
+    min-height: calc(var(--ds-topbar) + env(safe-area-inset-top, 0px));
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px;
+  }
+
+  .glymize-internal-shell .topbar-title strong { max-width: 108px; font-size: 12px; }
+  .glymize-internal-shell .topbar-title span,
+  .glymize-internal-shell .workspace-mode-badge { display: none; }
+  .glymize-internal-shell .page-content {
+    padding: 18px 12px calc(98px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .glymize-internal-shell .page-content small,
+  .glymize-internal-shell .page-content article p,
+  .glymize-internal-shell .page-content section > p,
+  .glymize-internal-shell .page-content section > div > p {
+    font-size: 13px;
+  }
+
+  .glymize-internal-shell[data-route="type-2"] [class*="factorGrid"] {
+    grid-template-columns: 1fr;
+  }
+
+  .shell-mobile-nav {
+    position: fixed;
+    z-index: 85;
+    inset-inline: 10px;
+    bottom: max(9px, env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    min-height: 60px;
+    padding: 6px;
+    border: 1px solid color-mix(in srgb, var(--glymize-line) 84%, transparent);
+    border-radius: 19px;
+    background: color-mix(in srgb, var(--glymize-surface) 94%, transparent);
+    box-shadow: 0 18px 50px rgba(10, 42, 44, .18);
+    backdrop-filter: blur(20px) saturate(140%);
+  }
+
+  .shell-mobile-nav a {
+    display: grid;
+    min-width: 0;
+    min-height: 48px;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    border-radius: 13px;
+    color: var(--glymize-muted);
+    text-decoration: none;
+  }
+
+  .shell-mobile-nav a > span:first-child {
+    font-size: 10px;
+    font-weight: 900;
+    direction: ltr;
+  }
+
+  .shell-mobile-nav a > span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 9.5px;
+    font-weight: 750;
+  }
+
+  .shell-mobile-nav a.active {
+    background: var(--glymize-accent-soft);
+    color: var(--glymize-accent-700);
+  }
+
+  .glymize-internal-shell[data-layout-preset="command_center"] .shell-mobile-nav,
+  .glymize-internal-shell[data-layout-preset="focused_workflow"] .shell-mobile-nav,
+  .glymize-internal-shell[data-layout-preset="compact_cards"] .shell-mobile-nav,
+  .glymize-internal-shell[data-layout-preset="auto"] .shell-mobile-nav {
+    display: grid;
+  }
+}
+
+@media (max-width: 430px) {
+  .glymize-internal-shell .topbar-actions { gap: 4px; }
+  .glymize-internal-shell .page-content { padding-inline: 10px; }
+  .shell-mobile-nav { inset-inline: 7px; }
+  .shell-mobile-nav a > span:last-child { font-size: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glymize-internal-shell *,
+  .glymize-internal-shell *::before,
+  .glymize-internal-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .001ms !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

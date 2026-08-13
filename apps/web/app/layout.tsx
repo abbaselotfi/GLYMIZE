@@ -6,6 +6,7 @@ import "./globals.css";
 import "./internal-shell.css";
 import "./theme-overrides.css";
 import "./dark-readability.css";
+import "./design-system-v2.css";
 
 export const metadata: Metadata = {
   title: "GLYMIZE | Diabetes Prescribing Intelligence",
