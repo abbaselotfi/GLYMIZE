@@ -1,0 +1,4 @@
+@media(max-width:620px){
+ .glymize-internal-shell[data-route="admin"] [class*="saveBar"]{position:static!important;bottom:auto!important;margin-top:4px!important;box-shadow:var(--g3-shadow-card)!important;backdrop-filter:none!important}
+ .glymize-internal-shell[data-route="admin"] button:disabled{opacity:1!important;background:var(--glymize-surface-soft)!important;color:var(--glymize-muted)!important;border-color:var(--glymize-line)!important;box-shadow:none!important}
+}
