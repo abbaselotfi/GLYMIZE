@@ -25,7 +25,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --exclude test/evidence-casebase-uci-v1.test.ts",
+    "test:evidence": "vitest run test/evidence-casebase-uci-v1.test.ts"
   },
   "dependencies": {
     "@glymize/contracts": "workspace:*"

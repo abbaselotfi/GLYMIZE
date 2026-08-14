@@ -19,3 +19,6 @@ tools/iran-drug-runner/output/
 apps/api/.local-data/
 .glymize-local-secrets.ps1
 .local-patch-backups/
+# GLYMIZE retrospective evidence casebase — do not commit patient-level/raw source data
+validation/evidence-casebase/uci-v1/*.zip
+validation/evidence-casebase/uci-v1/*.jsonl

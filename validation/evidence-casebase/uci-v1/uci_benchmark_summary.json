@@ -1,0 +1,68 @@
+{
+  "benchmark_version": "GLYMIZE-UCI-EVIDENCE-v1",
+  "generated_utc": "2026-08-14T04:37:47.740380+00:00",
+  "source": {
+    "name": "Diabetes 130-US Hospitals for Years 1999-2008",
+    "repository": "UCI Machine Learning Repository",
+    "doi": "10.24432/C5230J",
+    "url": "https://archive.ics.uci.edu/dataset/296/diabetes+130-us+hospitals+for+years+1999-2008",
+    "license": "CC BY 4.0",
+    "source_zip_sha256": "f82ac129da2ddd2299391ff6fbae3a6a58b3edcf59ac9d7bd480c00fe453112a",
+    "diabetic_data_csv_sha256": "0689e7ec031237dc63031b938805c48377748761a3b26acab621567afa24df97"
+  },
+  "methodology": {
+    "non_fabrication": true,
+    "numeric_hba1c_imputation": false,
+    "age_midpoint_imputation": false,
+    "t2dm_claim": "type2_or_unspecified_compatible, not confirmed",
+    "primary_unit": "one deterministically selected encounter per patient",
+    "selection": "prioritize acute crisis, then informative A1C category, active medication count, encounter_id"
+  },
+  "counts": {
+    "all_encounters": 101766,
+    "unique_patients": 71518,
+    "primary_patient_cases": 71518,
+    "primary_type2_or_unspecified_compatible": 4629,
+    "phenotype": {
+      "type1_compatible": 6205,
+      "diabetes_type_not_explicit": 89142,
+      "type2_or_unspecified_compatible": 6418,
+      "conflicting_type_codes": 1
+    },
+    "acute_crisis": {
+      "none": 98791,
+      "dka": 2579,
+      "hyperosmolarity": 386,
+      "dka_and_hyperosmolarity": 10
+    },
+    "a1c": {
+      "not_measured_or_not_recorded": 84748,
+      ">7": 3812,
+      ">8": 8216,
+      "Norm": 4990
+    },
+    "readmission": {
+      "NO": 54864,
+      ">30": 35545,
+      "<30": 11357
+    }
+  },
+  "scientific_scope": {
+    "valid_for": [
+      "retrospective safety guardrail testing",
+      "missing-data fail-safe behavior",
+      "acute DKA recognition benchmark",
+      "medication-state parsing robustness",
+      "patient-level non-leakage benchmark construction"
+    ],
+    "not_valid_as_standalone_gold_standard_for": [
+      "modern outpatient medication recommendation accuracy",
+      "Iran insurance or price validation",
+      "exact HbA1c-target decisions",
+      "modern SGLT2/GLP-1 therapeutic superiority"
+    ],
+    "known_schema_gap_to_measure": [
+      "hyperosmolar crisis/HHS is clinically urgent but GLYMIZE currently needs an explicit representable input pathway for it"
+    ]
+  }
+}
