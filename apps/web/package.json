@@ -1,25 +1,25 @@
 {
-  "name": "@glymize/web",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "build": "node scripts/next.cjs build --webpack",
-    "dev": "node scripts/next.cjs dev --webpack",
-    "start": "next start --port 3000",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@glymize/clinical-engine": "workspace:*",
-    "@glymize/contracts": "workspace:*",
-    "next": "16.2.12",
-    "pdfjs-dist": "6.1.200",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "read-excel-file": "9.3.5",
-    "tesseract.js": "7.0.0"
-  },
-  "devDependencies": {
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3"
-  }
+    "name":  "@glymize/web",
+    "version":  "0.1.0",
+    "private":  true,
+    "scripts":  {
+                    "build":  "node scripts/next.cjs build --webpack",
+                    "dev":  "node scripts/next.cjs dev --webpack",
+                    "start":  "next start --port 3000",
+                    "typecheck":  "node scripts/next.cjs typegen \u0026\u0026 tsc -p tsconfig.json --noEmit"
+                },
+    "dependencies":  {
+                         "@glymize/clinical-engine":  "workspace:*",
+                         "@glymize/contracts":  "workspace:*",
+                         "next":  "16.2.12",
+                         "pdfjs-dist":  "6.1.200",
+                         "react":  "19.2.8",
+                         "react-dom":  "19.2.8",
+                         "read-excel-file":  "9.3.5",
+                         "tesseract.js":  "7.0.0"
+                     },
+    "devDependencies":  {
+                            "@types/react":  "19.2.17",
+                            "@types/react-dom":  "19.2.3"
+                        }
 }
