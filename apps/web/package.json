@@ -3,7 +3,7 @@
     "version":  "0.1.0",
     "private":  true,
     "scripts":  {
-                    "build":  "node scripts/next.cjs build --webpack",
+                    "build":  "node scripts/next.cjs build --webpack \u0026\u0026 node scripts/split-market-static-assets.mjs",
                     "dev":  "node scripts/next.cjs dev --webpack",
                     "start":  "next start --port 3000",
                     "typecheck":  "node scripts/next.cjs typegen \u0026\u0026 tsc -p tsconfig.json --noEmit"
