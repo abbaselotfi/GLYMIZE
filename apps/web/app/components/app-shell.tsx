@@ -18,6 +18,9 @@ import { useGlymizeLocale } from "./use-glymize-locale";
 import runtimeStyles from "./runtime-shell.module.css";
 
 type NavGroup = "clinical" | "workflow";
+type LocalQaLayoutPreset = "auto" | "command_center" | "focused_workflow" | "compact_cards" | "evidence_trace";
+const LOCAL_QA_LAYOUT_KEY = "glymize-local-layout-preset";
+const LOCAL_QA_LAYOUT_EVENT = "glymize-local-layout-preset-change";
 
 type NavItem = {
   href: string;
@@ -48,7 +51,7 @@ const COPY = {
     loading: "در حال بازیابی نشست امن…", signInTitle: "ورود به GLYMIZE لازم است",
     signInText: "برای استفاده از فضای کار بالینی، با حساب پزشک یا دستیار/پرستار وارد شوید.",
     deniedTitle: "این بخش برای حساب شما فعال نیست", deniedText: "پزشک می‌تواند این دسترسی را از پروفایل و بخش تیم مراقبت تغییر دهد.",
-    modes: { auto: "Auto", command_center: "Command Center", focused_workflow: "Focused", compact_cards: "Compact" },
+    modes: { auto: "Auto", command_center: "Command Center", focused_workflow: "Guided Focus", compact_cards: "Visual Flow", evidence_trace: "Evidence Trace" },
   },
   en: {
     navLabel: "Primary navigation", workspace: "GLYMIZE Clinical Command Center", subtitle: "Decision support for diabetes prescribing",
@@ -59,7 +62,7 @@ const COPY = {
     loading: "Restoring secure session…", signInTitle: "Sign in to GLYMIZE",
     signInText: "Use a physician or independent assistant/nurse account to access the clinical workspace.",
     deniedTitle: "This section is not enabled for your account", deniedText: "The physician can change this permission from Profile → Care Team.",
-    modes: { auto: "Auto", command_center: "Command Center", focused_workflow: "Focused", compact_cards: "Compact" },
+    modes: { auto: "Auto", command_center: "Command Center", focused_workflow: "Guided Focus", compact_cards: "Visual Flow", evidence_trace: "Evidence Trace" },
   },
 } as const;
 
@@ -83,8 +86,10 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<RuntimeUser | null>(getCachedRuntimeUser());
   const [authReady, setAuthReady] = useState(false);
+  const [localQaPreset, setLocalQaPreset] = useState<LocalQaLayoutPreset>("auto");
   const { locale, isRtl } = useGlymizeLocale();
   const copy = COPY[locale];
+  const localUiBypass = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_LOCAL_UI_BYPASS === "1";
 
   useEffect(() => {
     let active = true;
@@ -97,6 +102,21 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
   }, []);
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    if (!localUiBypass) return;
+    function readLocalQaPreset() {
+      const value = window.localStorage.getItem(LOCAL_QA_LAYOUT_KEY);
+      if (value === "auto" || value === "command_center" || value === "focused_workflow" || value === "compact_cards" || value === "evidence_trace" || value === "evidence_trace" || value === "evidence_trace" || value === "evidence_trace" || value === "evidence_trace") {
+        setLocalQaPreset(value);
+      } else {
+        setLocalQaPreset("auto");
+      }
+    }
+    readLocalQaPreset();
+    window.addEventListener(LOCAL_QA_LAYOUT_EVENT, readLocalQaPreset);
+    return () => window.removeEventListener(LOCAL_QA_LAYOUT_EVENT, readLocalQaPreset);
+  }, [localUiBypass]);
 
   const visibleNavigation = useMemo(() => user?.role === "assistant"
     ? NAVIGATION.filter((item) => user.permissions.includes(item.permission))
@@ -120,7 +140,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
   if (pathname === "/") return <>{children}</>;
 
   let renderedChildren = children;
-  if (!isAdminPath && !isPublicRuntimePath && pathname !== "/profile") {
+  if (!localUiBypass && !isAdminPath && !isPublicRuntimePath && pathname !== "/profile") {
     if (!authReady) {
       renderedChildren = <section className={runtimeStyles.gate}><strong>{copy.loading}</strong></section>;
     } else if (!user) {
@@ -130,7 +150,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
     }
   }
 
-  const preset = user?.layoutPreset ?? "auto";
+  const preset = localUiBypass ? localQaPreset : (user?.layoutPreset ?? "auto");
 
   return (
     <div

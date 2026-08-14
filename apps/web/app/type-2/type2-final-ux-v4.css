@@ -1,0 +1,336 @@
+/* GLYMIZE TYPE 2 FINAL UX PASS V4
+   Scope:
+   - stable dashboard shell
+   - stepper only in Guided Focus
+   - true responsive widths
+   - Focus/Visual progressive disclosure for insurance + costing
+   - consistent button states
+   - light/dark clinical alert tokens
+*/
+
+/* ---------- Stable shell widths ---------- */
+.glymize-internal-shell[data-route="dashboard"] .page-content{
+  width:100%;
+  max-width:none!important;
+  margin:0!important;
+  padding-inline:clamp(16px,2.4vw,36px)!important;
+}
+.glymize-internal-shell[data-route="dashboard"] main[class*="page"]{
+  width:100%!important;
+  max-width:1180px!important;
+  margin-inline:auto!important;
+}
+
+.glymize-internal-shell[data-route="type-2"] .page-content{
+  width:100%;
+  max-width:none!important;
+  margin:0!important;
+  padding-inline:clamp(16px,2.4vw,36px)!important;
+}
+.glymize-internal-shell[data-route="type-2"]:not([data-layout-preset="focused_workflow"]) main[class*="page"]{
+  width:100%!important;
+  max-width:1280px!important;
+  margin-inline:auto!important;
+}
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] main[class*="page"]{
+  width:100%!important;
+  max-width:900px!important;
+  margin-inline:auto!important;
+}
+
+@media (min-width:761px) and (max-width:1180px){
+  .glymize-internal-shell[data-route="dashboard"] main[class*="page"],
+  .glymize-internal-shell[data-route="type-2"] main[class*="page"]{
+    max-width:calc(100vw - 48px)!important;
+  }
+}
+@media (max-width:760px){
+  .glymize-internal-shell[data-route="dashboard"] .page-content,
+  .glymize-internal-shell[data-route="type-2"] .page-content{
+    padding-inline:12px!important;
+  }
+  .glymize-internal-shell[data-route="dashboard"] main[class*="page"],
+  .glymize-internal-shell[data-route="type-2"] main[class*="page"]{
+    width:100%!important;
+    max-width:none!important;
+  }
+}
+
+/* ---------- Stepper belongs only to Guided Focus ---------- */
+.glymize-internal-shell[data-route="type-2"]:not([data-layout-preset="focused_workflow"]) .type2-v3-stepper{
+  display:none!important;
+}
+
+/* ---------- Dashboard should not morph when clinician preset changes ---------- */
+.glymize-internal-shell[data-route="dashboard"][data-layout-preset="auto"] main[class*="page"],
+.glymize-internal-shell[data-route="dashboard"][data-layout-preset="command_center"] main[class*="page"],
+.glymize-internal-shell[data-route="dashboard"][data-layout-preset="focused_workflow"] main[class*="page"],
+.glymize-internal-shell[data-route="dashboard"][data-layout-preset="compact_cards"] main[class*="page"],
+.glymize-internal-shell[data-route="dashboard"][data-layout-preset="evidence_trace"] main[class*="page"]{
+  transform:none!important;
+  zoom:1!important;
+}
+
+/* ---------- Button interaction contract ---------- */
+.glymize-internal-shell[data-route="dashboard"] [class*="heroAction"],
+.glymize-internal-shell[data-route="type-2"] [class*="submitBar"] button,
+.glymize-internal-shell[data-route="type-2"] [class*="subhead"] button{
+  border:1px solid var(--glymize-accent-600)!important;
+  background:var(--glymize-accent-600)!important;
+  color:#fff!important;
+  box-shadow:0 7px 18px color-mix(in srgb,var(--glymize-accent-600) 18%,transparent)!important;
+  transition:background-color .16s ease,color .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease!important;
+}
+.glymize-internal-shell[data-route="dashboard"] [class*="heroAction"]:visited{
+  color:#fff!important;
+}
+.glymize-internal-shell[data-route="dashboard"] [class*="heroAction"]:hover,
+.glymize-internal-shell[data-route="type-2"] [class*="submitBar"] button:hover,
+.glymize-internal-shell[data-route="type-2"] [class*="subhead"] button:hover{
+  border-color:var(--glymize-accent-500)!important;
+  background:var(--glymize-accent-500)!important;
+  color:#082f31!important;
+  transform:translateY(-1px);
+}
+.glymize-internal-shell[data-route="dashboard"] [class*="heroAction"]:active,
+.glymize-internal-shell[data-route="type-2"] [class*="submitBar"] button:active,
+.glymize-internal-shell[data-route="type-2"] [class*="subhead"] button:active{
+  border-color:var(--glymize-accent-700)!important;
+  background:var(--glymize-accent-700)!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  transform:none;
+}
+.glymize-internal-shell[data-route="dashboard"] [class*="heroAction"]:focus-visible,
+.glymize-internal-shell[data-route="type-2"] button:focus-visible,
+.glymize-internal-shell[data-route="type-2"] summary:focus-visible{
+  outline:3px solid var(--glymize-focus)!important;
+  outline-offset:3px!important;
+}
+
+/* ---------- Clinical warning surfaces: distinct Light / Dark ---------- */
+html[data-glymize-mode="light"] .glymize-internal-shell[data-route="type-2"] [class*="alertChecks"]{
+  background:#fff8e8!important;
+  border-color:#e8cf94!important;
+  color:#5b4619!important;
+}
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] [class*="alertChecks"]{
+  background:#182923!important;
+  border-color:#496e5d!important;
+  color:#e8f2ec!important;
+}
+
+/* ---------- Financial summary + detail trigger ---------- */
+.glymize-internal-shell[data-route="type-2"] [class*="financialCluster"]{
+  min-width:0;
+}
+.glymize-internal-shell[data-route="type-2"] [class*="financialCluster"] .medication-market-details>summary{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:40px;
+  margin-top:8px;
+  padding:8px 12px;
+  border:1px solid var(--glymize-line);
+  border-radius:10px;
+  background:var(--glymize-surface-soft);
+  color:var(--glymize-ink);
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+  list-style:none;
+}
+.glymize-internal-shell[data-route="type-2"] [class*="financialCluster"] .medication-market-details>summary::-webkit-details-marker{
+  display:none;
+}
+.glymize-internal-shell[data-route="type-2"] [class*="financialCluster"] .medication-market-details>summary::after{
+  content:" ↗";
+  color:var(--glymize-accent-600);
+  font-weight:900;
+}
+
+/* ---------- Progressive disclosure: Focus + Visual ---------- */
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]>.market-card-summary,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]>[class*="costBox"],
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]>.market-card-summary,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]>[class*="costBox"]{
+  display:none!important;
+}
+
+/* Open detail -> one drawer that includes insurance codes AND 30-day costing box. */
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]:has(.medication-market-details[open]),
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]:has(.medication-market-details[open]){
+  position:fixed!important;
+  inset-block:0!important;
+  inset-inline-end:0!important;
+  z-index:120!important;
+  display:block!important;
+  width:min(480px,calc(100vw - 24px))!important;
+  height:100dvh!important;
+  padding:18px!important;
+  overflow:auto!important;
+  overscroll-behavior:contain;
+  border-inline-start:1px solid var(--glymize-line);
+  background:var(--glymize-surface)!important;
+  box-shadow:0 0 48px rgba(5,34,37,.24)!important;
+}
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]:has(.medication-market-details[open])>.market-card-summary,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]:has(.medication-market-details[open])>[class*="costBox"],
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]:has(.medication-market-details[open])>.market-card-summary,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]:has(.medication-market-details[open])>[class*="costBox"]{
+  display:block!important;
+}
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]:has(.medication-market-details[open]) .medication-market-details,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]:has(.medication-market-details[open]) .medication-market-details{
+  display:block!important;
+}
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]:has(.medication-market-details[open]) .medication-market-details>summary,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]:has(.medication-market-details[open]) .medication-market-details>summary{
+  position:sticky;
+  top:0;
+  z-index:2;
+  display:flex;
+  width:100%;
+  margin:0 0 14px;
+  background:var(--glymize-accent-600);
+  border-color:var(--glymize-accent-600);
+  color:#fff;
+  box-shadow:0 8px 18px rgba(8,77,74,.16);
+}
+.glymize-internal-shell[data-route="type-2"] [class*="financialCluster"]:has(.medication-market-details[open]) .medication-market-details>summary::after{
+  content:" ×";
+  color:inherit;
+}
+.glymize-internal-shell[data-route="type-2"] [class*="financialCluster"]:has(.medication-market-details[open]) .market-details-body{
+  display:grid;
+  gap:12px;
+}
+.glymize-internal-shell[data-route="type-2"] [class*="financialCluster"]:has(.medication-market-details[open]) [class*="costBox"]{
+  margin-top:16px!important;
+  border-top:1px solid var(--glymize-line)!important;
+  border-radius:14px!important;
+}
+
+/* On a narrow viewport, the same disclosure becomes a bottom sheet. */
+@media(max-width:760px){
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="financialCluster"]:has(.medication-market-details[open]),
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="financialCluster"]:has(.medication-market-details[open]){
+    inset-block-start:auto!important;
+    inset-inline:0!important;
+    bottom:0!important;
+    width:100%!important;
+    height:auto!important;
+    max-height:88dvh!important;
+    padding:14px!important;
+    border:1px solid var(--glymize-line)!important;
+    border-radius:20px 20px 0 0!important;
+    box-shadow:0 -22px 52px rgba(5,34,37,.24)!important;
+  }
+}
+
+/* ---------- Command Center / Evidence: details stay inline ---------- */
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] [class*="financialCluster"] .market-card-summary,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="financialCluster"] .market-card-summary{
+  display:grid;
+}
+/* GLYMIZE_TYPE2_GEOMETRY_FIX_V6 */
+
+/* ----- Shared clinician shell geometry: one sidebar width everywhere ----- */
+.glymize-internal-shell{
+  --glymize-fixed-sidebar-width:250px;
+  grid-template-columns:var(--glymize-fixed-sidebar-width) minmax(0,1fr)!important;
+}
+
+.glymize-internal-shell>.sidebar{
+  width:var(--glymize-fixed-sidebar-width)!important;
+  min-width:var(--glymize-fixed-sidebar-width)!important;
+  max-width:var(--glymize-fixed-sidebar-width)!important;
+  z-index:70!important;
+}
+
+.glymize-internal-shell>.content-shell{
+  grid-column:2!important;
+  min-width:0!important;
+  width:100%!important;
+}
+
+.glymize-internal-shell .global-topbar{
+  position:sticky!important;
+  inset-block-start:0!important;
+  z-index:50!important;
+  width:100%!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+}
+
+/* Sidebar must visually own its area above the sticky header. */
+.glymize-internal-shell>.sidebar{
+  background:var(--glymize-surface,#fff)!important;
+  border-inline-end:1px solid var(--glymize-line)!important;
+}
+
+/* ----- Auto / Command Center: panoramic shell, readable internal grid ----- */
+@media(min-width:1181px){
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] [class*="factorGrid"],
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] [class*="factorGrid"]{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:12px!important;
+  }
+
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] [class*="factor"],
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] [class*="factor"]{
+    min-width:0!important;
+    min-height:88px!important;
+    padding:14px!important;
+    align-items:flex-start!important;
+  }
+
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] [class*="factor"]>span,
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] [class*="factor"]>span{
+    min-width:0!important;
+  }
+
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] [class*="factor"] b,
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] [class*="factor"] b{
+    line-height:1.55!important;
+    word-break:normal!important;
+    overflow-wrap:normal!important;
+  }
+
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] [class*="factor"] small,
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] [class*="factor"] small{
+    line-height:1.65!important;
+    overflow-wrap:anywhere!important;
+  }
+}
+
+/* ----- Tablet ----- */
+@media(min-width:761px) and (max-width:1180px){
+  .glymize-internal-shell[data-route="type-2"] [class*="factorGrid"]{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:10px!important;
+  }
+}
+
+/* ----- Mobile ----- */
+@media(max-width:760px){
+  .glymize-internal-shell{
+    grid-template-columns:1fr!important;
+  }
+
+  .glymize-internal-shell>.content-shell{
+    grid-column:1!important;
+    width:100%!important;
+  }
+
+  .glymize-internal-shell[data-route="type-2"] [class*="factorGrid"]{
+    grid-template-columns:1fr!important;
+  }
+}
+
+/* Native browser fallback in addition to JS offset. */
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] form[class*="form"]>section[class*="section"],
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="results"],
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="submitBar"]{
+  scroll-margin-top:180px!important;
+}

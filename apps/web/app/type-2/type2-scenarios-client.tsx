@@ -440,7 +440,7 @@ export default function Type2ScenariosClient() {
           <h1>{fa ? "از فهرست دارو به سناریوی درمانی" : "From medicine list to treatment scenarios"}</h1>
           <p>{fa ? "۲ تا ۳ مسیر قابل دفاع برای پزشک؛ با دلیل بالینی، محدودیت‌ها، داده بازار و برآورد شفاف هزینه." : "Two to three defensible clinician-facing paths with clinical rationale, trade-offs, market data, and transparent cost estimation."}</p>
         </div>
-        <div className={styles.heroMetric}><b>30</b><span>{fa ? "سناریوی اعتبارسنجی" : "validation cases"}</span></div>
+        <div className={styles.heroMetric}><b>1,000</b><span>{fa ? "کیس اعتبارسنجی بالینی تصادفی" : "Randomized Clinical Validation Cases"}</span></div>
       </header>
 
       <PatientHandoffLookup onApply={applyPatientHandoff} />
@@ -562,6 +562,7 @@ export default function Type2ScenariosClient() {
             return <section className={styles.scenarioMed} key={medication.cardId ?? medication.genericMedicationId}>
               <div className={styles.medTop}><div><b>{medication.displayName ?? medication.persianName}</b>{medication.selectedBrandName && <small>{fa ? "ژنریک" : "Generic"}: {medication.persianName}</small>}<small>{medication.therapeuticClass}</small></div><span>{medication.priorityScore}/100</span></div>
               <div className={styles.insuranceRow}>{medication.insuranceCoverages.length ? medication.insuranceCoverages.map((entry) => <span key={entry.provider}>✓ {INSURERS.find((item) => item.value === entry.provider)?.[fa ? "fa" : "en"] ?? entry.provider}: {formatCoveragePercent(entry.percent, locale)}%</span>) : <span>{fa ? "پوشش بیمه ثبت نشده" : "No recorded coverage"}</span>}</div>
+              <div className={styles.financialCluster}>
               <MedicationMarketDetails brandRegistryCode={medication.brandRegistryCode} coverages={medication.insuranceCoverages} genericRegistryCode={medication.genericRegistryCode} locale={locale} marketBadge={medication.marketBadge} price={medication.price} priceRange={medication.priceRange} selectedBrands={medication.selectedBrands} />
 
               <div className={styles.costBox}>
@@ -583,6 +584,7 @@ export default function Type2ScenariosClient() {
                 </div>
                 <p>{estimate?.calculationBasis}</p>
               </div>
+                          </div>
             </section>;
           })}</div>}
 
