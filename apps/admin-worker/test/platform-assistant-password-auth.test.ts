@@ -60,4 +60,34 @@ describe("assistant password invitation and login contracts", () => {
     expect(account).toContain("invitation.passwordSetupRequired");
     expect(account).toContain("Assistant / nurse sign in");
   });
+
+  it("keeps Account Persian copy valid UTF-8 without Windows-1256 mojibake", () => {
+    const mojibakeMarkers = [
+      "\u0638\u02c6",
+      "\u0637\u00a7",
+      "\u0637\u00b1",
+      "\u063a\u0152",
+      "\u00e2\u20ac",
+      "\u0622\u00ab",
+      "\u0639\u00a9",
+      "\u0638\u2026",
+      "\u0637\u00af",
+      "\u0637\u00a8",
+    ];
+
+    for (const marker of mojibakeMarkers) {
+      expect(account).not.toContain(marker);
+    }
+
+    expect(account).toContain(
+      "\u0648\u0631\u0648\u062f \u062f\u0633\u062a\u06cc\u0627\u0631",
+    );
+    expect(account).toContain(
+      "\u062f\u0639\u0648\u062a \u0628\u0647 \u062a\u06cc\u0645 \u0645\u0631\u0627\u0642\u0628\u062a GLYMIZE",
+    );
+    expect(account).toContain(
+      "\u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u062f\u0633\u062a\u06cc\u0627\u0631",
+    );
+  });
+
 });
