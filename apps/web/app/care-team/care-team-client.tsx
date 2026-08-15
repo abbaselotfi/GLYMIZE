@@ -236,7 +236,16 @@ export default function CareTeamClient() {
     setLabs((current) => [...current, newManualLab()]);
   }
 
-  function removeLab(id: string) {
+
+  function beginManualLabEntry() {
+    setLabs((current) =>
+      current.some((item) => item.sourceKind === "manual")
+        ? current
+        : [...current, newManualLab()],
+    );
+  }
+
+function removeLab(id: string) {
     setLabs((current) => current.filter((item) => item.id !== id));
   }
 
@@ -450,7 +459,7 @@ export default function CareTeamClient() {
       </section>
 
       <section className={styles.card}>
-        <div className={styles.sectionTitle}><b>2</b><div><h2>{fa ? "عکس / PDF آزمایش و OCR فارسی" : "Lab photo / PDF + Persian OCR"}</h2><p>{fa ? "پردازش تصویر در مرورگر انجام می‌شود؛ نتیجه همیشه ابتدا تأییدنشده است." : "Image OCR runs in the browser; extracted fields always start unverified."}</p></div></div>
+        <div className={styles.sectionTitle}><b>2</b><div><h2>{fa ? "ثبت نتایج آزمایش" : "Lab results"}</h2><p>{fa ? "از دوربین، PDF / JPG یا ثبت دستی استفاده کنید؛ هر نتیجه تا زمان تأیید در وضعیت بازبینی می‌ماند." : "Use camera, PDF/JPG, or manual entry; every result remains in review until explicitly confirmed."}</p></div></div>
         <div className={styles.uploadActions}>
           <button type="button" disabled={busy} onClick={() => cameraRef.current?.click()}>📷 {fa ? "عکس با موبایل" : "Take photo"}</button>
           <button type="button" disabled={busy} className={styles.secondary} onClick={() => fileRef.current?.click()}>PDF / JPG {fa ? "انتخاب فایل" : "Choose file"}</button>
@@ -458,9 +467,9 @@ export default function CareTeamClient() {
             type="button"
             disabled={busy}
             className={styles.secondary}
-            onClick={addManualLab}
+            onClick={beginManualLabEntry}
           >
-            + {fa ? "\u0627\u0641\u0632\u0648\u062f\u0646 \u0622\u0632\u0645\u0627\u06cc\u0634 \u062f\u0633\u062a\u06cc" : "Add lab manually"}
+            {fa ? "ثبت دستی آزمایش" : "Manual entry"}
           </button>
           <input ref={cameraRef} className={styles.hidden} type="file" accept="image/*" capture="environment" onChange={(event) => void processFile(event.target.files?.[0])} />
           <input ref={fileRef} className={styles.hidden} type="file" accept="application/pdf,image/*" onChange={(event) => void processFile(event.target.files?.[0])} />
@@ -477,7 +486,22 @@ export default function CareTeamClient() {
     />
   ))}
 </datalist>
-        {labs.length > 0 && <div className={styles.labTable}>
+        {labs.length > 0 && <div className={styles.labResultsBlock}>
+          <div className={styles.labTableToolbar}>
+            <div>
+              <strong>{fa ? "نتایج آزمایش" : "Lab results"}</strong>
+              <small>{fa ? "برای آزمایش دوم و بعدی، ردیف جدید اضافه کنید." : "Add another row for each additional observation."}</small>
+            </div>
+            <button
+              type="button"
+              className={styles.addLabRow}
+              onClick={addManualLab}
+              disabled={busy}
+            >
+              + {fa ? "افزودن ردیف" : "Add row"}
+            </button>
+          </div>
+          <div className={styles.labTable}>
           <div className={styles.labHeader}>
             <span>{fa ? "\u0622\u0632\u0645\u0627\u06cc\u0634" : "Test"}</span>
             <span>{fa ? "\u0645\u0642\u062f\u0627\u0631" : "Value"}</span>
@@ -593,7 +617,7 @@ export default function CareTeamClient() {
               </small>
             </div>
           </div>)}
-        </div>}
+        </div></div>}
         {ocrText && <details className={styles.ocrRaw}><summary>{fa ? "متن خام OCR" : "Raw OCR text"}</summary><textarea value={ocrText} onChange={(event) => setOcrText(event.target.value)} rows={10} /></details>}
       </section>
 

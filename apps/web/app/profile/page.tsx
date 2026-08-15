@@ -229,10 +229,16 @@ export default function ProfilePage() {
               </p>
             </div>
           </div>
-          <Link className={styles.archiveLink} href="/records">
-            {fa
+          <Link
+            className={styles.archiveLink}
+            href="/records"
+            aria-label={fa ? "\u0645\u0634\u0627\u0647\u062f\u0647 \u0622\u0631\u0634\u06cc\u0648 \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627" : "Open patient archive"}
+          >
+            <span className={styles.archiveLinkLabel}>
+{fa
               ? "\u0645\u0634\u0627\u0647\u062f\u0647 \u0622\u0631\u0634\u06cc\u0648 \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627"
               : "Open patient archive"}
+            </span>
           </Link>
         </section>
       )}

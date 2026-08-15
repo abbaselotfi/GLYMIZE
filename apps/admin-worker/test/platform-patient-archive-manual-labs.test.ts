@@ -34,6 +34,18 @@ describe("patient archive and manual lab contracts", () => {
     new URL("../../../packages/clinical-engine/src/lab-text-parser.ts", import.meta.url),
     "utf8",
   );
+  const profile = fs.readFileSync(
+    new URL("../../web/app/profile/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const profileStyles = fs.readFileSync(
+    new URL("../../web/app/profile/profile.module.css", import.meta.url),
+    "utf8",
+  );
+  const careTeamStyles = fs.readFileSync(
+    new URL("../../web/app/care-team/care-team.module.css", import.meta.url),
+    "utf8",
+  );
 
   it("keeps the practice archive uncapped while using cursor pagination for transport", () => {
     expect(platform).not.toContain(
@@ -139,4 +151,15 @@ expect(contracts).toContain(
   "sourceKind?: LabObservationSource",
 );
   });
+  it("keeps archive CTA visible and separates manual source selection from row insertion", () => {
+    expect(profile).toContain("archiveLinkLabel");
+    expect(profileStyles).toContain("-webkit-text-fill-color:#fff!important");
+    expect(careTeam).toContain("beginManualLabEntry");
+    expect(careTeam).toContain("Manual entry");
+    expect(careTeam).toContain("Add row");
+    expect(careTeam).toContain("addLabRow");
+    expect(careTeamStyles).toContain(".labTableToolbar");
+    expect(careTeamStyles).toContain(".addLabRow");
+  });
+
 });
