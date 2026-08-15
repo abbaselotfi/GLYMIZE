@@ -16,6 +16,25 @@ export const ASSISTANT_PERMISSION_KEYS = [
 
 export type AssistantPermission = typeof ASSISTANT_PERMISSION_KEYS[number];
 
+export const ADMIN_PERMISSION_KEYS = [
+  "admin.center",
+  "admin.medications",
+  "admin.data_updates",
+  "admin.master_registry",
+  "admin.users",
+  "admin.ai_models",
+  "admin.communications",
+  "admin.notifications",
+] as const;
+
+export const RUNTIME_PERMISSION_KEYS = [
+  ...ASSISTANT_PERMISSION_KEYS,
+  ...ADMIN_PERMISSION_KEYS,
+] as const;
+
+export type AdminPermission = typeof ADMIN_PERMISSION_KEYS[number];
+export type RuntimePermission = typeof RUNTIME_PERMISSION_KEYS[number];
+
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
@@ -67,8 +86,18 @@ export function sanitizeAssistantPermissions(value: unknown): AssistantPermissio
   return [...new Set(value.map(String).filter((item): item is AssistantPermission => allowed.has(item)))];
 }
 
+export function sanitizeRuntimePermissions(value: unknown): RuntimePermission[] {
+  if (!Array.isArray(value)) return [];
+  const allowed = new Set<string>(RUNTIME_PERMISSION_KEYS);
+  return [...new Set(value.map(String).filter((item): item is RuntimePermission => allowed.has(item)))];
+}
+
 export function defaultAssistantPermissions(): AssistantPermission[] {
   return ["dashboard", "care_team", "handoff.read", "handoff.write"];
+}
+
+export function defaultPhysicianPermissions(): RuntimePermission[] {
+  return [...ASSISTANT_PERMISSION_KEYS];
 }
 
 export function validLayoutPreset(value: unknown): value is LayoutPreset {

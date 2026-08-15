@@ -2,35 +2,81 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { getAdminSession } from "../../lib/admin-auth";
+import {
+  ADMIN_PAGE_PERMISSIONS,
+  type AdminPermission,
+} from "../../lib/runtime-permissions";
+import {
+  getCachedRuntimeUser,
+  initializeRuntimeSession,
+} from "../../lib/runtime-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import styles from "./admin-workspace-nav.module.css";
 
-const ITEMS = [
-  { href: "/admin", icon: "AD", fa: "مرکز مدیریت", en: "Admin center" },
-  { href: "/admin/medications", icon: "RX", fa: "دارو و برندها", en: "Medicines & brands" },
-  { href: "/admin/data-updates", icon: "DT", fa: "به‌روزرسانی داده", en: "Data updates" },
-  { href: "/admin/master-registry", icon: "MR", fa: "رجیستری مرجع", en: "Master registry" },
-  { href: "/admin/users", icon: "ID", fa: "کاربران و دسترسی", en: "Users & access" },
-  { href: "/admin/ai-models", icon: "AI", fa: "مدل‌های AI", en: "AI models" },
-  { href: "/admin/communications", icon: "CM", fa: "ارتباطات", en: "Communications" },
-  { href: "/admin/notifications", icon: "NT", fa: "اعلان‌ها", en: "Notifications" },
-] as const;
+const ICONS: Record<AdminPermission, string> = {
+  "admin.center": "AD",
+  "admin.medications": "RX",
+  "admin.data_updates": "DT",
+  "admin.master_registry": "MR",
+  "admin.users": "ID",
+  "admin.ai_models": "AI",
+  "admin.communications": "CM",
+  "admin.notifications": "NT",
+};
 
 export default function AdminWorkspaceNav() {
   const pathname = usePathname();
   const { locale } = useGlymizeLocale();
+  const [permissions, setPermissions] = useState(
+    () => getCachedRuntimeUser()?.permissions ?? [],
+  );
+  const [githubSuperadmin, setGithubSuperadmin] = useState(false);
+
+  useEffect(() => {
+    const github = Boolean(getAdminSession());
+    setGithubSuperadmin(github);
+    if (github) return;
+    void initializeRuntimeSession(true).then((user) =>
+      setPermissions(user?.permissions ?? []),
+    );
+  }, [pathname]);
+
+  const items = useMemo(
+    () =>
+      ADMIN_PAGE_PERMISSIONS.filter(
+        (item) => githubSuperadmin || permissions.includes(item.key),
+      ),
+    [githubSuperadmin, permissions],
+  );
+
   return (
-    <nav className={styles.nav} aria-label={locale === "fa" ? "بخش‌های مدیریت GLYMIZE" : "GLYMIZE admin sections"}>
+    <nav
+      className={styles.nav}
+      aria-label={
+        locale === "fa" ? "بخش‌های مدیریت GLYMIZE" : "GLYMIZE admin sections"
+      }
+    >
       <div className={styles.title}>
         <span>GLYMIZE OPS</span>
-        <strong>{locale === "fa" ? "کنترل و انتشار" : "Control & publishing"}</strong>
+        <strong>
+          {locale === "fa" ? "کنترل و انتشار" : "Control & publishing"}
+        </strong>
       </div>
       <div className={styles.items}>
-        {ITEMS.map((item) => {
-          const active = item.href === "/admin" ? pathname === item.href : pathname.startsWith(item.href);
+        {items.map((item) => {
+          const active =
+            item.href === "/admin"
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
           return (
-            <Link href={item.href} className={active ? styles.active : styles.item} key={item.href}>
-              <span className={styles.icon}>{item.icon}</span>
+            <Link
+              href={item.href}
+              className={active ? styles.active : styles.item}
+              key={item.key}
+            >
+              <span className={styles.icon}>{ICONS[item.key]}</span>
               <span>{item[locale]}</span>
             </Link>
           );

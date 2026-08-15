@@ -17,6 +17,7 @@ import {
   updateOwnPassword,
   type RuntimeV3Capabilities,
 } from "../../lib/runtime-v3-client";
+import { firstAllowedRuntimePath } from "../../lib/runtime-permissions";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import styles from "./account.module.css";
 
@@ -48,7 +49,7 @@ export default function AccountV3Client(){
 
  async function acceptInvite(){if(!inviteToken)return;setBusy(true);setError("");try{const user=await acceptTeamInvitation(inviteToken,rememberMe);setCurrentUser(user);setMessage(fa?"عضویت در تیم پذیرفته شد و نشست مستقل فعال است.":"Invitation accepted and your independent session is active.")}catch(reason){setError(reason instanceof Error?reason.message:"INVITATION_ACCEPT_FAILED")}finally{setBusy(false)}}
 
- if(currentUser)return <main className={styles.page} dir={isRtl?"rtl":"ltr"}><section className={styles.successCard}><span>GLYMIZE ID</span><h1>{fa?`خوش آمدید، ${currentUser.firstName} ${currentUser.lastName}`:`Welcome, ${currentUser.firstName} ${currentUser.lastName}`}</h1><p>{currentUser.role==="physician"?(fa?"حساب پزشک فعال است.":"Physician account is active."):(fa?`دستیار/پرستار مستقل · ${currentUser.practiceName}`:`Independent assistant/nurse · ${currentUser.practiceName}`)}</p><div className={styles.actions}><Link href="/dashboard">{fa?"ورود به فضای کار":"Open workspace"}</Link><Link className={styles.secondary} href="/profile">{fa?"پروفایل و امنیت":"Profile & security"}</Link></div></section></main>;
+ if(currentUser)return <main className={styles.page} dir={isRtl?"rtl":"ltr"}><section className={styles.successCard}><span>GLYMIZE ID</span><h1>{fa?`خوش آمدید، ${currentUser.firstName} ${currentUser.lastName}`:`Welcome, ${currentUser.firstName} ${currentUser.lastName}`}</h1><p>{currentUser.role==="physician"?(fa?"حساب پزشک فعال است.":"Physician account is active."):(fa?`دستیار/پرستار مستقل · ${currentUser.practiceName}`:`Independent assistant/nurse · ${currentUser.practiceName}`)}</p><div className={styles.actions}><Link href={firstAllowedRuntimePath(currentUser.permissions)}>{fa?"ورود به فضای کار":"Open workspace"}</Link><Link className={styles.secondary} href="/profile">{fa?"پروفایل و امنیت":"Profile & security"}</Link></div></section></main>;
 
  if(inviteToken)return <main className={styles.page} dir={isRtl?"rtl":"ltr"}><section className={styles.card}><span className={styles.eyebrow}>CARE TEAM INVITATION</span><h1>{fa?"دعوت به تیم مراقبت GLYMIZE":"GLYMIZE care-team invitation"}</h1>{invitation?<><p>{fa?`${invitation.physicianName} شما را به «${invitation.practiceName}» دعوت کرده است.`:`${invitation.physicianName} invited you to “${invitation.practiceName}”.`}</p><p className={styles.muted}>{invitation.email??invitation.mobile}</p><label className={styles.remember}><input type="checkbox" checked={rememberMe} onChange={e=>setRememberMe(e.target.checked)}/><span>{fa?"ورود من روی این دستگاه حفظ شود":"Keep me signed in on this device"}</span></label><button disabled={busy} onClick={()=>void acceptInvite()} type="button">{fa?"پذیرش و ورود مستقل":"Accept and sign in"}</button></>:<p>{busy?(fa?"در حال بررسی دعوت…":"Checking invitation…"):error}</p>}</section></main>;
 

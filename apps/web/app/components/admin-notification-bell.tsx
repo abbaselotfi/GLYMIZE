@@ -4,9 +4,22 @@ import type { AdminNotification } from "@glymize/contracts";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api-client";
+import { getAdminSession } from "../../lib/admin-auth";
+import { initializeRuntimeSession } from "../../lib/runtime-client";
 
 export default function AdminNotificationBell() {
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    if (getAdminSession()) {
+      setAllowed(true);
+      return;
+    }
+    void initializeRuntimeSession(true).then((user) =>
+      setAllowed(Boolean(user?.permissions.includes("admin.notifications"))),
+    );
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -19,6 +32,7 @@ export default function AdminNotificationBell() {
   }, []);
 
   useEffect(() => {
+    if (!allowed) return;
     void refresh();
     const onCatalogChange = () => void refresh();
     window.addEventListener("glymize-catalog-change", onCatalogChange);
@@ -27,7 +41,9 @@ export default function AdminNotificationBell() {
       window.removeEventListener("glymize-catalog-change", onCatalogChange);
       window.clearInterval(timer);
     };
-  }, [refresh]);
+  }, [allowed, refresh]);
+
+  if (!allowed) return null;
 
   const open = notifications.filter((item) => item.status !== "resolved");
   const unread = open.filter((item) => item.status === "unread").length;

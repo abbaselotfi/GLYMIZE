@@ -1,3 +1,11 @@
+import {
+  ADMIN_PERMISSION_KEYS,
+  openPayload,
+  sanitizeRuntimePermissions,
+  type AdminPermission,
+  type RuntimePermission,
+} from "./runtime-security";
+
 interface Env {
   ADMIN_ORIGIN: string;
   ADMIN_PATH_PREFIX: string;
@@ -11,6 +19,7 @@ interface Env {
   AI_CONFIG_KV: KVNamespace;
   AI_CONFIG_MASTER_KEY: string;
   AI_RUNTIME_SHARED_SECRET: string;
+  GLYMIZE_DB?: D1Database;
 }
 
 interface OAuthState {
@@ -25,6 +34,29 @@ interface AdminSession {
   githubToken: string;
   expiresAt: number;
 }
+
+type RuntimeAccessPayload = {
+  kind: "runtime_access";
+  userId: string;
+  practiceId: string;
+  sessionId: string;
+  expiresAt: number;
+};
+
+type GitHubAdminPrincipal = AdminSession & {
+  source: "github";
+  permissions: RuntimePermission[];
+};
+
+type RuntimeAdminPrincipal = {
+  source: "runtime";
+  login: string;
+  userId: string;
+  permissions: RuntimePermission[];
+  expiresAt: number;
+};
+
+type AdminPrincipal = GitHubAdminPrincipal | RuntimeAdminPrincipal;
 
 interface CoverageState {
   provider: string;
@@ -153,13 +185,111 @@ function bearerToken(request: Request) {
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
 }
 
-async function requireAdmin(request: Request, env: Env): Promise<AdminSession | null> {
+function anyAdminPermission(permissions: readonly RuntimePermission[]) {
+  return ADMIN_PERMISSION_KEYS.some((permission) => permissions.includes(permission));
+}
+
+function adminHasPermission(session: AdminPrincipal, permission: AdminPermission) {
+  return session.source === "github" || session.permissions.includes(permission);
+}
+
+async function runtimeAdminFromToken(
+  token: string,
+  env: Env,
+): Promise<RuntimeAdminPrincipal | null> {
+  if (!env.GLYMIZE_DB) return null;
+  const [iv, ciphertext, extra] = token.split(".");
+  if (!iv || !ciphertext || extra) return null;
+  const access = await openPayload<RuntimeAccessPayload>(
+    { iv, ciphertext },
+    env.SESSION_SECRET,
+    "RUNTIME-ACCESS-V1",
+  );
+  if (
+    !access ||
+    access.kind !== "runtime_access" ||
+    access.expiresAt <= Date.now()
+  ) {
+    return null;
+  }
+
+  const session = await env.GLYMIZE_DB.prepare(
+    `SELECT revoked_at, expires_at
+     FROM refresh_tokens
+     WHERE id=? AND user_id=? AND practice_id=?`,
+  )
+    .bind(access.sessionId, access.userId, access.practiceId)
+    .first<{ revoked_at: string | null; expires_at: string }>();
+  if (
+    !session ||
+    session.revoked_at ||
+    Date.parse(session.expires_at) <= Date.now()
+  ) {
+    return null;
+  }
+
+  const row = await env.GLYMIZE_DB.prepare(
+    `SELECT u.id, u.status, u.first_name, u.last_name,
+            m.status AS membership_status, m.permissions_json
+     FROM runtime_users u
+     JOIN practice_memberships m ON m.user_id=u.id
+     WHERE u.id=? AND m.practice_id=?`,
+  )
+    .bind(access.userId, access.practiceId)
+    .first<{
+      id: string;
+      status: string;
+      first_name: string;
+      last_name: string;
+      membership_status: string;
+      permissions_json: string;
+    }>();
+  if (
+    !row ||
+    row.status !== "active" ||
+    row.membership_status !== "active"
+  ) {
+    return null;
+  }
+
+  let permissions: RuntimePermission[] = [];
+  try {
+    permissions = sanitizeRuntimePermissions(
+      row.permissions_json ? JSON.parse(row.permissions_json) : [],
+    );
+  } catch {
+    permissions = [];
+  }
+  if (!anyAdminPermission(permissions)) return null;
+
+  return {
+    source: "runtime",
+    login: `${row.first_name} ${row.last_name}`.trim() || row.id,
+    userId: row.id,
+    permissions,
+    expiresAt: access.expiresAt,
+  };
+}
+
+async function requireAdmin(request: Request, env: Env): Promise<AdminPrincipal | null> {
   const token = bearerToken(request);
   if (!token) return null;
-  const session = await open<AdminSession>(token, env.SESSION_SECRET);
-  if (!session || session.kind !== "admin_session" || session.expiresAt <= Date.now()) return null;
-  if (session.login.toLocaleLowerCase() !== env.ALLOWED_GITHUB_LOGIN.toLocaleLowerCase()) return null;
-  return session;
+
+  const github = await open<AdminSession>(token, env.SESSION_SECRET);
+  if (
+    github &&
+    github.kind === "admin_session" &&
+    github.expiresAt > Date.now() &&
+    github.login.toLocaleLowerCase() === env.ALLOWED_GITHUB_LOGIN.toLocaleLowerCase()
+  ) {
+    return {
+      ...github,
+      source: "github",
+      permissions: [...ADMIN_PERMISSION_KEYS],
+    };
+  }
+
+  return runtimeAdminFromToken(token, env);
 }
 
 function validCoverage(value: unknown) {
@@ -1090,7 +1220,7 @@ async function completeAuthentication(request: Request, env: Env) {
   return Response.redirect(returnUrl.toString(), 302);
 }
 
-async function publishCatalog(request: Request, env: Env, session: AdminSession) {
+async function publishCatalog(request: Request, env: Env, session: GitHubAdminPrincipal) {
   const raw = await request.text();
   if (raw.length > 1_500_000) return json(request, env, { error: "catalog_too_large" }, 413);
   let payload: { catalog?: unknown };
@@ -1165,8 +1295,28 @@ export default {
     const session = await requireAdmin(request, env);
     if (!session) return json(request, env, { error: "admin_auth_required" }, 401);
     if (request.method === "GET" && url.pathname === "/session") {
-      return json(request, env, { login: session.login, expiresAt: new Date(session.expiresAt).toISOString() });
+      return json(request, env, {
+        login: session.login,
+        expiresAt: new Date(session.expiresAt).toISOString(),
+        source: session.source,
+        userId: session.source === "runtime" ? session.userId : undefined,
+        permissions: session.permissions,
+      });
     }
+
+    if (
+      url.pathname.startsWith("/communications/") &&
+      !adminHasPermission(session, "admin.communications")
+    ) {
+      return json(request, env, { error: "admin_permission_denied" }, 403);
+    }
+    if (
+      (url.pathname === "/ai/models" || url.pathname.startsWith("/ai/models/")) &&
+      !adminHasPermission(session, "admin.ai_models")
+    ) {
+      return json(request, env, { error: "admin_permission_denied" }, 403);
+    }
+
     if (request.method === "GET" && url.pathname === "/communications/config") {
       return json(request, env, await publicCommunicationsConfig(env));
     }
@@ -1195,6 +1345,9 @@ export default {
       return sendTestEmail(request, env);
     }
     if (request.method === "POST" && url.pathname === "/catalog/publish") {
+      if (session.source !== "github") {
+        return json(request, env, { error: "github_superadmin_required" }, 403);
+      }
       return publishCatalog(request, env, session);
     }
     if (request.method === "GET" && url.pathname === "/ai/models") {

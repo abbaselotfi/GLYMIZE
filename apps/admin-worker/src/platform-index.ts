@@ -2,6 +2,7 @@
 import adminHandler from "./index";
 import {
   defaultAssistantPermissions,
+  defaultPhysicianPermissions,
   constantTimeEqual,
   decryptClinicalPayload,
   encryptClinicalPayload,
@@ -14,11 +15,13 @@ import {
   openPayload,
   randomToken,
   sanitizeAssistantPermissions,
+  sanitizeRuntimePermissions,
   sealPayload,
   sha256Hex,
   validLayoutPreset,
   validateIranianNationalId,
   type AssistantPermission,
+  type RuntimePermission,
   type LayoutPreset,
   type RuntimeRole,
 } from "./runtime-security";
@@ -78,7 +81,7 @@ type RuntimeUser = {
   layoutPreset: LayoutPreset;
   practiceId: string;
   practiceName: string;
-  permissions: AssistantPermission[];
+  permissions: RuntimePermission[];
 };
 
 type DbUserRow = {
@@ -181,11 +184,8 @@ function safePhoto(value: unknown) {
   return null;
 }
 
-function fullPermissionsForPhysician(): AssistantPermission[] {
-  return [
-    "dashboard", "type2", "type1", "pregnancy", "insulin_tools",
-    "evidence", "care_team", "handoff.read", "handoff.write",
-  ];
+function fullPermissionsForPhysician(): RuntimePermission[] {
+  return defaultPhysicianPermissions();
 }
 
 async function audit(env: Env, actorUserId: string | null, practiceId: string | null, action: string, targetType?: string, targetId?: string, meta?: unknown) {
@@ -242,9 +242,7 @@ async function readRuntimeUser(env: Env, userId: string, practiceId: string): Pr
     layoutPreset: user.layout_preset ?? "auto",
     practiceId: membership.practice_id,
     practiceName: membership.practice_name,
-    permissions: membership.role === "physician"
-      ? fullPermissionsForPhysician()
-      : sanitizeAssistantPermissions(parseJson<unknown>(membership.permissions_json, [])),
+    permissions: sanitizeRuntimePermissions(parseJson<unknown>(membership.permissions_json, [])),
   };
 }
 
@@ -297,7 +295,7 @@ async function isAdminSession(request: Request, env: Env) {
 }
 
 function hasPermission(user: RuntimeUser, permission: AssistantPermission) {
-  return user.role === "physician" || user.permissions.includes(permission);
+  return user.permissions.includes(permission);
 }
 
 async function issueSession(env: Env, user: RuntimeUser, rememberMe: boolean, deviceLabel?: string) {
@@ -636,16 +634,18 @@ async function createPhysicianAccount(env: Env, input: {
   const practiceId = crypto.randomUUID();
   const now = nowIso();
   const practiceName = `Dr. ${input.lastName}`;
+  const irimcVerified = input.verificationSource === "irimc_exact";
   await db(env).batch([
     db(env).prepare(
       `INSERT INTO runtime_users
        (id, role, status, first_name, last_name, email_norm, mobile_norm, medical_council_code,
         irimc_status, irimc_verified_at, irimc_verification_source, profile_photo, profile_photo_source,
         layout_preset, created_at, updated_at)
-       VALUES (?, 'physician', 'active', ?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?, 'auto', ?, ?)`,
+       VALUES (?, 'physician', 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, ?)`,
     ).bind(
       userId, input.firstName, input.lastName, input.email ?? null, input.mobile ?? null,
-      input.medicalCouncilCode, now, input.verificationSource, input.photo ?? null,
+      input.medicalCouncilCode, irimcVerified ? "verified" : "unavailable",
+      irimcVerified ? now : null, input.verificationSource, input.photo ?? null,
       input.photo ? (input.verificationSource === "irimc_exact" ? "irimc" : "user_upload") : "none", now, now,
     ),
     db(env).prepare(

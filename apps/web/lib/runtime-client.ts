@@ -1,5 +1,8 @@
 "use client";
 
+import type { AssistantPermission, RuntimePermission } from "./runtime-permissions";
+export type { AssistantPermission, RuntimePermission } from "./runtime-permissions";
+
 const runtimeApiUrl = (process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "").replace(/\/$/, "");
 const accessKey = "glymize-runtime-access-v1";
 const refreshLocalKey = "glymize-runtime-refresh-v1";
@@ -9,10 +12,6 @@ const authEvent = "glymize-runtime-auth-change";
 
 export type RuntimeRole = "physician" | "assistant";
 export type LayoutPreset = "auto" | "command_center" | "focused_workflow" | "compact_cards";
-export type AssistantPermission =
-  | "dashboard" | "type2" | "type1" | "pregnancy" | "insulin_tools"
-  | "evidence" | "care_team" | "handoff.read" | "handoff.write";
-
 export interface RuntimeUser {
   id: string;
   role: RuntimeRole;
@@ -29,7 +28,7 @@ export interface RuntimeUser {
   layoutPreset: LayoutPreset;
   practiceId: string;
   practiceName: string;
-  permissions: AssistantPermission[];
+  permissions: RuntimePermission[];
 }
 
 export interface RuntimeSessionResponse {
@@ -74,6 +73,10 @@ export function isRuntimeApiConfigured() {
 
 export function getCachedRuntimeUser() {
   return cachedUser;
+}
+
+export function getRuntimeAccessToken() {
+  return getAccessToken();
 }
 
 function getAccessToken() {

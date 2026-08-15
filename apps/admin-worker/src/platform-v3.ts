@@ -1,4 +1,5 @@
 import platformHandler from "./platform-index";
+import { adminRuntimeRoute } from "./platform-v3-admin";
 import { credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -43,10 +44,13 @@ export default {
         capabilities: {
           passwordLogin: true,
           passwordSetup: true,
-          adminUsers: false,
+          adminUsers: true,
         },
       });
     }
+
+    const adminRuntime = await adminRuntimeRoute(request, env);
+    if (adminRuntime) return adminRuntime;
 
     return platformHandler.fetch(request, env as never);
   },

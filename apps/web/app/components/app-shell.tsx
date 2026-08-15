@@ -11,6 +11,10 @@ import {
   initializeRuntimeSession,
   runtimeAuthEventName,
 } from "../../lib/runtime-client";
+import {
+  firstAllowedAdminPath,
+  permissionForClinicalPath,
+} from "../../lib/runtime-permissions";
 import GlymizeLanguageSwitch from "./glymize-language-switch";
 import PwaInstall from "./pwa-install";
 import ThemeControls from "./theme-controls";
@@ -50,7 +54,7 @@ const COPY = {
     clinical: "مسیرهای بالینی", workflow: "ابزار و همکاری",
     loading: "در حال بازیابی نشست امن…", signInTitle: "ورود به GLYMIZE لازم است",
     signInText: "برای استفاده از فضای کار بالینی، با حساب پزشک یا دستیار/پرستار وارد شوید.",
-    deniedTitle: "این بخش برای حساب شما فعال نیست", deniedText: "پزشک می‌تواند این دسترسی را از پروفایل و بخش تیم مراقبت تغییر دهد.",
+    deniedTitle: "این بخش برای حساب شما فعال نیست", deniedText: "مدیر سیستم می‌تواند دسترسی این صفحه را از بخش کاربران و دسترسی‌ها تغییر دهد.",
     modes: { auto: "Auto", command_center: "Command Center", focused_workflow: "Guided Focus", compact_cards: "Visual Flow", evidence_trace: "Evidence Trace" },
   },
   en: {
@@ -61,14 +65,10 @@ const COPY = {
     clinical: "Clinical pathways", workflow: "Tools & collaboration",
     loading: "Restoring secure session…", signInTitle: "Sign in to GLYMIZE",
     signInText: "Use a physician or independent assistant/nurse account to access the clinical workspace.",
-    deniedTitle: "This section is not enabled for your account", deniedText: "The physician can change this permission from Profile → Care Team.",
+    deniedTitle: "This section is not enabled for your account", deniedText: "A system administrator can change this page permission from Users & access.",
     modes: { auto: "Auto", command_center: "Command Center", focused_workflow: "Guided Focus", compact_cards: "Visual Flow", evidence_trace: "Evidence Trace" },
   },
 } as const;
-
-function permissionForPath(pathname: string): AssistantPermission | null {
-  return NAVIGATION.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.permission ?? null;
-}
 
 function routeToken(pathname: string) {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return "admin";
@@ -118,7 +118,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
     return () => window.removeEventListener(LOCAL_QA_LAYOUT_EVENT, readLocalQaPreset);
   }, [localUiBypass]);
 
-  const visibleNavigation = useMemo(() => user?.role === "assistant"
+  const visibleNavigation = useMemo(() => user
     ? NAVIGATION.filter((item) => user.permissions.includes(item.permission))
     : NAVIGATION, [user]);
 
@@ -132,10 +132,17 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
     return preferred.map((href) => visibleNavigation.find((item) => item.href === href)).filter((item): item is NavItem => Boolean(item));
   }, [visibleNavigation]);
 
-  const requiredPermission = permissionForPath(pathname);
+  const adminHref = useMemo(
+    () => user ? firstAllowedAdminPath(user.permissions) : null,
+    [user],
+  );
+  const homeHref = user
+    ? (visibleNavigation[0]?.href ?? adminHref ?? "/profile")
+    : "/account";
+  const requiredPermission = permissionForClinicalPath(pathname);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
   const isPublicRuntimePath = pathname === "/account" || pathname.startsWith("/account/");
-  const assistantDenied = Boolean(user?.role === "assistant" && requiredPermission && !user.permissions.includes(requiredPermission));
+  const permissionDenied = Boolean(user && requiredPermission && !user.permissions.includes(requiredPermission));
 
   if (pathname === "/") return <>{children}</>;
 
@@ -145,7 +152,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
       renderedChildren = <section className={runtimeStyles.gate}><strong>{copy.loading}</strong></section>;
     } else if (!user) {
       renderedChildren = <section className={runtimeStyles.gate}><strong>{copy.signInTitle}</strong><p>{copy.signInText}</p><Link href="/account">{copy.login}</Link></section>;
-    } else if (assistantDenied) {
+    } else if (permissionDenied) {
       renderedChildren = <section className={runtimeStyles.gate}><strong>{copy.deniedTitle}</strong><p>{copy.deniedText}</p><Link href="/profile">{copy.profile}</Link></section>;
     }
   }
@@ -161,7 +168,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
       data-role={user?.role ?? "guest"}
     >
       <aside className={menuOpen ? "sidebar open" : "sidebar"} aria-label={copy.navLabel}>
-        <Link className="brand" href={user ? "/dashboard" : "/account"}>
+        <Link className="brand" href={homeHref}>
           <span className="brand-mark" aria-hidden="true">Y</span>
           <span><strong>GLYMIZE</strong><small>{copy.brandSubtitle}</small></span>
         </Link>
@@ -178,6 +185,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
             return <Link className={active ? "nav-item active" : "nav-item"} href={item.href} key={item.href}><span>{item.icon}</span><span>{item[locale]}</span></Link>;
           })}
           <Link className={pathname.startsWith("/profile") ? "nav-item active" : "nav-item"} href={user ? "/profile" : "/account"}><span>ID</span><span>{user ? copy.profile : copy.login}</span></Link>
+          {adminHref && <Link className={pathname.startsWith("/admin") ? "nav-item active" : "nav-item"} href={adminHref}><span>AD</span><span>{locale === "fa" ? "مدیریت" : "Admin"}</span></Link>}
         </nav>
 
         <div className="sidebar-note"><span className="status-dot" /><div><strong>{copy.installable}</strong><small>{copy.privacy}</small><a className="support-email" href="mailto:info@glymize.ir?subject=GLYMIZE%20Feedback" title={copy.contact}>info@glymize.ir</a></div></div>
@@ -202,6 +210,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
           return <Link className={active ? "active" : ""} href={item.href} key={item.href}><span>{item.icon}</span><span>{item[locale]}</span></Link>;
         })}
         <Link className={pathname.startsWith("/profile") ? "active" : ""} href="/profile"><span>ID</span><span>{copy.profile}</span></Link>
+        {adminHref && <Link className={pathname.startsWith("/admin") ? "active" : ""} href={adminHref}><span>AD</span><span>{locale === "fa" ? "مدیریت" : "Admin"}</span></Link>}
       </nav>}
 
       {menuOpen && <button className="sidebar-overlay" onClick={() => setMenuOpen(false)} type="button" aria-label={copy.close} />}
