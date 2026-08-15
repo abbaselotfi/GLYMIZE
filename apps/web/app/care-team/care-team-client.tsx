@@ -9,6 +9,11 @@ import type {
   PatientHandoffMedication,
   PatientHandoffVitals,
 } from "@glymize/contracts";
+import {
+  LAB_MASTER_REGISTRY,
+  normalizeLabUnit,
+  resolveLabMasterEntry,
+} from "@glymize/clinical-engine/lab-text-parser";
 import { recognizeClinicalDocument, type OcrProgress } from "../../lib/client-ocr";
 import { lookupPatientHandoff, savePatientHandoff, validateIranianNationalId } from "../../lib/patient-handoff-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
@@ -25,6 +30,28 @@ type MedicationDraft = {
 
 const EMPTY_VITALS = { weightKg: "", heightCm: "", systolicBp: "", diastolicBp: "", pulseBpm: "" };
 const EMPTY_FLAGS: PatientHandoffClinicalFlags = {};
+
+const LAB_DATALIST_OPTIONS = LAB_MASTER_REGISTRY.flatMap(
+  (test) =>
+    [...new Set([test.name, test.faName, ...test.aliases])].map(
+      (alias) => ({
+        key: `${test.canonicalKey}:${alias}`,
+        value: alias,
+        label: `${test.name} / ${test.faName} / ${test.defaultUnit ?? ""}`,
+      }),
+    ),
+);
+
+function labObservationIdentity(lab: PatientHandoffLab) {
+  return [
+    lab.canonicalKey ?? lab.rawName.trim().toLowerCase(),
+    lab.value ?? lab.valueText ?? "",
+    lab.unit ?? "",
+    lab.observedAt ?? "",
+    lab.sourceDocumentName ?? "",
+    lab.sourcePage ?? "",
+  ].join("|");
+}
 
 const FREQUENCY_ALIASES: Record<string, { timesPerDay: number; code: string }> = {
   "1": { timesPerDay: 1, code: "OD" },
@@ -86,6 +113,28 @@ function newMedication(): MedicationDraft {
   return { id: crypto.randomUUID(), genericName: "", doseAmount: "", doseUnit: "mg", frequencyPerDay: "", verification: "unverified" };
 }
 
+
+function newManualLab(): PatientHandoffLab {
+  return {
+    id: crypto.randomUUID(),
+    rawName: "",
+    value: undefined,
+    valueText: undefined,
+    unit: "",
+    referenceRange: "",
+    observedAt: "",
+    verification: "unverified",
+sourceKind: "manual",
+sourceDocumentName: "manual-entry",
+  };
+}
+
+function labValueInput(lab: PatientHandoffLab) {
+  if (lab.valueText !== undefined) return lab.valueText;
+  if (lab.value !== undefined) return String(lab.value);
+  return "";
+}
+
 export default function CareTeamClient() {
   const { locale, isRtl } = useGlymizeLocale();
   const fa = locale === "fa";
@@ -122,6 +171,73 @@ export default function CareTeamClient() {
 
   function updateLab(id: string, patch: Partial<PatientHandoffLab>) {
     setLabs((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function updateLabName(id: string, value: string) {
+    const match = resolveLabMasterEntry(value);
+
+    setLabs((current) =>
+      current.map((item) => {
+        if (item.id !== id) return item;
+
+        if (!match) {
+          return {
+            ...item,
+            canonicalKey: undefined,
+            rawName: value,
+          };
+        }
+
+        const existingUnit = normalizeLabUnit(item.unit);
+        const unit =
+          existingUnit &&
+          match.allowedUnits.includes(existingUnit)
+            ? existingUnit
+            : match.defaultUnit;
+
+        return {
+  ...item,
+  canonicalKey: match.canonicalKey,
+  canonicalName: match.name,
+  rawName: value,
+  specimen: match.specimens[0],
+  unit,
+};
+      }),
+    );
+  }
+
+  function updateLabValue(id: string, value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      updateLab(id, {
+        value: undefined,
+        valueText: undefined,
+      });
+      return;
+    }
+
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) {
+      updateLab(id, {
+        value: numeric,
+        valueText: undefined,
+      });
+      return;
+    }
+
+    updateLab(id, {
+      value: undefined,
+      valueText: value,
+    });
+  }
+
+  function addManualLab() {
+    setLabs((current) => [...current, newManualLab()]);
+  }
+
+  function removeLab(id: string) {
+    setLabs((current) => current.filter((item) => item.id !== id));
   }
 
 
@@ -201,9 +317,14 @@ export default function CareTeamClient() {
       const result = await recognizeClinicalDocument(file, setOcrProgress);
       setOcrText((current) => [current, result.rawText].filter(Boolean).join("\n\n"));
       setLabs((current) => {
-        const existingKeys = new Set(current.map((item) => item.canonicalKey).filter(Boolean));
-        return [...current, ...result.labs.filter((item) => !item.canonicalKey || !existingKeys.has(item.canonicalKey))];
-      });
+  const existing = new Set(
+    current.map(labObservationIdentity),
+  );
+  const additions = result.labs.filter(
+    (item) => !existing.has(labObservationIdentity(item)),
+  );
+  return [...current, ...additions];
+});
       const extractionModeFa = result.ocrPages > 0
         ? (result.embeddedTextPages > 0 ? ` · ${result.embeddedTextPages} صفحه متن PDF + ${result.ocrPages} صفحه OCR` : ` · ${result.ocrPages} صفحه OCR`)
         : (result.embeddedTextPages > 0 ? ` · متن ساختاری PDF بدون OCR تصویری` : "");
@@ -294,8 +415,19 @@ export default function CareTeamClient() {
   return (
     <main className={styles.page} dir={isRtl ? "rtl" : "ltr"} lang={locale}>
       <div className={styles.topline}>
-        <Link href="/dashboard">{isRtl ? "→" : "←"} {fa ? "داشبورد" : "Dashboard"}</Link>
-        <span>{fa ? "PRE-VISIT · داده ساختاریافته و قابل بازبینی" : "PRE-VISIT · structured, reviewable data"}</span>
+        <div className={styles.topLinks}>
+          <Link href="/dashboard">
+            {isRtl ? "\u2192" : "\u2190"} {fa ? "\u062f\u0627\u0634\u0628\u0648\u0631\u062f" : "Dashboard"}
+          </Link>
+          <Link href="/records">
+            {fa ? "\u0622\u0631\u0634\u06cc\u0648 \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627" : "Patient archive"}
+          </Link>
+        </div>
+        <span>
+          {fa
+            ? "PRE-VISIT \u00b7 \u062f\u0627\u062f\u0647 \u0633\u0627\u062e\u062a\u0627\u0631\u06cc\u0627\u0641\u062a\u0647 \u0648 \u0642\u0627\u0628\u0644 \u0628\u0627\u0632\u0628\u06cc\u0646\u06cc"
+            : "PRE-VISIT \u00b7 structured, reviewable data"}
+        </span>
       </div>
 
       <header className={styles.hero}>
@@ -322,22 +454,143 @@ export default function CareTeamClient() {
         <div className={styles.uploadActions}>
           <button type="button" disabled={busy} onClick={() => cameraRef.current?.click()}>📷 {fa ? "عکس با موبایل" : "Take photo"}</button>
           <button type="button" disabled={busy} className={styles.secondary} onClick={() => fileRef.current?.click()}>PDF / JPG {fa ? "انتخاب فایل" : "Choose file"}</button>
+          <button
+            type="button"
+            disabled={busy}
+            className={styles.secondary}
+            onClick={addManualLab}
+          >
+            + {fa ? "\u0627\u0641\u0632\u0648\u062f\u0646 \u0622\u0632\u0645\u0627\u06cc\u0634 \u062f\u0633\u062a\u06cc" : "Add lab manually"}
+          </button>
           <input ref={cameraRef} className={styles.hidden} type="file" accept="image/*" capture="environment" onChange={(event) => void processFile(event.target.files?.[0])} />
           <input ref={fileRef} className={styles.hidden} type="file" accept="application/pdf,image/*" onChange={(event) => void processFile(event.target.files?.[0])} />
         </div>
         {ocrProgress && <div className={styles.progress}><div style={{ width: `${progressPercent}%` }} /><span>{progressPercent}% · {ocrProgress.message}</span></div>}
         <p className={styles.privacy}>{fa ? "در حالت OCR مرورگری، تصویر برای سرویس OCR خارجی آپلود نمی‌شود؛ مدل‌های زبان فارسی/انگلیسی در اولین استفاده ممکن است دانلود شوند." : "Browser OCR does not upload the image to a third-party OCR service; Persian/English language models may download on first use."}</p>
 
+        <datalist id="glymize-lab-catalog">
+  {LAB_DATALIST_OPTIONS.map((option) => (
+    <option
+      key={option.key}
+      value={option.value}
+      label={option.label}
+    />
+  ))}
+</datalist>
         {labs.length > 0 && <div className={styles.labTable}>
-          <div className={styles.labHeader}><span>{fa ? "آزمایش" : "Test"}</span><span>{fa ? "مقدار" : "Value"}</span><span>{fa ? "واحد" : "Unit"}</span><span>{fa ? "وضعیت" : "State"}</span></div>
+          <div className={styles.labHeader}>
+            <span>{fa ? "\u0622\u0632\u0645\u0627\u06cc\u0634" : "Test"}</span>
+            <span>{fa ? "\u0645\u0642\u062f\u0627\u0631" : "Value"}</span>
+            <span>{fa ? "\u0648\u0627\u062d\u062f" : "Unit"}</span>
+            <span>{fa ? "\u0645\u062d\u062f\u0648\u062f\u0647 \u0645\u0631\u062c\u0639" : "Reference"}</span>
+            <span>{fa ? "\u062a\u0627\u0631\u06cc\u062e" : "Date"}</span>
+            <span>{fa ? "\u067e\u0631\u0686\u0645 H/L" : "H/L flag"}</span>
+            <span>{fa ? "\u0648\u0636\u0639\u06cc\u062a" : "State"}</span>
+          </div>
           {labs.map((lab) => <div className={styles.labRow} key={lab.id}>
-            <input value={lab.rawName} onChange={(event) => updateLab(lab.id, { rawName: event.target.value })} />
-            <input inputMode="decimal" value={lab.value ?? ""} onChange={(event) => updateLab(lab.id, { value: numberOrUndefined(event.target.value) })} />
-            <input value={lab.unit ?? ""} onChange={(event) => updateLab(lab.id, { unit: event.target.value })} />
+            <input
+              list="glymize-lab-catalog"
+              value={lab.rawName}
+              placeholder={fa ? "\u0646\u0627\u0645 \u0622\u0632\u0645\u0627\u06cc\u0634 \u0631\u0627 \u062c\u0633\u062a\u200c\u0648\u062c\u0648 \u06a9\u0646\u06cc\u062f" : "Search lab test"}
+              onChange={(event) => updateLabName(
+                lab.id,
+                event.target.value,
+              )}
+            />
+            <input
+              value={labValueInput(lab)}
+              placeholder={fa ? "\u0645\u0642\u062f\u0627\u0631" : "Value"}
+              onChange={(event) => updateLabValue(
+                lab.id,
+                event.target.value,
+              )}
+            />
+            <input
+              value={lab.unit ?? ""}
+              placeholder={fa ? "\u0648\u0627\u062d\u062f" : "Unit"}
+              onChange={(event) => updateLab(
+                lab.id,
+                { unit: event.target.value },
+              )}
+            />
+            <input
+              value={lab.referenceRange ?? ""}
+              placeholder={fa ? "\u0645\u062b\u0644\u0627\u064b 70-100" : "e.g. 70-100"}
+              onChange={(event) => updateLab(
+                lab.id,
+                { referenceRange: event.target.value },
+              )}
+            />
+            <input
+              type="date"
+              value={(lab.observedAt ?? "").slice(0, 10)}
+              onChange={(event) => updateLab(
+                lab.id,
+                { observedAt: event.target.value || undefined },
+              )}
+            />
+            <select
+              className={styles.labFlag}
+              data-interpretation={lab.interpretation ?? ""}
+              value={lab.interpretation ?? ""}
+              onChange={(event) => updateLab(
+                lab.id,
+                {
+                  interpretation:
+                    (event.target.value || undefined) as PatientHandoffLab["interpretation"],
+                  interpretationSource:
+                    event.target.value ? "manual" : undefined,
+                },
+              )}
+            >
+              <option value="">
+                {fa ? "\u0628\u062f\u0648\u0646 \u067e\u0631\u0686\u0645" : "No flag"}
+              </option>
+              <option value="N">N - {fa ? "\u0646\u0631\u0645\u0627\u0644" : "Normal"}</option>
+              <option value="L">L - {fa ? "\u067e\u0627\u06cc\u06cc\u0646" : "Low"}</option>
+              <option value="H">H - {fa ? "\u0628\u0627\u0644\u0627" : "High"}</option>
+              <option value="LL">LL - {fa ? "\u067e\u0627\u06cc\u06cc\u0646 \u0628\u062d\u0631\u0627\u0646\u06cc" : "Critical low"}</option>
+              <option value="HH">HH - {fa ? "\u0628\u0627\u0644\u0627\u06cc \u0628\u062d\u0631\u0627\u0646\u06cc" : "Critical high"}</option>
+              <option value="A">A - {fa ? "\u063a\u06cc\u0631\u0637\u0628\u06cc\u0639\u06cc" : "Abnormal"}</option>
+            </select>
             <div className={styles.verifyActions}>
-              <button type="button" className={lab.verification === "confirmed" ? styles.confirmed : styles.smallButton} onClick={() => updateLab(lab.id, { verification: "confirmed" })}>✓</button>
-              <button type="button" className={lab.verification === "rejected" ? styles.rejected : styles.smallButton} onClick={() => updateLab(lab.id, { verification: "rejected" })}>×</button>
-              <small>{lab.verification === "confirmed" ? (fa ? "تأیید" : "confirmed") : lab.verification === "rejected" ? (fa ? "رد" : "rejected") : (fa ? "بازبینی" : "review")}</small>
+              <button
+                type="button"
+                title={fa ? "\u062a\u0627\u06cc\u06cc\u062f" : "Confirm"}
+                className={lab.verification === "confirmed" ? styles.confirmed : styles.smallButton}
+                onClick={() => updateLab(
+                  lab.id,
+                  { verification: "confirmed" },
+                )}
+              >
+                {"\u2713"}
+              </button>
+              <button
+                type="button"
+                title={fa ? "\u0631\u062f" : "Reject"}
+                className={lab.verification === "rejected" ? styles.rejected : styles.smallButton}
+                onClick={() => updateLab(
+                  lab.id,
+                  { verification: "rejected" },
+                )}
+              >
+                {"\u00d7"}
+              </button>
+              <button
+                type="button"
+                title={fa ? "\u062d\u0630\u0641 \u0631\u062f\u06cc\u0641" : "Remove row"}
+                className={styles.removeLab}
+                onClick={() => removeLab(lab.id)}
+              >
+                {"\u2212"}
+              </button>
+              <small>
+                {lab.verification === "confirmed"
+                  ? (fa ? "\u062a\u0627\u06cc\u06cc\u062f" : "confirmed")
+                  : lab.verification === "rejected"
+                    ? (fa ? "\u0631\u062f" : "rejected")
+                    : (fa ? "\u0628\u0627\u0632\u0628\u06cc\u0646\u06cc" : "review")}
+              </small>
             </div>
           </div>)}
         </div>}

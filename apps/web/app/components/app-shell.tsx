@@ -42,6 +42,7 @@ const NAVIGATION: readonly NavItem[] = [
   { href: "/pregnancy", icon: "◇", fa: "دیابت بارداری", en: "Gestational diabetes", permission: "pregnancy", group: "clinical" },
   { href: "/insulin-tools", icon: "IU", fa: "ابزارهای انسولین", en: "Insulin tools", permission: "insulin_tools", group: "workflow" },
   { href: "/care-team", icon: "RN", fa: "تیم مراقبت", en: "Care team", permission: "care_team", group: "workflow" },
+  { href: "/records", icon: "AR", fa: "\u0622\u0631\u0634\u06cc\u0648 \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627", en: "Patient archive", permission: "handoff.read", group: "workflow" },
   { href: "/evidence-assistant", icon: "AI", fa: "دستیار علمی AI", en: "Evidence AI", permission: "evidence", group: "workflow" },
 ];
 
@@ -75,6 +76,7 @@ function routeToken(pathname: string) {
   if (pathname === "/type-2" || pathname.startsWith("/type-2/")) return "type-2";
   if (pathname === "/insulin-tools" || pathname.startsWith("/insulin-tools/")) return "insulin-tools";
   if (pathname === "/care-team" || pathname.startsWith("/care-team/")) return "care-team";
+  if (pathname === "/records" || pathname.startsWith("/records/")) return "records";
   if (pathname === "/evidence-assistant" || pathname.startsWith("/evidence-assistant/")) return "evidence";
   if (pathname === "/profile" || pathname.startsWith("/profile/")) return "profile";
   if (pathname === "/account" || pathname.startsWith("/account/")) return "account";

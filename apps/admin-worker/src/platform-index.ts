@@ -1184,16 +1184,158 @@ async function lookupHandoff(request: Request, env: Env, auth: AuthContext) {
   }});
 }
 
-async function listHandoffs(request:Request,env:Env,auth:AuthContext) {
-  if (!hasPermission(auth.user,"handoff.read")) return json(request,env,{error:"permission_denied"},403);
-  const rows=await db(env).prepare(
-    `SELECT id,patient_code_kind,patient_code_display,status,revision,created_at,updated_at
-     FROM patient_handoffs WHERE practice_id=? ORDER BY updated_at DESC LIMIT 100`,
-  ).bind(auth.user.practiceId).all<any>();
-  return json(request,env,rows.results.map((row:any)=>({
-    id:row.id,patientCodeKind:row.patient_code_kind,patientCodeDisplay:row.patient_code_display,
-    status:row.status,revision:row.revision,createdAt:row.created_at,updatedAt:row.updated_at,
-  })));
+async function getHandoffById(
+  request: Request,
+  env: Env,
+  auth: AuthContext,
+  recordId: string,
+) {
+  if (!hasPermission(auth.user, "handoff.read")) {
+    return json(request, env, { error: "permission_denied" }, 403);
+  }
+
+  const id = recordId.trim();
+  if (!/^[A-Za-z0-9-]{8,80}$/.test(id)) {
+    return json(request, env, { error: "invalid_handoff_id" }, 422);
+  }
+
+  const row = await db(env).prepare(
+    `SELECT id,patient_code_hash,patient_code_kind,patient_code_display,
+            ciphertext,iv,auth_tag,status,revision,created_at,updated_at
+     FROM patient_handoffs
+     WHERE practice_id=? AND id=?`,
+  ).bind(
+    auth.user.practiceId,
+    id,
+  ).first<any>();
+
+  if (!row) {
+    return json(request, env, { error: "handoff_not_found" }, 404);
+  }
+
+  const secret = clinicalSecret(env);
+  const payload = await decryptClinicalPayload<any>(
+    {
+      iv: row.iv,
+      ciphertext: row.ciphertext,
+      authTag: row.auth_tag,
+    },
+    secret,
+    `${auth.user.practiceId}:${row.patient_code_hash}`,
+  );
+
+  if (!payload) {
+    return json(request, env, { error: "handoff_decryption_failed" }, 500);
+  }
+
+  return json(request, env, {
+    ...payload,
+    id: row.id,
+    patientCodeKind: row.patient_code_kind,
+    patientCodeDisplay: row.patient_code_display,
+    status: row.status,
+    revision: row.revision,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+}
+
+function parseHandoffArchiveCursor(raw: string) {
+  const separator = raw.lastIndexOf("|");
+  if (separator <= 0 || separator >= raw.length - 1) return null;
+
+  const updatedAt = raw.slice(0, separator);
+  const id = raw.slice(separator + 1);
+
+  if (
+    Number.isNaN(Date.parse(updatedAt)) ||
+    !/^[A-Za-z0-9-]{8,80}$/.test(id)
+  ) {
+    return null;
+  }
+
+  return { updatedAt, id };
+}
+
+async function listHandoffs(
+  request: Request,
+  env: Env,
+  auth: AuthContext,
+) {
+  if (!hasPermission(auth.user, "handoff.read")) {
+    return json(request, env, { error: "permission_denied" }, 403);
+  }
+
+  const url = new URL(request.url);
+  const requestedLimit = Number(url.searchParams.get("limit") ?? "50");
+  const pageSize = Number.isFinite(requestedLimit)
+    ? Math.max(10, Math.min(100, Math.trunc(requestedLimit)))
+    : 50;
+
+  const rawCursor = url.searchParams.get("cursor")?.trim() ?? "";
+  const cursor = rawCursor
+    ? parseHandoffArchiveCursor(rawCursor)
+    : null;
+
+  if (rawCursor && !cursor) {
+    return json(request, env, { error: "invalid_archive_cursor" }, 422);
+  }
+
+  // pageSize is a transport/page size only. It is NOT an archive or
+  // retention cap. No patient_handoffs are deleted by this endpoint.
+  const result = cursor
+    ? await db(env).prepare(
+        `SELECT id,patient_code_kind,patient_code_display,status,
+                revision,created_at,updated_at
+         FROM patient_handoffs
+         WHERE practice_id=?
+           AND (
+             updated_at < ?
+             OR (updated_at = ? AND id < ?)
+           )
+         ORDER BY updated_at DESC, id DESC
+         LIMIT ?`,
+      ).bind(
+        auth.user.practiceId,
+        cursor.updatedAt,
+        cursor.updatedAt,
+        cursor.id,
+        pageSize + 1,
+      ).all<any>()
+    : await db(env).prepare(
+        `SELECT id,patient_code_kind,patient_code_display,status,
+                revision,created_at,updated_at
+         FROM patient_handoffs
+         WHERE practice_id=?
+         ORDER BY updated_at DESC, id DESC
+         LIMIT ?`,
+      ).bind(
+        auth.user.practiceId,
+        pageSize + 1,
+      ).all<any>();
+
+  const hasMore = result.results.length > pageSize;
+  const visible = result.results.slice(0, pageSize);
+
+  const items = visible.map((row: any) => ({
+    id: row.id,
+    patientCodeKind: row.patient_code_kind,
+    patientCodeDisplay: row.patient_code_display,
+    status: row.status,
+    revision: row.revision,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+
+  const last = visible[visible.length - 1];
+  const nextCursor = hasMore && last
+    ? `${last.updated_at}|${last.id}`
+    : null;
+
+  return json(request, env, {
+    items,
+    nextCursor,
+  });
 }
 
 async function evidenceStatus(request:Request,env:Env) {
@@ -1287,6 +1429,15 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
 
   if (url.pathname==="/v1/patient-handoff/upsert" && request.method==="POST") return upsertHandoff(request,env,auth);
   if (url.pathname==="/v1/patient-handoff/lookup" && request.method==="POST") return lookupHandoff(request,env,auth);
+  const handoffRecordMatch=url.pathname.match(/^\/v1\/patient-handoff\/records\/([^/]+)$/);
+  if (handoffRecordMatch && request.method==="GET") {
+    return getHandoffById(
+      request,
+      env,
+      auth,
+      decodeURIComponent(handoffRecordMatch[1]!),
+    );
+  }
   if (url.pathname==="/v1/patient-handoff/list" && request.method==="GET") return listHandoffs(request,env,auth);
 
   return json(request,env,{error:"not_found"},404);

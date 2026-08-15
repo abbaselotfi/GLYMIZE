@@ -8,7 +8,7 @@
 --   * append-only encounter history instead of overwriting prior visits;
 --   * encrypted full clinical snapshots suitable for later authorized longitudinal display/export;
 --   * searchable observation keys with encrypted observation values for efficient trends;
---   * separate physician final-prescription records;
+--   * separate physician Final Plans with medication and investigation orders;
 --   * preserve legacy patient_handoffs during staged migration.
 --
 -- IMPORTANT:
@@ -131,29 +131,102 @@ CREATE INDEX IF NOT EXISTS patient_observations_practice_key_time_idx
 CREATE INDEX IF NOT EXISTS patient_observations_encounter_idx
   ON patient_observations(encounter_id, created_at);
 
--- Physician's final medication plan is intentionally separate from engine recommendations.
--- The encrypted payload should retain canonical medication IDs, drug names, strength/form,
--- dose, frequency, total daily dose, action (KEEP/UP/DOWN/HOLD/STOP/SWITCH/ADD where relevant),
--- and any physician-entered modification/override metadata.
-CREATE TABLE IF NOT EXISTS patient_prescription_records (
+-- Physician Final Plan is intentionally separate from engine recommendations.
+-- A signed plan may contain medication orders, investigation/laboratory orders, both,
+-- or no medication order. Signed clinical content is immutable; later changes create a
+-- superseding plan rather than silently rewriting history.
+CREATE TABLE IF NOT EXISTS patient_final_plans (
   id TEXT PRIMARY KEY,
   encounter_id TEXT NOT NULL REFERENCES patient_encounters(id) ON DELETE CASCADE,
   patient_id TEXT NOT NULL REFERENCES patient_registry(id) ON DELETE CASCADE,
   practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
-  decision_state TEXT NOT NULL DEFAULT 'final' CHECK (decision_state IN ('draft','final','void')),
+  plan_version INTEGER NOT NULL CHECK (plan_version >= 1),
+  plan_status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (plan_status IN ('draft','signed','superseded','void')),
+  supersedes_plan_id TEXT REFERENCES patient_final_plans(id) ON DELETE SET NULL,
+  payload_ciphertext TEXT,
+  payload_iv TEXT,
+  payload_auth_tag TEXT,
+  engine_decision_record_id TEXT,
+  engine_version TEXT,
+  rule_pack_version TEXT,
+  authored_by TEXT NOT NULL REFERENCES runtime_users(id) ON DELETE RESTRICT,
+  signed_by TEXT REFERENCES runtime_users(id) ON DELETE RESTRICT,
+  signed_at TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE(encounter_id, plan_version)
+);
+CREATE INDEX IF NOT EXISTS patient_final_plans_patient_signed_idx
+  ON patient_final_plans(patient_id, signed_at DESC);
+CREATE INDEX IF NOT EXISTS patient_final_plans_encounter_idx
+  ON patient_final_plans(encounter_id, plan_version DESC);
+
+-- Encrypted medication orders include dose/schedule and the payer-registration snapshot.
+-- Encrypted investigation orders include Lab Master key, timing/preparation and any
+-- insurer/service registration code snapshot available at physician sign-off.
+CREATE TABLE IF NOT EXISTS patient_final_orders (
+  id TEXT PRIMARY KEY,
+  plan_id TEXT NOT NULL REFERENCES patient_final_plans(id) ON DELETE CASCADE,
+  encounter_id TEXT NOT NULL REFERENCES patient_encounters(id) ON DELETE CASCADE,
+  patient_id TEXT NOT NULL REFERENCES patient_registry(id) ON DELETE CASCADE,
+  practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
+  order_kind TEXT NOT NULL CHECK (order_kind IN ('medication','investigation')),
+  order_status TEXT NOT NULL DEFAULT 'active'
+    CHECK (order_status IN ('active','cancelled')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
   payload_ciphertext TEXT NOT NULL,
   payload_iv TEXT NOT NULL,
   payload_auth_tag TEXT NOT NULL,
-  engine_version TEXT,
-  rule_pack_version TEXT,
-  created_by TEXT NOT NULL REFERENCES runtime_users(id) ON DELETE RESTRICT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  schema_version TEXT NOT NULL DEFAULT 'physician-order-v1',
+  created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS patient_prescription_patient_time_idx
-  ON patient_prescription_records(patient_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS patient_prescription_encounter_idx
-  ON patient_prescription_records(encounter_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS patient_final_orders_plan_idx
+  ON patient_final_orders(plan_id, sort_order, created_at);
+CREATE INDEX IF NOT EXISTS patient_final_orders_patient_idx
+  ON patient_final_orders(patient_id, created_at DESC);
+
+-- Care Team execution is append-only and never mutates physician-authored orders.
+CREATE TABLE IF NOT EXISTS patient_order_fulfillment_events (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES patient_final_orders(id) ON DELETE CASCADE,
+  plan_id TEXT NOT NULL REFERENCES patient_final_plans(id) ON DELETE CASCADE,
+  patient_id TEXT NOT NULL REFERENCES patient_registry(id) ON DELETE CASCADE,
+  practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
+  fulfillment_status TEXT NOT NULL CHECK (
+    fulfillment_status IN (
+      'pending',
+      'submitted_to_payer',
+      'registered',
+      'scheduled',
+      'collected',
+      'result_received',
+      'completed',
+      'unable_to_process',
+      'cancelled'
+    )
+  ),
+  note_ciphertext TEXT,
+  note_iv TEXT,
+  note_auth_tag TEXT,
+  updated_by TEXT NOT NULL REFERENCES runtime_users(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS patient_order_fulfillment_order_time_idx
+  ON patient_order_fulfillment_events(order_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS patient_order_fulfillment_patient_time_idx
+  ON patient_order_fulfillment_events(patient_id, created_at DESC);
+
+-- Returned observations may satisfy earlier investigation orders without overwriting orders.
+CREATE TABLE IF NOT EXISTS patient_investigation_result_links (
+  order_id TEXT NOT NULL REFERENCES patient_final_orders(id) ON DELETE CASCADE,
+  observation_id TEXT NOT NULL REFERENCES patient_observations(id) ON DELETE CASCADE,
+  linked_by TEXT NOT NULL REFERENCES runtime_users(id) ON DELETE RESTRICT,
+  linked_at TEXT NOT NULL,
+  PRIMARY KEY(order_id, observation_id)
+);
+CREATE INDEX IF NOT EXISTS patient_investigation_result_observation_idx
+  ON patient_investigation_result_links(observation_id);
+
 
 -- Maps a legacy current patient_handoffs row to the new patient/encounter model during staged rollout.
 -- This allows migration without dropping or rewriting the currently tested handoff path.

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   type AssistantPermission,
@@ -210,6 +211,31 @@ export default function ProfilePage() {
       </div>
 
       <div className={styles.saveBar}><div><strong>{fa ? "تغییرات پروفایل" : "Profile changes"}</strong><small>{fa ? "نام، عکس و چیدمان با یک ذخیره به‌روزرسانی می‌شوند." : "Name, photo, and layout are updated together."}</small></div><button disabled={busy} onClick={() => void saveProfile()}>{busy ? (fa ? "در حال ذخیره…" : "Saving…") : (fa ? "ذخیره پروفایل" : "Save profile")}</button></div>
+
+      {user.permissions.includes("handoff.read") && (
+        <section className={`${styles.card} ${styles.archiveCard}`}>
+          <div className={styles.heading}>
+            <div>
+              <span>PATIENT ARCHIVE</span>
+              <h2>
+                {fa
+                  ? "\u0622\u0631\u0634\u06cc\u0648 \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627"
+                  : "Patient archive"}
+              </h2>
+              <p>
+                {fa
+                  ? "\u0641\u0647\u0631\u0633\u062a \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627\u06cc \u062b\u0628\u062a\u200c\u0634\u062f\u0647 \u0647\u0645\u06cc\u0646 \u0645\u0637\u0628 \u0631\u0627 \u0628\u062f\u0648\u0646 \u0646\u06cc\u0627\u0632 \u0628\u0647 \u062f\u0627\u0646\u0633\u062a\u0646 \u0634\u0645\u0627\u0631\u0647 \u067e\u0631\u0648\u0646\u062f\u0647 \u0645\u0634\u0627\u0647\u062f\u0647 \u06a9\u0646\u06cc\u062f."
+                  : "Browse the records saved for this practice without first knowing a patient code."}
+              </p>
+            </div>
+          </div>
+          <Link className={styles.archiveLink} href="/records">
+            {fa
+              ? "\u0645\u0634\u0627\u0647\u062f\u0647 \u0622\u0631\u0634\u06cc\u0648 \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627"
+              : "Open patient archive"}
+          </Link>
+        </section>
+      )}
 
       {isPhysician ? <>
         <section className={styles.card}>

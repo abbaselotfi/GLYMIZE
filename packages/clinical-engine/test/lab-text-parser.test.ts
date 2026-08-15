@@ -36,10 +36,10 @@ describe("pre-visit OCR lab parser", () => {
     expect(parseClinicalLabText("HbA1c pending\neGFR not reported")).toHaveLength(0);
   });
 
-  it("deduplicates repeated OCR lines by canonical lab", () => {
-    const labs = parseClinicalLabText("HbA1c 7.2 %\nHbA1c 7.3 %");
-    expect(labs.filter((x) => x.canonicalKey === "hba1c")).toHaveLength(1);
-  });
+  it("preserves distinct repeated same-analyte observations for review", () => {
+  const labs = parseClinicalLabText("HbA1c 7.2 %\nHbA1c 7.3 %");
+  expect(labs.filter((x) => x.canonicalKey === "hba1c")).toHaveLength(2);
+});
   it("09 keeps the PDF page marker for traceability", () => {
     const labs = parseClinicalLabText("--- page 1 ---\nnoise\n--- page 2 ---\nHbA1c 7.4 %", "lab.pdf");
     expect(labs.find((item) => item.canonicalKey === "hba1c")?.sourcePage).toBe(2);

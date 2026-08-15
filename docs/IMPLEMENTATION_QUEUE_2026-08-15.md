@@ -8,9 +8,11 @@ Immediate next atomic patches after the roadmap/schema foundation:
 4. Diagnose and fix Care Team patient-handoff save failure with explicit runtime error mapping.
 5. Complete release acceptance: permission changes, CSV export, synthetic user deletion/login failure, post-deploy smoke, production invariant.
 6. Patient Record v2 runtime adapter and RC-only migration rehearsal.
-7. Shared medication selector + dose schema across Type 2 and Care Team.
-8. Focused Workflow optional Patient step.
-9. Longitudinal timeline/trends and physician final prescription.
-10. Integrated clinical domain engines, dose/action engine, then cost/insurance engine.
+7. Shared medication selector + dose schema across Type 2, Care Team, medication reconciliation and physician Final Plan.
+8. Physician Final Plan + medication/investigation orders + Care Team fulfillment: signed encounter-scoped plan, payer-code snapshots, Lab Master order keys, and order-to-result linking.
+9. Engine REQUEST_INVESTIGATION integration: only explicit approved missing-data rules may suggest a test; physician acceptance/sign-off remains required.
+10. Focused Workflow optional Patient step.
+11. Longitudinal timeline/trends including pending/completed investigation orders and What changed since last visit.
+12. Integrated clinical domain engines, dose/action engine, then cost/insurance engine.
 
 No item in this queue authorizes a production deployment or PR merge by itself.

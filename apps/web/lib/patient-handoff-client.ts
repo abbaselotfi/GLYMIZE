@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  PatientHandoffArchivePage,
   PatientHandoffLookupResult,
   PatientHandoffRecord,
   PatientHandoffUpsertInput,
@@ -60,4 +61,54 @@ export async function lookupPatientHandoff(patientCode: string): Promise<Patient
   if (response.status === 404) return { found: false };
   if (!response.ok) throw new Error(handoffError(response.status, "HANDOFF_LOOKUP_FAILED"));
   return response.json() as Promise<PatientHandoffLookupResult>;
+}
+
+export async function listPatientHandoffs(
+  cursor?: string | null,
+  limit = 50,
+): Promise<PatientHandoffArchivePage> {
+  const query = new URLSearchParams({
+    limit: String(limit),
+  });
+  if (cursor) query.set("cursor", cursor);
+
+  const response = await runtimeFetch(
+    `/v1/patient-handoff/list?${query.toString()}`,
+    { method: "GET" },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      handoffError(
+        response.status,
+        "HANDOFF_ARCHIVE_LIST_FAILED",
+      ),
+    );
+  }
+
+  return response.json() as Promise<PatientHandoffArchivePage>;
+}
+
+export async function getPatientHandoffById(
+  recordId: string,
+): Promise<PatientHandoffRecord> {
+  const response = await runtimeFetch(
+    `/v1/patient-handoff/records/${encodeURIComponent(recordId)}`,
+    { method: "GET" },
+  );
+
+  if (response.status === 404) {
+    throw new Error("HANDOFF_NOT_FOUND");
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      handoffError(
+        response.status,
+        "HANDOFF_ARCHIVE_OPEN_FAILED",
+      ),
+    );
+  }
+
+  return response.json() as Promise<PatientHandoffRecord>;
 }

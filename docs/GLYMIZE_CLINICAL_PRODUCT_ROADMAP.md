@@ -185,6 +185,8 @@ Store every clinically extractable laboratory observation present in the source 
 - inflammation: ESR, CRP/hs-CRP where present;
 - any other laboratory test present in the patient report.
 
+An ordered investigation and an observed result are different clinical objects. `PhysicianInvestigationOrder` records what the physician asked to be done; a laboratory observation records the result actually measured. A future result may satisfy/link to an earlier order, but the order must not be overwritten by the result.
+
 Each observation should preserve:
 
 - raw test name;
@@ -308,6 +310,19 @@ Insulin requires dose/unit logic rather than static strength dropdowns, includin
 
 LLMs must not invent dose numbers.
 
+### Missing-data investigation action
+
+The engine may emit `REQUEST_INVESTIGATION` when a required datum is unavailable **only** when an explicit approved/versioned clinical rule defines:
+
+- the missing required-data key;
+- the investigation/test that can obtain the needed information;
+- rationale/reason code;
+- priority and timing;
+- whether the missing datum blocks a treatment decision;
+- source IDs and active rule-pack version.
+
+An engine investigation recommendation is not a medical order. The physician must accept, modify or reject it before it can appear in the signed Final Plan. LLMs must never invent a test request or convert a missing field into an order without an approved rule.
+
 ---
 
 ## 9. Shared medication selector and dose schema
@@ -328,7 +343,9 @@ Features:
 - formulation-specific dose entry;
 - validated frequency choices;
 - total daily dose calculation;
-- prevention of impossible/obvious data-entry errors.
+- prevention of impossible/obvious data-entry errors;
+- payer/insurance registration code resolution for the selected product/provider;
+- snapshot of selected generic/brand/IRC/insurance codes when a medication order is signed, with source/freshness metadata.
 
 Dose modes should support at least:
 
@@ -342,26 +359,92 @@ Do not create separate inconsistent medication-entry widgets for physician and a
 
 ---
 
-## 10. Physician final prescription and medication history
+## 10. Physician final plan, medication/investigation orders and care-team execution
 
-Scenario recommendations are not the final medical order.
+Scenario recommendations are not the final medical order. The physician's final output is a **Final Plan**, not merely a drug prescription.
 
-Add an optional physician confirmation area:
+A signed Final Plan may contain:
 
-- accept recommendation;
-- modify drug/dose/schedule;
-- reject recommendation;
-- add a physician-selected medication not proposed by the engine.
+- medication orders;
+- laboratory/investigation orders;
+- both;
+- or no new medication at all when investigation/monitoring is the appropriate next action.
+
+### 10.1 Medication orders
+
+Medication orders use the shared Medication Selector + Dose Schema and may include:
+
+- canonical generic/product identity;
+- brand/product when selected;
+- formulation/strength/route;
+- dose and frequency;
+- duration/quantity when appropriate;
+- payer/insurance registration snapshot:
+  - insurer/provider;
+  - generic insurance code;
+  - brand insurance code;
+  - generic/brand registry code;
+  - IRC code when available;
+  - source/freshness metadata.
+
+If a payer code is unavailable, GLYMIZE shows it as unavailable; it must never invent one. Historical signed orders retain the code snapshot used at sign-off even if the live catalog later changes.
+
+### 10.2 Investigation / laboratory orders
+
+The physician may order investigations independently of medication changes. Each order should preserve, where applicable:
+
+- canonical Lab Master Registry key for laboratory tests;
+- raw/display order name;
+- specimen/context when relevant;
+- timing (`now`, `before_next_visit`, `at_next_visit`, `routine`);
+- priority;
+- fasting/preparation instructions;
+- structured reason code;
+- payer/service registration code for the selected insurer when available;
+- link to an engine investigation recommendation when one was accepted or modified.
+
+If an insurer/service code for an investigation is unavailable, GLYMIZE must show it as unavailable rather than inventing a code.
+
+An investigation order is distinct from the eventual result. When a result later arrives through OCR/PDF/manual/import, it is stored as a laboratory observation and may be linked back to the originating order.
+
+### 10.3 Physician sign-off and provenance
 
 Persist separately:
 
 - engine recommendation;
 - physician final decision;
 - accepted/modified/rejected state;
+- signed Final Plan version;
+- medication and investigation orders;
 - optional structured reason for override;
-- rule-pack/engine version at decision time.
+- engine/rule-pack version at decision time.
 
-At the next visit, the assistant should be able to load the last physician-approved medication list and perform reconciliation instead of retyping from scratch.
+Signed plans are encounter-scoped and immutable. A later change creates a superseding plan/version rather than silently rewriting history.
+
+### 10.4 Care Team visibility and execution
+
+After authorized Care Team staff open a patient by file number or national ID, they must be able to see the **latest signed physician Final Plan** for that patient/encounter.
+
+The Care Team view is read-only for physician-authored clinical content and shows:
+
+- medication orders with dose/frequency and payer/insurance registration codes;
+- investigation/laboratory orders, payer/service codes when available, and preparation/timing instructions;
+- order status and plan version/sign-off time.
+
+Care Team administrative execution is stored separately from the physician order. Depending on permission, staff may append fulfillment states such as:
+
+- pending;
+- submitted to payer;
+- registered;
+- scheduled;
+- collected;
+- result received;
+- completed;
+- unable to process.
+
+Care Team fulfillment must never alter the signed clinical order itself.
+
+At a later visit the assistant/nurse should load the last physician-approved medication list for reconciliation and see pending/completed investigation orders before collecting new data.
 
 ---
 
@@ -391,6 +474,8 @@ Preferred approach:
 - derive a central 80% market band (for example P10-P90);
 - use a robust center such as median or availability-weighted median within the band;
 - show premium/outlier brands separately rather than allowing them to distort the reference estimate.
+
+For a signed medication order, payer-registration identifiers used for execution must be snapshotted with source/freshness metadata. Live catalog changes must not rewrite historical signed orders.
 
 Display:
 
@@ -445,6 +530,8 @@ Provide simple longitudinal views after sufficient visits exist:
 - other observation trends when clinically useful.
 
 Never interpolate missing values as if measured.
+
+The longitudinal view should distinguish ordered investigations from completed results and surface pending physician orders to authorized Care Team users.
 
 Add `What changed since last visit` summary:
 

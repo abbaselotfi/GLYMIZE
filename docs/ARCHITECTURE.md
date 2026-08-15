@@ -106,3 +106,14 @@ API رویدادهای حداقلی و فاقد دادهٔ بالینی را ب�
 - منبع معتبر و مجوز داده‌های برند/عرضه در ایران؛
 - سیاست نهایی نگهداری داده و محل میزبانی؛
 - فرایند رسمی اعتبارسنجی به‌عنوان نرم‌افزار پزشکی در بازار هدف.
+## Physician Final Plan / Orders boundary (2026-08-15 roadmap extension)
+
+The Clinical Decision Service may produce evidence-bound considerations, including `REQUEST_INVESTIGATION` for missing required data, but it does not sign orders.
+
+The physician creates/signs an encounter-scoped `PhysicianFinalPlan`. The signed plan contains medication and/or investigation orders and is immutable; modifications create a superseding plan.
+
+Care Team users with the required patient-access permission can read the latest signed plan. They may append operational fulfillment events but cannot alter the signed order. Medication payer codes and investigation service codes shown to Care Team are snapshots from the signed order, not ad-hoc UI guesses.
+
+Laboratory results arriving later through OCR/PDF/manual/import use the Lab Master Registry observation model and may be linked to the originating investigation order. This creates the order -> execution -> result chain needed for longitudinal follow-up.
+
+The Patient Record v2 runtime adapter owns this flow. Do not persist signed plans as a temporary field inside legacy `patient_handoffs`.

@@ -134,7 +134,7 @@ export async function recognizeClinicalDocument(file: File, onProgress: Progress
     if (page.embeddedText) textByPage.set(page.pageNumber, page.embeddedText);
   }
 
-  const confidenceByPage: number[] = [];
+  const confidenceByPage = new Map<number, number>();
   if (ocrPages.length > 0) {
     onProgress({ stage: "load_ocr", progress: 0, message: "Loading Persian + English OCR" });
     const { createWorker } = await import("tesseract.js");
@@ -159,7 +159,10 @@ export async function recognizeClinicalDocument(file: File, onProgress: Progress
         const page = ocrPages[index]!;
         const result = await worker.recognize(page.canvas!);
         textByPage.set(page.pageNumber, result.data.text ?? "");
-        confidenceByPage.push(Number(result.data.confidence ?? 0));
+confidenceByPage.set(
+  page.pageNumber,
+  Number(result.data.confidence ?? 0),
+);
         page.canvas!.width = 1;
         page.canvas!.height = 1;
       }
@@ -173,14 +176,23 @@ export async function recognizeClinicalDocument(file: File, onProgress: Progress
     .map((page) => `--- page ${page.pageNumber} ---\n${(textByPage.get(page.pageNumber) ?? "").trim()}`)
     .join("\n\n")
     .trim();
-  const meanConfidence = confidenceByPage.length
-    ? confidenceByPage.reduce((sum, value) => sum + value, 0) / confidenceByPage.length
-    : undefined;
   onProgress({ stage: "parse", progress: 1, message: "Parsing clinical fields for review" });
-  return {
-    rawText,
-    labs: parseClinicalLabText(rawText, file.name, meanConfidence),
-    processedPageCount: pages.length,
+const labs = pages
+  .sort((a, b) => a.pageNumber - b.pageNumber)
+  .flatMap((page) => {
+    const pageText = `--- page ${page.pageNumber} ---\n${(textByPage.get(page.pageNumber) ?? "").trim()}`;
+    return parseClinicalLabText(
+      pageText,
+      file.name,
+      confidenceByPage.get(page.pageNumber),
+      page.canvas ? "ocr" : "pdf_text",
+    );
+  });
+
+return {
+  rawText,
+  labs,
+processedPageCount: pages.length,
     sourcePageCount: originalPages,
     truncated: originalPages > pages.length,
     embeddedTextPages: pages.filter((page) => Boolean(page.embeddedText)).length,

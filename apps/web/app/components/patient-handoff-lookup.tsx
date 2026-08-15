@@ -44,6 +44,7 @@ export default function PatientHandoffLookup({ onApply }: { onApply: (record: Pa
   }
 
   const confirmedLabs = record?.labs.filter((item) => item.verification === "confirmed") ?? [];
+  const flaggedLabs = confirmedLabs.filter((item) => item.interpretation && item.interpretation !== "N");
   const rejectedOrPending = record?.labs.filter((item) => item.verification !== "confirmed") ?? [];
   const confirmedMeds = record?.medications.filter((item) => item.verification === "confirmed") ?? [];
   const fullName = [record?.firstName, record?.lastName].filter(Boolean).join(" ");
@@ -70,6 +71,11 @@ export default function PatientHandoffLookup({ onApply }: { onApply: (record: Pa
       {record && <div className={styles.preview}>
         <div><strong>{fullName || (fa ? "بیمار بدون نام ثبت‌شده" : "Patient name not recorded")}</strong><small>{record.patientCodeDisplay} · rev {record.revision} · {new Date(record.updatedAt).toLocaleString(fa ? "fa-IR" : "en-US")}</small></div>
         <div className={styles.metrics}><span><b>{confirmedLabs.length}</b>{fa ? " آزمایش تأییدشده" : " confirmed labs"}</span><span><b>{confirmedMeds.length}</b>{fa ? " داروی تأییدشده" : " confirmed meds"}</span>{rejectedOrPending.length > 0 && <span className={styles.pending}><b>{rejectedOrPending.length}</b>{fa ? " مورد OCR منتقل نمی‌شود" : " OCR items excluded"}</span>}</div>
+        {flaggedLabs.length > 0 && <div className={styles.status} role="status">
+          {fa
+            ? `\u0647\u0634\u062f\u0627\u0631 \u0628\u0631\u06af\u0647 \u0622\u0632\u0645\u0627\u06cc\u0634: ${flaggedLabs.map((item) => `${item.canonicalName ?? item.rawName} ${item.interpretation}`).join(" \u00b7 ")}`
+            : `Reported lab flags: ${flaggedLabs.map((item) => `${item.canonicalName ?? item.rawName} ${item.interpretation}`).join(" \u00b7 ")}`}
+        </div>}
         <div className={styles.previewActions}><button className={styles.edit} type="button" onClick={openForEdit}>{fa ? "باز کردن / ویرایش پرونده" : "Open / edit handoff"}</button><button className={styles.apply} type="button" onClick={() => { onApply(record); setStatus(fa ? "داده‌های تأییدشده روی فرم اعمال شد؛ قبل از محاسبه مرور کنید." : "Confirmed data was applied; review the form before calculation."); }}>{fa ? "اعمال داده" : "Apply data"}</button></div>
       </div>}
       {status && <div className={styles.status} role="status">{status}</div>}

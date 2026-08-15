@@ -36,13 +36,23 @@ export interface Type2RuleParameters {
   weights: Type2RuleWeights;
 }
 
+export interface ClinicalInvestigationRuleAction {
+  kind: "request_investigation";
+  requiredDataKey: string;
+  investigationKey: string;
+  reasonCode: string;
+  timing: "now" | "before_next_visit" | "at_next_visit" | "routine";
+  priority: "routine" | "priority" | "urgent";
+  blocksDecision: boolean;
+}
+
 export interface ClinicalRuleDefinition {
   id: string;
   domain: string;
   descriptionFa: string;
-  descriptionEn: string;
-  sourceIds: string[];
+  descriptionEn: string;  sourceIds: string[];
   engineEffect: string;
+  missingDataActions?: ClinicalInvestigationRuleAction[];
 }
 
 export interface ClinicalRulePack {
@@ -196,8 +206,20 @@ export function validateClinicalRulePack(pack: ClinicalRulePack): string[] {
     ruleIds.add(rule.id);
     if (!rule.sourceIds.length) errors.push(`Clinical rule ${rule.id} has no evidence source.`);
     for (const sourceId of rule.sourceIds) {
-      if (!knownSources.has(sourceId)) errors.push(`Clinical rule ${rule.id} references unknown source ${sourceId}.`);
-    }
+  if (!knownSources.has(sourceId)) errors.push(`Clinical rule ${rule.id} references unknown source ${sourceId}.`);
+}
+for (const action of rule.missingDataActions ?? []) {
+  if (
+    action.kind !== "request_investigation" ||
+    !action.requiredDataKey.trim() ||
+    !action.investigationKey.trim() ||
+    !action.reasonCode.trim()
+  ) {
+    errors.push(
+      `Clinical rule ${rule.id} has an invalid missing-data investigation action.`,
+    );
+  }
+}
   }
   return errors;
 }

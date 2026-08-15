@@ -135,3 +135,21 @@ DecisionRecord و snapshot مطابق سیاست نگهداری حفاظت/حذ�
 اصلاحات دستی و اعلان‌های بازبینی در migration شماره 005 و سند
 `IRAN_DRUG_DATA_PIPELINE.md` تعریف شده است. snapshotهای منبع immutable هستند؛
 اصلاح ادمین فقط به‌صورت overlay ذخیره می‌شود.
+## Physician Final Plan and Order Execution (2026-08-15 roadmap extension)
+
+`PhysicianFinalPlan` is an encounter-scoped, physician-authored artifact distinct from an engine `DecisionRecord`. A signed plan may contain medication orders, investigation/laboratory orders, both, or no medication order.
+
+`PhysicianMedicationOrder` stores canonical medication/product identity and an encrypted structured payload for dose, route, schedule, duration/quantity and the payer-registration snapshot used at sign-off. The snapshot may include insurer generic code, insurer brand code, generic/brand registry code, IRC code, source and observed/freshness time. Later catalog changes must not rewrite the historical order.
+
+`PhysicianInvestigationOrder` stores a physician-requested laboratory/imaging/procedure/other investigation. For laboratory orders it should use the Lab Master Registry canonical key when known. It may also snapshot the insurer/service registration code when available. An order is not a result: later `PatientObservation` rows may be linked to the originating investigation order.
+
+Signed plan content is immutable. A later clinical change creates a new plan that supersedes the prior plan.
+
+`CareTeamOrderFulfillmentEvent` is append-only operational state (`pending`, payer submission/registration, scheduling, collection, result receipt, completion, inability to process, cancellation). Care Team fulfillment is not permission to alter physician-authored clinical content.
+
+The Patient Record v2 schema must support:
+- latest signed plan lookup by patient/practice;
+- order-level stable IDs;
+- encrypted order payloads;
+- append-only fulfillment events;
+- links from investigation orders to returned observations.

@@ -95,6 +95,12 @@ export const RUNTIME_PERMISSION_GROUPS = [
 export function permissionForClinicalPath(
   pathname: string,
 ): AssistantPermission | null {
+  if (
+    pathname === "/records" ||
+    pathname.startsWith("/records/")
+  ) {
+    return "handoff.read";
+  }
   const item = CLINICAL_PAGE_PERMISSIONS.find(
     (entry) => pathname === entry.href || pathname.startsWith(`${entry.href}/`),
   );
@@ -137,6 +143,7 @@ export function firstAllowedRuntimePath(
   return (
     CLINICAL_PAGE_PERMISSIONS.find((item) => permissions.includes(item.key))
       ?.href ??
+    (permissions.includes("handoff.read") ? "/records" : null) ??
     firstAllowedAdminPath(permissions) ??
     "/profile"
   );

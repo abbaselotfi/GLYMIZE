@@ -1,6 +1,8 @@
 export type PatientCodeKind = "file_number" | "national_id" | "other";
 export type PatientHandoffStatus = "draft" | "ready_for_physician" | "reviewed";
 export type VerificationState = "unverified" | "confirmed" | "rejected";
+export type LabInterpretation = "N" | "H" | "L" | "HH" | "LL" | "A";
+export type LabObservationSource = "manual" | "ocr" | "pdf_text" | "import";
 
 export interface PatientHandoffMedication {
   genericMedicationId?: string;
@@ -16,12 +18,19 @@ export interface PatientHandoffMedication {
 export interface PatientHandoffLab {
   id: string;
   canonicalKey?: string;
+  canonicalName?: string;
   rawName: string;
   value?: number;
   valueText?: string;
   unit?: string;
+  specimen?: string;
   referenceRange?: string;
+  referenceLow?: number;
+  referenceHigh?: number;
   observedAt?: string;
+  sourceKind?: LabObservationSource;
+  interpretation?: LabInterpretation;
+  interpretationSource?: "ocr" | "manual";
   ocrConfidence?: number;
   parserConfidence?: number;
   verification: VerificationState;
@@ -63,6 +72,21 @@ export interface PatientHandoffRecord {
   medications: PatientHandoffMedication[];
   nurseNotes?: string;
   ocrText?: string;
+}
+
+export interface PatientHandoffArchiveItem {
+  id: string;
+  patientCodeKind: PatientCodeKind;
+  patientCodeDisplay: string;
+  status: PatientHandoffStatus;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PatientHandoffArchivePage {
+  items: PatientHandoffArchiveItem[];
+  nextCursor: string | null;
 }
 
 export interface PatientHandoffUpsertInput {
