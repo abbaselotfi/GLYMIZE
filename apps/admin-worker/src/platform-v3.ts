@@ -1,6 +1,6 @@
 import platformHandler from "./platform-index";
 import { adminRuntimeRoute } from "./platform-v3-admin";
-import { credentialLogin } from "./platform-v3-login";
+import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
 
@@ -33,6 +33,13 @@ export default {
       return credentialLogin(request, env);
     }
 
+    if (
+      request.method === "POST" &&
+      url.pathname === "/v1/auth/assistant/password"
+    ) {
+      return assistantCredentialLogin(request, env);
+    }
+
     if (request.method === "PATCH" && url.pathname === "/v1/profile/password") {
       return profileCredential(request, env);
     }
@@ -43,6 +50,7 @@ export default {
         status: "ready",
         capabilities: {
           passwordLogin: true,
+          assistantPasswordLogin: true,
           passwordSetup: true,
           adminUsers: true,
         },

@@ -264,16 +264,26 @@ export async function inspectTeamInvitation(token: string) {
   const response = await directFetch(`/v1/team/invitations/${encodeURIComponent(token)}`);
   const result = await response.json() as {
     id?: string; firstName?: string; lastName?: string; email?: string; mobile?: string;
-    expiresAt?: string; practiceName?: string; physicianName?: string; error?: string;
+    expiresAt?: string; practiceName?: string; physicianName?: string;
+    passwordSetupRequired?: boolean; error?: string;
   };
   if (!response.ok) throw new Error(result.error ?? "INVITATION_INVALID");
   return result;
 }
 
-export async function acceptTeamInvitation(token: string, rememberMe: boolean) {
+export async function acceptTeamInvitation(
+  token: string,
+  rememberMe: boolean,
+  newPassword?: string,
+) {
   const response = await directFetch("/v1/team/invitations/accept", {
     method: "POST",
-    body: JSON.stringify({ token, rememberMe, deviceLabel: deviceLabel() }),
+    body: JSON.stringify({
+      token,
+      rememberMe,
+      newPassword,
+      deviceLabel: deviceLabel(),
+    }),
   });
   const result = await response.json() as RuntimeSessionResponse & { error?: string };
   if (!response.ok || !result.accessToken) throw new Error(result.error ?? "INVITATION_ACCEPT_FAILED");

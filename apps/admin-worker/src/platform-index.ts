@@ -4,6 +4,7 @@ import {
   assistantInvitationEmailEnabled,
   resolvePublicAppBaseUrl,
 } from "./platform-team-invitation-policy";
+import { createCredential, validCredentialValue } from "./platform-v3-credential";
 import {
   defaultAssistantPermissions,
   defaultPhysicianPermissions,
@@ -831,12 +832,46 @@ async function inspectInvitation(request: Request, env: Env, token: string) {
      JOIN runtime_users u ON u.id=i.invited_by
      WHERE i.token_hash=?`,
   ).bind(hash).first<any>();
-  if (!row || row.accepted_at || Date.parse(row.expires_at)<=Date.now()) return json(request,env,{error:"invitation_invalid"},404);
+
+  if (!row || row.accepted_at || Date.parse(row.expires_at)<=Date.now()) {
+    return json(request,env,{error:"invitation_invalid"},404);
+  }
+
+  const matches=await db(env).prepare(
+    `SELECT id,role,status,password_hash,password_salt,password_iterations
+     FROM runtime_users
+     WHERE (? IS NOT NULL AND email_norm=?)
+        OR (? IS NOT NULL AND mobile_norm=?)`,
+  ).bind(row.email_norm,row.email_norm,row.mobile_norm,row.mobile_norm).all<any>();
+
+  const uniqueIds=new Set(matches.results.map((item:any)=>item.id));
+  if (uniqueIds.size>1) {
+    return json(request,env,{error:"invitation_identity_conflict"},409);
+  }
+
+  const existing=matches.results[0] as any | undefined;
+  if (existing && existing.role!=="assistant") {
+    return json(request,env,{error:"invitation_identity_conflict"},409);
+  }
+  if (existing && existing.status!=="active") {
+    return json(request,env,{error:"assistant_account_disabled"},403);
+  }
+
+  const passwordSetupRequired=!existing ||
+    !existing.password_hash ||
+    !existing.password_salt ||
+    !existing.password_iterations;
+
   return json(request,env,{
-    id:row.id, firstName:row.first_name,lastName:row.last_name,
-    email:row.email_norm ?? undefined,mobile:row.mobile_norm ?? undefined,
-    expiresAt:row.expires_at,practiceName:row.practice_name,
+    id:row.id,
+    firstName:row.first_name,
+    lastName:row.last_name,
+    email:row.email_norm ?? undefined,
+    mobile:row.mobile_norm ?? undefined,
+    expiresAt:row.expires_at,
+    practiceName:row.practice_name,
     physicianName:`${row.physician_first_name} ${row.physician_last_name}`,
+    passwordSetupRequired,
   });
 }
 
@@ -844,45 +879,133 @@ async function acceptInvitation(request: Request, env: Env) {
   let body:Record<string,unknown>;
   try { body=await request.json() as Record<string,unknown>; }
   catch { return json(request,env,{error:"invalid_json"},400); }
+
   const token=String(body.token ?? "").trim();
+  const newPassword=String(body.newPassword ?? "");
   if (token.length<32) return json(request,env,{error:"invitation_invalid"},422);
+
   const hash=await sha256Hex(token);
   const invite=await db(env).prepare(
     `SELECT id, practice_id, invited_by, first_name, last_name, email_norm, mobile_norm,
             permissions_json, expires_at, accepted_at
      FROM team_invitations WHERE token_hash=?`,
   ).bind(hash).first<any>();
-  if (!invite || invite.accepted_at || Date.parse(invite.expires_at)<=Date.now()) return json(request,env,{error:"invitation_invalid"},404);
-  const existing=await db(env).prepare(
-    `SELECT id FROM runtime_users
-     WHERE (? IS NOT NULL AND email_norm=?) OR (? IS NOT NULL AND mobile_norm=?)
-     LIMIT 1`,
-  ).bind(invite.email_norm,invite.email_norm,invite.mobile_norm,invite.mobile_norm).first<{id:string}>();
+
+  if (!invite || invite.accepted_at || Date.parse(invite.expires_at)<=Date.now()) {
+    return json(request,env,{error:"invitation_invalid"},404);
+  }
+
+  const matches=await db(env).prepare(
+    `SELECT id,role,status,password_hash,password_salt,password_iterations
+     FROM runtime_users
+     WHERE (? IS NOT NULL AND email_norm=?)
+        OR (? IS NOT NULL AND mobile_norm=?)`,
+  ).bind(invite.email_norm,invite.email_norm,invite.mobile_norm,invite.mobile_norm).all<any>();
+
+  const uniqueIds=new Set(matches.results.map((item:any)=>item.id));
+  if (uniqueIds.size>1) {
+    return json(request,env,{error:"invitation_identity_conflict"},409);
+  }
+
+  const existing=matches.results[0] as any | undefined;
+  if (existing && existing.role!=="assistant") {
+    return json(request,env,{error:"invitation_identity_conflict"},409);
+  }
+  if (existing && existing.status!=="active") {
+    return json(request,env,{error:"assistant_account_disabled"},403);
+  }
+
+  const passwordSetupRequired=!existing ||
+    !existing.password_hash ||
+    !existing.password_salt ||
+    !existing.password_iterations;
+
+  if (passwordSetupRequired && !validCredentialValue(newPassword)) {
+    return json(request,env,{error:"password_policy"},422);
+  }
+
+  const credential=passwordSetupRequired
+    ? await createCredential(newPassword)
+    : null;
+
   const userId=existing?.id ?? crypto.randomUUID();
   const now=nowIso();
+
   if (!existing) {
     await db(env).prepare(
       `INSERT INTO runtime_users
        (id,role,status,first_name,last_name,email_norm,mobile_norm,medical_council_code,
         irimc_status,irimc_verified_at,irimc_verification_source,profile_photo,profile_photo_source,
-        layout_preset,created_at,updated_at)
-       VALUES (?,'assistant','active',?,?,?,?,NULL,NULL,NULL,NULL,NULL,'none','auto',?,?)`,
-    ).bind(userId,invite.first_name,invite.last_name,invite.email_norm,invite.mobile_norm,now,now).run();
+        layout_preset,password_hash,password_salt,password_iterations,password_updated_at,created_at,updated_at)
+       VALUES (?,'assistant','active',?,?,?,?,NULL,NULL,NULL,NULL,NULL,'none','auto',?,?,?,?,?,?)`,
+    ).bind(
+      userId,
+      invite.first_name,
+      invite.last_name,
+      invite.email_norm,
+      invite.mobile_norm,
+      credential!.hash,
+      credential!.salt,
+      credential!.iterations,
+      now,
+      now,
+      now,
+    ).run();
+  } else if (passwordSetupRequired && credential) {
+    await db(env).prepare(
+      `UPDATE runtime_users
+       SET password_hash=?,password_salt=?,password_iterations=?,
+           password_updated_at=?,updated_at=?
+       WHERE id=?`,
+    ).bind(
+      credential.hash,
+      credential.salt,
+      credential.iterations,
+      now,
+      now,
+      userId,
+    ).run();
   }
+
   await db(env).batch([
     db(env).prepare(
       `INSERT INTO practice_memberships
        (practice_id,user_id,role,status,permissions_json,invited_by,created_at,updated_at)
        VALUES (?,?,'assistant','active',?,?,?,?)
        ON CONFLICT(practice_id,user_id) DO UPDATE SET
-       status='active',permissions_json=excluded.permissions_json,updated_at=excluded.updated_at`,
+       status='active',
+       permissions_json=excluded.permissions_json,
+       updated_at=excluded.updated_at`,
     ).bind(invite.practice_id,userId,invite.permissions_json,invite.invited_by,now,now),
-    db(env).prepare("UPDATE team_invitations SET accepted_at=? WHERE id=?").bind(now,invite.id),
+    db(env).prepare(
+      "UPDATE team_invitations SET accepted_at=? WHERE id=? AND accepted_at IS NULL",
+    ).bind(now,invite.id),
   ]);
+
   const user=await readRuntimeUser(env,userId,invite.practice_id);
   if (!user) return json(request,env,{error:"invitation_accept_failed"},500);
-  await audit(env,userId,invite.practice_id,"team.invitation_accepted","user",userId);
-  return json(request,env,await issueSession(env,user,body.rememberMe!==false,String(body.deviceLabel ?? "")),201);
+
+  await audit(
+    env,
+    userId,
+    invite.practice_id,
+    "team.invitation_accepted",
+    "user",
+    userId,
+    {passwordSetup:passwordSetupRequired},
+  );
+
+  return json(
+    request,
+    env,
+    await issueSession(
+      env,
+      user,
+      body.rememberMe!==false,
+      String(body.deviceLabel ?? ""),
+    ),
+    201,
+  );
 }
 
 async function updateTeamMember(request: Request, env: Env, auth: AuthContext, memberId: string) {
