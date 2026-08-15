@@ -8,9 +8,7 @@ import {
   adoptRuntimeSession,
   getRuntimeAccessToken,
 } from "./runtime-client";
-
-const runtimeApiUrl=(process.env.NEXT_PUBLIC_ADMIN_API_URL??"")
-  .replace(/\/$/,"");
+import { runtimeApiUrl } from "./runtime-api-url";
 
 export interface RuntimeV3Capabilities{
   passwordLogin:boolean;

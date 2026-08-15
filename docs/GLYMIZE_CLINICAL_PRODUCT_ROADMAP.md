@@ -33,6 +33,7 @@ Core safety rule: **GLYMIZE may store a broad clinical dataset, but no datum may
 - Patient identifiers must not be exposed in analytics/research exports.
 - Clinical data must not be treated as anonymous merely because name is absent.
 - Fail closed for authentication, authorization, credential verification and unsafe clinical decision paths.
+- Browser clinical-runtime traffic must not depend on direct reachability of a vendor preview hostname. RC/production may use a same-origin, fixed-upstream gateway on the application domain; it must not become an open proxy, and Admin OAuth routing remains independently configurable.
 
 ---
 
@@ -172,6 +173,8 @@ Physician workflow:
 Do not restrict storage to HbA1c/eGFR/UACR.
 
 Store every clinically extractable laboratory observation present in the source report, including but not limited to:
+
+OCR/PDF parsing must continue after the first matched analyte even when a laboratory table is flattened into one long text line. Value, unit, reference interval/threshold and abnormal flag extraction must be bounded to the corresponding analyte window so neighboring tests cannot contaminate each other.
 
 - glycemia: glucose, FBS, 2hPP, HbA1c;
 - lipid: total cholesterol, LDL, HDL, TG, non-HDL where available;

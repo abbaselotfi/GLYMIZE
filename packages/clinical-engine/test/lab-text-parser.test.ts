@@ -45,4 +45,65 @@ describe("pre-visit OCR lab parser", () => {
     expect(labs.find((item) => item.canonicalKey === "hba1c")?.sourcePage).toBe(2);
   });
 
+  it("extracts multiple analytes from one OCR-flattened line", () => {
+    const labs = parseClinicalLabText(
+      "HbA1c 8.0 % 5.7-6.4 FBG 158 mg/dL 70-99 Creatinine 1.0 mg/dL 0.5-1.1 eGFR 68 mL/min/1.73m2 >=90 UACR 55 mg/g <30 Total Cholesterol 205 mg/dL <200 Triglycerides 175 mg/dL <150 LDL-C 108 mg/dL <100 ALT 26 U/L <33",
+      "flattened-lab.pdf",
+      76,
+    );
+
+    expect(labs.find((x) => x.canonicalKey === "hba1c")).toMatchObject({
+      value: 8,
+      unit: "%",
+    });
+    expect(labs.find((x) => x.canonicalKey === "fbs")).toMatchObject({
+      value: 158,
+      unit: "mg/dL",
+    });
+    expect(labs.find((x) => x.canonicalKey === "creatinine")).toMatchObject({
+      value: 1,
+      unit: "mg/dL",
+    });
+    expect(labs.find((x) => x.canonicalKey === "egfr")).toMatchObject({
+      value: 68,
+      referenceRange: ">=90",
+      referenceLow: 90,
+    });
+    expect(labs.find((x) => x.canonicalKey === "uacr")).toMatchObject({
+      value: 55,
+      unit: "mg/g",
+      referenceRange: "<30",
+      referenceHigh: 30,
+    });
+    expect(labs.find((x) => x.canonicalKey === "total_cholesterol")?.value).toBe(205);
+    expect(labs.find((x) => x.canonicalKey === "tg")?.value).toBe(175);
+    expect(labs.find((x) => x.canonicalKey === "ldl")?.value).toBe(108);
+    expect(labs.find((x) => x.canonicalKey === "alt")).toMatchObject({
+      value: 26,
+      unit: "U/L",
+      referenceRange: "<33",
+      referenceHigh: 33,
+    });
+  });
+
+  it("keeps units scoped to each analyte window on a flattened line", () => {
+    const labs = parseClinicalLabText(
+      "HbA1c 8.0 % 5.7-6.4 Creatinine 1.0 mg/dL 0.5-1.1",
+    );
+
+    expect(labs.find((x) => x.canonicalKey === "hba1c")?.unit).toBe("%");
+    expect(labs.find((x) => x.canonicalKey === "creatinine")?.unit).toBe("mg/dL");
+  });
+
+  it("preserves distinct repeated analytes flattened onto one line", () => {
+    const labs = parseClinicalLabText(
+      "HbA1c 7.2 % HbA1c 7.3 %",
+    );
+    const a1c = labs.filter((x) => x.canonicalKey === "hba1c");
+
+    expect(a1c).toHaveLength(2);
+    expect(a1c.map((x) => x.value)).toEqual([7.2, 7.3]);
+    expect(new Set(a1c.map((x) => x.id)).size).toBe(2);
+  });
+
 });

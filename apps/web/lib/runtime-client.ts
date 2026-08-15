@@ -1,9 +1,9 @@
 "use client";
 
 import type { AssistantPermission, RuntimePermission } from "./runtime-permissions";
+import { runtimeApiUrl } from "./runtime-api-url";
 export type { AssistantPermission, RuntimePermission } from "./runtime-permissions";
 
-const runtimeApiUrl = (process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "").replace(/\/$/, "");
 const accessKey = "glymize-runtime-access-v1";
 const refreshLocalKey = "glymize-runtime-refresh-v1";
 const refreshSessionKey = "glymize-runtime-refresh-session-v1";

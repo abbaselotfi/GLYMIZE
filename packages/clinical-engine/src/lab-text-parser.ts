@@ -75,32 +75,47 @@ type RegistryMatch = {
   text: string;
 };
 
-function findRegistryMatch(line: string): RegistryMatch | undefined {
-  let best: RegistryMatch | undefined;
+function findRegistryMatches(line: string): RegistryMatch[] {
+  const candidates: RegistryMatch[] = [];
 
   for (const matcher of OCR_REGISTRY_MATCHERS) {
-    const match = matcher.regex.exec(line);
-    if (!match || match.index === undefined) continue;
+    let offset = 0;
 
-    const candidate: RegistryMatch = {
-      entry: matcher.entry,
-      index: match.index,
-      text: match[0],
-    };
+    while (offset < line.length) {
+      const match = matcher.regex.exec(line.slice(offset));
+      if (!match || match.index === undefined) break;
 
-    if (
-      !best ||
-      candidate.index < best.index ||
-      (
-        candidate.index === best.index &&
-        candidate.text.length > best.text.length
-      )
-    ) {
-      best = candidate;
+      const index = offset + match.index;
+      candidates.push({
+        entry: matcher.entry,
+        index,
+        text: match[0],
+      });
+
+      offset = index + Math.max(1, match[0].length);
     }
   }
 
-  return best;
+  candidates.sort(
+    (a, b) =>
+      a.index - b.index ||
+      b.text.length - a.text.length,
+  );
+
+  const selected: RegistryMatch[] = [];
+  for (const candidate of candidates) {
+    const previous = selected[selected.length - 1];
+    if (
+      previous &&
+      candidate.index <
+        previous.index + previous.text.length
+    ) {
+      continue;
+    }
+    selected.push(candidate);
+  }
+
+  return selected;
 }
 
 function extractUnit(
@@ -136,18 +151,51 @@ function extractReferenceRange(
     );
   });
 
-  if (!candidate) {
+  if (candidate) {
     return {
-      text: undefined,
-      low: undefined,
-      high: undefined,
+      text: `${candidate[1]}–${candidate[2]}`,
+      low: Number(candidate[1]),
+      high: Number(candidate[2]),
     };
   }
 
+  const threshold = line.match(
+    /(<=|>=|<|>|≤|≥)\s*(-?\d+(?:\.\d+)?)/,
+  );
+  if (threshold) {
+    const operatorToken = threshold[1];
+    const boundaryToken = threshold[2];
+
+    if (operatorToken && boundaryToken) {
+      const boundary = Number(boundaryToken);
+      const isReportedValue =
+        selectedValue !== undefined &&
+        Math.abs(boundary - selectedValue) <= 0.001;
+
+      if (!isReportedValue) {
+        const operator = operatorToken
+          .replace("≤", "<=")
+          .replace("≥", ">=");
+
+        return {
+          text: `${operator}${boundaryToken}`,
+          low:
+            operator === ">" || operator === ">="
+              ? boundary
+              : undefined,
+          high:
+            operator === "<" || operator === "<="
+              ? boundary
+              : undefined,
+        };
+      }
+    }
+  }
+
   return {
-    text: `${candidate[1]}–${candidate[2]}`,
-    low: Number(candidate[1]),
-    high: Number(candidate[2]),
+    text: undefined,
+    low: undefined,
+    high: undefined,
   };
 }
 
@@ -223,7 +271,7 @@ function stableId(
   sourceDocumentName: string | undefined,
   line: string,
   key: string,
-  index: number,
+  index: number | string,
 ) {
   const raw =
     `${sourceDocumentName ?? "ocr"}:${key}:${index}:${line}`;
@@ -284,34 +332,83 @@ export function parseClinicalLabText(
       return;
     }
 
-    const matched = findRegistryMatch(line);
-    if (!matched) return;
+    const matches = findRegistryMatches(line);
+    matches.forEach((matched, matchIndex) => {
+      const { entry } = matched;
+      const nextMatch = matches[matchIndex + 1];
+      const windowEnd = nextMatch?.index ?? line.length;
+      const after = line
+        .slice(
+          matched.index + matched.text.length,
+          windowEnd,
+        )
+        .trim();
 
-    const { entry } = matched;
-    const after = line.slice(
-      matched.index + matched.text.length,
-    );
+      const interpretation =
+        extractLabInterpretation(after);
+      const stableIndex = `${lineIndex}:${matched.index}`;
 
-    const interpretation =
-      extractLabInterpretation(after);
+      if (entry.valueKind === "qualitative") {
+        const valueText = extractQualitativeValue(after);
+        if (!valueText) return;
 
-    if (entry.valueKind === "qualitative") {
-      const valueText = extractQualitativeValue(after);
-      if (!valueText) return;
+        labs.push({
+          id: stableId(
+            sourceDocumentName,
+            line,
+            entry.canonicalKey,
+            stableIndex,
+          ),
+          canonicalKey: entry.canonicalKey,
+          canonicalName: entry.name,
+          rawName: matched.text,
+          valueText,
+          unit: extractUnit(after, entry.defaultUnit),
+          specimen: entry.specimens[0],
+          observedAt: documentDate,
+          sourceKind,
+          interpretation,
+          interpretationSource:
+            interpretation ? "ocr" : undefined,
+          ocrConfidence,
+          parserConfidence: 0.84,
+          verification: "unverified",
+          sourceDocumentName,
+          sourcePage,
+        });
+        return;
+      }
+
+      const values = Array.from(
+        after.matchAll(/-?\d+(?:\.\d+)?/g),
+      )
+        .map((item) => Number(item[0]))
+        .filter(Number.isFinite);
+
+      const value = values[0];
+      if (value === undefined) return;
+
+      const reference = extractReferenceRange(
+        after,
+        value,
+      );
 
       labs.push({
         id: stableId(
           sourceDocumentName,
           line,
           entry.canonicalKey,
-          lineIndex,
+          stableIndex,
         ),
         canonicalKey: entry.canonicalKey,
         canonicalName: entry.name,
         rawName: matched.text,
-        valueText,
-        unit: extractUnit(line, entry.defaultUnit),
+        value,
+        unit: extractUnit(after, entry.defaultUnit),
         specimen: entry.specimens[0],
+        referenceRange: reference.text,
+        referenceLow: reference.low,
+        referenceHigh: reference.high,
         observedAt: documentDate,
         sourceKind,
         interpretation,
@@ -323,49 +420,6 @@ export function parseClinicalLabText(
         sourceDocumentName,
         sourcePage,
       });
-      return;
-    }
-
-    const values = Array.from(
-      after.matchAll(/-?\d+(?:\.\d+)?/g),
-    )
-      .map((item) => Number(item[0]))
-      .filter(Number.isFinite);
-
-    const value = values[0];
-    if (value === undefined) return;
-
-    const reference = extractReferenceRange(
-      after,
-      value,
-    );
-
-    labs.push({
-      id: stableId(
-        sourceDocumentName,
-        line,
-        entry.canonicalKey,
-        lineIndex,
-      ),
-      canonicalKey: entry.canonicalKey,
-      canonicalName: entry.name,
-      rawName: matched.text,
-      value,
-      unit: extractUnit(line, entry.defaultUnit),
-      specimen: entry.specimens[0],
-      referenceRange: reference.text,
-      referenceLow: reference.low,
-      referenceHigh: reference.high,
-      observedAt: documentDate,
-      sourceKind,
-      interpretation,
-      interpretationSource:
-        interpretation ? "ocr" : undefined,
-      ocrConfidence,
-      parserConfidence: 0.84,
-      verification: "unverified",
-      sourceDocumentName,
-      sourcePage,
     });
   });
 
