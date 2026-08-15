@@ -125,4 +125,45 @@ describe("pre-visit OCR lab parser", () => {
     expect(new Set(a1c.map((x) => x.id)).size).toBe(2);
   });
 
+  it("does not mistake the D3 analyte suffix for the Vitamin D result", () => {
+    const labs = parseClinicalLabText(
+      "25(OH) Vitamin D3 115.3 ng/ml Deficient:<20 Insufficient : 20-29 Sufficient : 30-100 Potential Intoxication : >100 H H:High",
+    );
+    const vitaminD = labs.find(
+      (item) => item.canonicalKey === "vitamin_d_25oh",
+    );
+
+    expect(vitaminD).toMatchObject({
+      value: 115.3,
+      unit: "ng/mL",
+      interpretation: "H",
+      verification: "unverified",
+    });
+    expect(vitaminD?.parserConfidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("uses a unit-adjacent value and lowers confidence when numeric context is ambiguous", () => {
+    const labs = parseClinicalLabText(
+      "Vitamin D 3 115.3 ng/mL",
+    );
+    const vitaminD = labs.find(
+      (item) => item.canonicalKey === "vitamin_d_25oh",
+    );
+
+    expect(vitaminD?.value).toBe(115.3);
+    expect(vitaminD?.parserConfidence).toBeLessThan(0.8);
+  });
+
+  it("does not convert an H:High legend into a TIBC result flag", () => {
+    const labs = parseClinicalLabText(
+      "TIBC 342 micg/dl 230 - 440 H:High *:Rechecked",
+    );
+    const tibc = labs.find(
+      (item) => item.canonicalKey === "tibc",
+    );
+
+    expect(tibc?.value).toBe(342);
+    expect(tibc?.interpretation).toBeUndefined();
+  });
+
 });

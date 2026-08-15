@@ -167,6 +167,14 @@ function labDateInputValue(value?: string) {
     : text.replace(/\//g, "-");
 }
 
+function labNeedsReviewAttention(lab: PatientHandoffLab) {
+  return (
+    lab.verification === "unverified" &&
+    lab.parserConfidence !== undefined &&
+    lab.parserConfidence < 0.8
+  );
+}
+
 function draftFingerprint(input: {
   patientCodeKind: PatientCodeKind;
   patientCode: string;
@@ -252,6 +260,10 @@ export default function CareTeamClient() {
   const [status, setStatus] = useState("");
   const [loadedRevision, setLoadedRevision] = useState<number | null>(null);
   const [newRecordPromptOpen, setNewRecordPromptOpen] = useState(false);
+  const [fullNameReviewSuggestion, setFullNameReviewSuggestion] =
+    useState<OcrPatientFieldSuggestion | null>(null);
+  const [fullNameReviewFirstName, setFullNameReviewFirstName] = useState("");
+  const [fullNameReviewLastName, setFullNameReviewLastName] = useState("");
   const savedDraftFingerprintRef = useRef(emptyDraftFingerprint());
 
   const nationalIdWarning = useMemo(() => patientCodeKind === "national_id" && patientCode.trim() && !validateIranianNationalId(patientCode), [patientCode, patientCodeKind]);
@@ -324,16 +336,109 @@ export default function CareTeamClient() {
     };
   }
 
+  function openFullNameReview(
+    suggestion: OcrPatientFieldSuggestion,
+  ) {
+    const safeSplit = splitReviewedFullName(
+      String(suggestion.value),
+    );
+
+    setFullNameReviewSuggestion(suggestion);
+    setFullNameReviewFirstName(
+      firstName || safeSplit?.firstName || "",
+    );
+    setFullNameReviewLastName(
+      lastName || safeSplit?.lastName || "",
+    );
+  }
+
+  function confirmFullNameReview() {
+    const suggestion = fullNameReviewSuggestion;
+    if (!suggestion) return;
+
+    const reviewedFirstName = fullNameReviewFirstName.trim();
+    const reviewedLastName = fullNameReviewLastName.trim();
+
+    if (!reviewedFirstName || !reviewedLastName) {
+      setStatus(
+        fa
+          ? "برای اعمال نام کامل، نام و نام خانوادگی را پس از تطبیق با برگه جداگانه وارد کنید."
+          : "To apply the full name, enter reviewed first and last names separately.",
+      );
+      return;
+    }
+
+    setFirstName(reviewedFirstName);
+    setLastName(reviewedLastName);
+    setSuggestionProvenance("firstName", suggestion);
+    setSuggestionProvenance("lastName", suggestion);
+    setFullNameReviewSuggestion(null);
+    setFullNameReviewFirstName("");
+    setFullNameReviewLastName("");
+    setStatus(
+      fa
+        ? "نام و نام خانوادگی پس از بازبینی اعمال شد."
+        : "Reviewed first and last name were applied.",
+    );
+  }
+
+  function isPatientSuggestionApplied(
+    suggestion: OcrPatientFieldSuggestion,
+  ) {
+    const textValue = String(suggestion.value).trim();
+
+    if (suggestion.field === "first_name") {
+      return firstName.trim() === textValue;
+    }
+    if (suggestion.field === "last_name") {
+      return lastName.trim() === textValue;
+    }
+    if (suggestion.field === "reported_age_years") {
+      return reportedAgeYears.trim() === textValue;
+    }
+    if (suggestion.field === "reported_sex") {
+      return reportedSex === textValue;
+    }
+    if (suggestion.field === "weight_kg") {
+      return vitals.weightKg.trim() === textValue;
+    }
+    if (suggestion.field === "height_cm") {
+      return vitals.heightCm.trim() === textValue;
+    }
+    if (suggestion.field === "national_id") {
+      return (
+        patientCodeKind === "national_id" &&
+        patientCode.trim() === textValue
+      );
+    }
+    if (suggestion.field === "full_name") {
+      return Boolean(
+        firstName.trim() &&
+        lastName.trim() &&
+        patientFieldProvenance.firstName?.sourceDocumentName ===
+          suggestion.sourceDocumentName &&
+        patientFieldProvenance.lastName?.sourceDocumentName ===
+          suggestion.sourceDocumentName
+      );
+    }
+    return false;
+  }
+
   function applyPatientFieldSuggestion(
     suggestion: OcrPatientFieldSuggestion,
   ) {
-    const textValue = String(suggestion.value);
+    const textValue = String(suggestion.value).trim();
 
     if (suggestion.field === "first_name") {
-      if (firstName.trim() && firstName.trim() !== textValue.trim()) {
-        setStatus(fa
-          ? "نام فعلی حفظ شد؛ برای جایگزینی، ابتدا فیلد نام را پاک یا دستی ویرایش کنید."
-          : "Existing first name was preserved. Clear or edit it manually before replacing it.");
+      if (
+        firstName.trim() &&
+        firstName.trim() !== textValue
+      ) {
+        setStatus(
+          fa
+            ? "نام فعلی حفظ شد؛ برای جایگزینی، ابتدا فیلد نام را پاک یا دستی ویرایش کنید."
+            : "Existing first name was preserved. Clear or edit it manually before replacing it.",
+        );
         return;
       }
       setFirstName(textValue);
@@ -342,10 +447,15 @@ export default function CareTeamClient() {
     }
 
     if (suggestion.field === "last_name") {
-      if (lastName.trim() && lastName.trim() !== textValue.trim()) {
-        setStatus(fa
-          ? "نام خانوادگی فعلی حفظ شد؛ برای جایگزینی، ابتدا فیلد را پاک یا دستی ویرایش کنید."
-          : "Existing last name was preserved. Clear or edit it manually before replacing it.");
+      if (
+        lastName.trim() &&
+        lastName.trim() !== textValue
+      ) {
+        setStatus(
+          fa
+            ? "نام خانوادگی فعلی حفظ شد؛ برای جایگزینی، ابتدا فیلد را پاک یا دستی ویرایش کنید."
+            : "Existing last name was preserved. Clear or edit it manually before replacing it.",
+        );
         return;
       }
       setLastName(textValue);
@@ -355,30 +465,30 @@ export default function CareTeamClient() {
 
     if (suggestion.field === "full_name") {
       const split = splitReviewedFullName(textValue);
-      if (!split) {
-        setStatus(fa
-          ? "نام کامل OCR چندبخشی یا مبهم است؛ برای جلوگیری از تفکیک اشتباه، نام و نام خانوادگی را پس از مشاهده پیشنهاد دستی وارد کنید."
-          : "The OCR full name is multipart or ambiguous; enter first and last name manually after reviewing the suggestion to avoid a wrong split.");
+
+      if (
+        split &&
+        !firstName.trim() &&
+        !lastName.trim()
+      ) {
+        setFirstName(split.firstName);
+        setLastName(split.lastName);
+        setSuggestionProvenance("firstName", suggestion);
+        setSuggestionProvenance("lastName", suggestion);
         return;
       }
-      if (firstName.trim() || lastName.trim()) {
-        setStatus(fa
-          ? "نام/نام خانوادگی فعلی حفظ شد؛ نام کامل OCR خودکار جایگزین نشد."
-          : "Existing name fields were preserved; OCR full name was not auto-replaced.");
-        return;
-      }
-      setFirstName(split.firstName);
-      setLastName(split.lastName);
-      setSuggestionProvenance("firstName", suggestion);
-      setSuggestionProvenance("lastName", suggestion);
+
+      openFullNameReview(suggestion);
       return;
     }
 
     if (suggestion.field === "national_id") {
       if (patientCode.trim()) {
-        setStatus(fa
-          ? "شناسه فعلی بیمار حفظ شد. کد ملی OCR به‌طور خودکار جای شماره پرونده را نمی‌گیرد."
-          : "The current patient identifier was preserved. OCR National ID will not silently replace a file number.");
+        setStatus(
+          fa
+            ? "شناسه فعلی بیمار حفظ شد. کد ملی OCR به‌طور خودکار جای شماره پرونده را نمی‌گیرد."
+            : "The current patient identifier was preserved. OCR National ID will not silently replace a file number.",
+        );
         return;
       }
       setPatientCodeKind("national_id");
@@ -388,14 +498,22 @@ export default function CareTeamClient() {
     }
 
     if (suggestion.field === "reported_age_years") {
-      if (reportedAgeYears.trim() && reportedAgeYears.trim() !== textValue) {
-        setStatus(fa
-          ? "سن فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
-          : "Existing age was preserved; OCR did not overwrite it.");
+      if (
+        reportedAgeYears.trim() &&
+        reportedAgeYears.trim() !== textValue
+      ) {
+        setStatus(
+          fa
+            ? "سن فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+            : "Existing age was preserved; OCR did not overwrite it.",
+        );
         return;
       }
       setReportedAgeYears(textValue);
-      setSuggestionProvenance("reportedAgeYears", suggestion);
+      setSuggestionProvenance(
+        "reportedAgeYears",
+        suggestion,
+      );
       return;
     }
 
@@ -404,12 +522,18 @@ export default function CareTeamClient() {
         textValue === "male" || textValue === "female"
           ? textValue
           : "";
+
       if (!nextSex) return;
 
-      if (reportedSex && reportedSex !== nextSex) {
-        setStatus(fa
-          ? "جنس گزارش‌شده فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
-          : "Existing reported sex was preserved; OCR did not overwrite it.");
+      if (
+        reportedSex &&
+        reportedSex !== nextSex
+      ) {
+        setStatus(
+          fa
+            ? "جنس گزارش‌شده فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+            : "Existing reported sex was preserved; OCR did not overwrite it.",
+        );
         return;
       }
 
@@ -419,25 +543,41 @@ export default function CareTeamClient() {
     }
 
     if (suggestion.field === "weight_kg") {
-      if (vitals.weightKg.trim() && vitals.weightKg.trim() !== textValue) {
-        setStatus(fa
-          ? "وزن فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
-          : "Existing weight was preserved; OCR did not overwrite it.");
+      if (
+        vitals.weightKg.trim() &&
+        vitals.weightKg.trim() !== textValue
+      ) {
+        setStatus(
+          fa
+            ? "وزن فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+            : "Existing weight was preserved; OCR did not overwrite it.",
+        );
         return;
       }
-      setVitals((current) => ({ ...current, weightKg: textValue }));
+      setVitals((current) => ({
+        ...current,
+        weightKg: textValue,
+      }));
       setSuggestionProvenance("weightKg", suggestion);
       return;
     }
 
     if (suggestion.field === "height_cm") {
-      if (vitals.heightCm.trim() && vitals.heightCm.trim() !== textValue) {
-        setStatus(fa
-          ? "قد فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
-          : "Existing height was preserved; OCR did not overwrite it.");
+      if (
+        vitals.heightCm.trim() &&
+        vitals.heightCm.trim() !== textValue
+      ) {
+        setStatus(
+          fa
+            ? "قد فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+            : "Existing height was preserved; OCR did not overwrite it.",
+        );
         return;
       }
-      setVitals((current) => ({ ...current, heightCm: textValue }));
+      setVitals((current) => ({
+        ...current,
+        heightCm: textValue,
+      }));
       setSuggestionProvenance("heightCm", suggestion);
     }
   }
@@ -524,6 +664,7 @@ export default function CareTeamClient() {
       updateLab(id, {
         value: undefined,
         valueText: undefined,
+        parserConfidence: 1,
       });
       return;
     }
@@ -533,6 +674,7 @@ export default function CareTeamClient() {
       updateLab(id, {
         value: numeric,
         valueText: undefined,
+        parserConfidence: 1,
       });
       return;
     }
@@ -540,6 +682,7 @@ export default function CareTeamClient() {
     updateLab(id, {
       value: undefined,
       valueText: value,
+      parserConfidence: 1,
     });
   }
 
@@ -685,6 +828,9 @@ function removeLab(id: string) {
     setOcrProgress(null);
     setLoadedRevision(null);
     setNewRecordPromptOpen(false);
+    setFullNameReviewSuggestion(null);
+    setFullNameReviewFirstName("");
+    setFullNameReviewLastName("");
     savedDraftFingerprintRef.current = emptyDraftFingerprint();
     setStatus(nextStatus);
 
@@ -744,12 +890,12 @@ function removeLab(id: string) {
         const seen = new Set(
           current.map(
             (item) =>
-              `${item.field}|${String(item.value)}|${item.sourceDocumentName}|${item.sourcePage ?? ""}`,
+              `${item.field}|${String(item.value)}|${item.sourceDocumentName}`,
           ),
         );
         const additions = result.patientFields.filter((item) => {
           const identity =
-            `${item.field}|${String(item.value)}|${item.sourceDocumentName}|${item.sourcePage ?? ""}`;
+            `${item.field}|${String(item.value)}|${item.sourceDocumentName}`;
           if (seen.has(identity)) return false;
           seen.add(identity);
           return true;
@@ -1017,39 +1163,49 @@ function removeLab(id: string) {
               </div>
             </div>
             <div className={styles.patientOcrSuggestionGrid}>
-              {patientFieldSuggestions.map((suggestion, index) => (
-                <div
-                  className={styles.patientOcrSuggestion}
-                  key={`${suggestion.field}:${String(suggestion.value)}:${suggestion.sourcePage ?? 0}:${index}`}
-                >
-                  <div>
-                    <span>{patientSuggestionLabel(suggestion)}</span>
-                    <strong>
-                      {patientSuggestionValue(suggestion)}
-                      {suggestion.field === "reported_age_years"
-                        ? (fa ? " سال" : " years")
-                        : suggestion.field === "weight_kg"
-                          ? " kg"
-                          : suggestion.field === "height_cm"
-                            ? " cm"
-                            : ""}
-                    </strong>
-                    <small>
-                      {fa ? "صفحه" : "page"} {suggestion.sourcePage ?? 1}
-                      {" · "}
-                      {fa ? "اطمینان parser" : "parser confidence"}{" "}
-                      {Math.round(suggestion.parserConfidence * 100)}%
-                    </small>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => applyPatientFieldSuggestion(suggestion)}
+              {patientFieldSuggestions.map((suggestion, index) => {
+                const applied = isPatientSuggestionApplied(suggestion);
+
+                return (
+                  <div
+                    className={
+                      applied
+                        ? `${styles.patientOcrSuggestion} ${styles.patientOcrSuggestionApplied}`
+                        : styles.patientOcrSuggestion
+                    }
+                    key={`${suggestion.field}:${String(suggestion.value)}:${suggestion.sourceDocumentName}:${index}`}
                   >
-                    {fa ? "اعمال پس از بررسی" : "Apply after review"}
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <span>{patientSuggestionLabel(suggestion)}</span>
+                      <strong>
+                        {patientSuggestionValue(suggestion)}
+                        {suggestion.field === "reported_age_years"
+                          ? (fa ? " سال" : " years")
+                          : suggestion.field === "weight_kg"
+                            ? " kg"
+                            : suggestion.field === "height_cm"
+                              ? " cm"
+                              : ""}
+                      </strong>
+                      <small>
+                        {fa ? "صفحه" : "page"} {suggestion.sourcePage ?? 1}
+                        {" · "}
+                        {fa ? "اطمینان parser" : "parser confidence"}{" "}
+                        {Math.round(suggestion.parserConfidence * 100)}%
+                      </small>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy || applied}
+                      onClick={() => applyPatientFieldSuggestion(suggestion)}
+                    >
+                      {applied
+                        ? (fa ? "اعمال شد ✓" : "Applied ✓")
+                        : (fa ? "اعمال پس از بررسی" : "Apply after review")}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1088,7 +1244,14 @@ function removeLab(id: string) {
             <span>{fa ? "\u067e\u0631\u0686\u0645 H/L" : "H/L flag"}</span>
             <span>{fa ? "\u0648\u0636\u0639\u06cc\u062a" : "State"}</span>
           </div>
-          {labs.map((lab) => <div className={styles.labRow} key={lab.id}>
+          {labs.map((lab) => <div
+            className={
+              labNeedsReviewAttention(lab)
+                ? `${styles.labRow} ${styles.labRowAttention}`
+                : styles.labRow
+            }
+            key={lab.id}
+          >
             <input
               list="glymize-lab-catalog"
               value={lab.rawName}
@@ -1099,6 +1262,11 @@ function removeLab(id: string) {
               )}
             />
             <input
+              className={
+                labNeedsReviewAttention(lab)
+                  ? styles.labValueAttention
+                  : undefined
+              }
               value={labValueInput(lab)}
               placeholder={fa ? "\u0645\u0642\u062f\u0627\u0631" : "Value"}
               onChange={(event) => updateLabValue(
@@ -1205,11 +1373,13 @@ function removeLab(id: string) {
                 {"\u2212"}
               </button>
               <small>
-                {lab.verification === "confirmed"
-                  ? (fa ? "\u062a\u0627\u06cc\u06cc\u062f" : "confirmed")
-                  : lab.verification === "rejected"
-                    ? (fa ? "\u0631\u062f" : "rejected")
-                    : (fa ? "\u0628\u0627\u0632\u0628\u06cc\u0646\u06cc" : "review")}
+                {labNeedsReviewAttention(lab)
+                  ? (fa ? "⚠ تطبیق عدد" : "⚠ check value")
+                  : lab.verification === "confirmed"
+                    ? (fa ? "\u062a\u0627\u06cc\u06cc\u062f" : "confirmed")
+                    : lab.verification === "rejected"
+                      ? (fa ? "\u0631\u062f" : "rejected")
+                      : (fa ? "\u0628\u0627\u0632\u0628\u06cc\u0646\u06cc" : "review")}
               </small>
             </div>
           </div>)}
@@ -1298,6 +1468,56 @@ function removeLab(id: string) {
         </div>
       </section>
       {status && <div className={styles.status} role="status">{status}</div>}
+
+      {fullNameReviewSuggestion && (
+        <div className={styles.dialogBackdrop}>
+          <section
+            className={styles.fullNameReviewDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="full-name-review-title"
+          >
+            <span className={styles.dialogEyebrow}>
+              {fa ? "بازبینی نام OCR" : "OCR NAME REVIEW"}
+            </span>
+            <h2 id="full-name-review-title">
+              {fa ? "نام کامل را به نام و نام خانوادگی تبدیل کنید" : "Split the reviewed full name"}
+            </h2>
+            <p className={styles.fullNameSource}><strong>{String(fullNameReviewSuggestion.value)}</strong></p>
+            <p>
+              {fa
+                ? "برای نام‌های چندبخشی GLYMIZE حدس نمی‌زند. پس از تطبیق با برگه، دو فیلد زیر را تکمیل کنید."
+                : "GLYMIZE does not guess multipart name boundaries. Review the document and complete the two fields below."}
+            </p>
+            <div className={styles.fullNameReviewGrid}>
+              <label>
+                <span>{fa ? "نام" : "First name"}</span>
+                <input value={fullNameReviewFirstName} onChange={(event) => setFullNameReviewFirstName(event.target.value)} autoFocus />
+              </label>
+              <label>
+                <span>{fa ? "نام خانوادگی" : "Last name"}</span>
+                <input value={fullNameReviewLastName} onChange={(event) => setFullNameReviewLastName(event.target.value)} />
+              </label>
+            </div>
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.dialogPrimary} onClick={confirmFullNameReview}>
+                {fa ? "ثبت پس از بازبینی" : "Apply reviewed name"}
+              </button>
+              <button
+                type="button"
+                className={styles.dialogCancel}
+                onClick={() => {
+                  setFullNameReviewSuggestion(null);
+                  setFullNameReviewFirstName("");
+                  setFullNameReviewLastName("");
+                }}
+              >
+                {fa ? "انصراف" : "Cancel"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {newRecordPromptOpen && (
         <div className={styles.dialogBackdrop}>

@@ -229,4 +229,19 @@ expect(contracts).toContain(
     expect(careTeamStyles).toContain(".gridClinical");
   });
 
+  it("makes OCR patient suggestions actionable and highlights ambiguous lab numbers", () => {
+    expect(careTeam).toContain("fullNameReviewSuggestion");
+    expect(careTeam).toContain("confirmFullNameReview");
+    expect(careTeam).toContain("isPatientSuggestionApplied");
+    expect(careTeam).toContain("اعمال شد ✓");
+    expect(careTeam).toContain("labNeedsReviewAttention");
+    expect(careTeam).toContain("parserConfidence: 1");
+    expect(careTeam).toContain("⚠ تطبیق عدد");
+    expect(careTeamStyles).toContain(".labRowAttention");
+    expect(careTeamStyles).toContain(".labValueAttention");
+    expect(careTeamStyles).toContain(".fullNameReviewDialog");
+    expect(labParser).toContain("extractQuantitativeValue");
+    expect(labParser).toContain("stripInterpretationLegend");
+  });
+
 });

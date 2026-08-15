@@ -146,6 +146,53 @@ function extractUnit(
   );
 }
 
+const IMMEDIATE_VALUE_UNIT =
+  /^\s*(?:mL\s*\/\s*min(?:\s*\/\s*1\.73\s*m(?:2|²))?|mg\s*\/\s*(?:dL|L|g|mmol)|g\s*\/\s*(?:dL|L|24h)|mmol\s*\/\s*L|mEq\s*\/\s*L|u?mol\s*\/\s*L|[µμ]mol\s*\/\s*L|U\s*\/\s*L|I?U\s*\/\s*(?:L|mL)|mIU\s*\/\s*L|[uµμ]IU\s*\/\s*mL|ng\s*\/\s*(?:mL|dL|L)|pg\s*\/\s*mL|[uµμ]g\s*\/\s*(?:dL|L|mL)|nmol\s*\/\s*L|pmol\s*\/\s*L|10(?:\^|\*)?[36]\s*\/\s*[uµμ]L|\/\s*[uµμ]L|\/\s*HPF|fL|pg|mm\s*\/\s*h|mmHg|mOsm\s*\/\s*kg|micg\s*\/\s*dL|x?1000\s*\/\s*mm3|million\s*\/\s*mm3|%)/i;
+
+function extractQuantitativeValue(text: string) {
+  const matches = Array.from(
+    text.matchAll(/-?\d+(?:\.\d+)?/g),
+  );
+
+  if (matches.length === 0) {
+    return {
+      value: undefined as number | undefined,
+      parserConfidence: 0,
+    };
+  }
+
+  const unitBound = matches.find((match) => {
+    const index = match.index;
+    if (index === undefined) return false;
+    const tail = text.slice(index + match[0].length);
+    return IMMEDIATE_VALUE_UNIT.test(tail);
+  });
+
+  const selected = unitBound ?? matches[0]!;
+  const value = Number(selected[0]);
+  const selectedIndex = selected.index ?? 0;
+  const skippedEarlierNumeric = matches.some(
+    (match) =>
+      (match.index ?? 0) < selectedIndex,
+  );
+
+  return {
+    value: Number.isFinite(value) ? value : undefined,
+    parserConfidence: skippedEarlierNumeric ? 0.68 : 0.84,
+  };
+}
+
+function stripInterpretationLegend(text: string) {
+  return text
+    .replace(/\bH\s*:\s*High\b/gi, " ")
+    .replace(/\bL\s*:\s*Low\b/gi, " ")
+    .replace(/\bHH\s*:\s*Critical\s*High\b/gi, " ")
+    .replace(/\bLL\s*:\s*Critical\s*Low\b/gi, " ")
+    .replace(/\*\s*:\s*Rechecked\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function extractReferenceRange(
   line: string,
   selectedValue?: number,
@@ -360,7 +407,9 @@ export function parseClinicalLabText(
         .trim();
 
       const interpretation =
-        extractLabInterpretation(after);
+        extractLabInterpretation(
+          stripInterpretationLegend(after),
+        );
       const stableIndex = `${lineIndex}:${matched.index}`;
 
       if (entry.valueKind === "qualitative") {
@@ -394,13 +443,8 @@ export function parseClinicalLabText(
         return;
       }
 
-      const values = Array.from(
-        after.matchAll(/-?\d+(?:\.\d+)?/g),
-      )
-        .map((item) => Number(item[0]))
-        .filter(Number.isFinite);
-
-      const value = values[0];
+      const quantitative = extractQuantitativeValue(after);
+      const value = quantitative.value;
       if (value === undefined) return;
 
       const reference = extractReferenceRange(
@@ -430,7 +474,7 @@ export function parseClinicalLabText(
         interpretationSource:
           interpretation ? "ocr" : undefined,
         ocrConfidence,
-        parserConfidence: 0.84,
+        parserConfidence: quantitative.parserConfidence,
         verification: "unverified",
         sourceDocumentName,
         sourcePage,

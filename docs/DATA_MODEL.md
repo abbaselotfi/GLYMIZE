@@ -105,6 +105,8 @@ AuditEvent --> any versioned aggregate
 
 پیش از parsing سربرگ فارسی، Unicode باید برای Arabic Presentation Forms، شکل‌های عربی/فارسی ی و ک، کشیده و bidi controls canonical شود. همچنین parser باید وارونگی ترتیب value/label در text layerهای RTL را به‌عنوان artifact سند تحمل کند، بدون اینکه از محتوای نامشخص داده بسازد. جنس گزارش‌شده روی برگه فقط source/encounter demographic است و نباید به gender identity تعبیر شود.
 
+برای داده آزمایشگاهی، `parserConfidence` فقط metadata نمایشی نیست: اگر parser برای انتخاب مقدار مجبور به رفع ابهام عددی شود (مثلاً عدد موجود در suffix نام آزمایش در برابر عدد نتیجه کنار واحد)، observation باید تا تأیید انسانی در UI برجسته شود. تأیید انسانی ambiguity نمایشی را برطرف می‌کند ولی provenance منبع را از بین نمی‌برد. Legendهای چاپی مانند `H:High` و `L:Low` نباید به‌عنوان flag خود نتیجه تفسیر شوند.
+
 برای اسناد آزمایشگاهی، متن PDF و تصویر دو منبع استخراج مکمل‌اند: متن embedded می‌تواند برای جدول آزمایش دقیق باشد ولی به دلیل font/RTL mapping برای سربرگ فارسی خراب باشد. در این حالت fallback تصویری فقط برای سربرگ بیمار/metadata اجرا می‌شود. تاریخ صریح آزمایش باید به observationهای همان سند منتقل شود. تا پیش از Patient Record v2، تاریخ شمسی منبع می‌تواند به‌صورت متن تاریخ گزارش‌شده حفظ شود؛ مدل طولی نهایی باید calendar، مقدار خام منبع و تاریخ canonical قابل محاسبه را از هم جدا کند.
 
 `DecisionRecord` شامل موارد زیر است:

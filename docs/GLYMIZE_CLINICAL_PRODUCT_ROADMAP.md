@@ -139,6 +139,8 @@ Laboratory/PDF OCR may also detect explicit patient-header fields such as first 
 - national ID suggestions require checksum validation before being offered;
 - an OCR national ID must not silently replace an already-entered file number;
 - applying a suggestion records source/provenance and human confirmation;
+- identical patient-header suggestions repeated on multiple pages of the same report should collapse to a single review item;
+- a multipart full name must not silently fail or be guessed into first/last name: the Care Team gets an explicit split-review step before applying it;
 - raw OCR and structured identity/demographic fields remain protected clinical data;
 - Patient Record v2 should prefer verified date of birth and support multiple identifiers without forcing one to replace another.
 - Persian patient-header parsing must normalize Unicode Arabic Presentation Forms, Arabic/Persian Yeh/Kaf variants, tatweel and bidi controls before semantic matching. The parser must tolerate both logical `label: value` order and RTL PDF text layers that expose `value label:` order.
@@ -200,6 +202,8 @@ Do not restrict storage to HbA1c/eGFR/UACR.
 Store every clinically extractable laboratory observation present in the source report, including but not limited to:
 
 OCR/PDF parsing must continue after the first matched analyte even when a laboratory table is flattened into one long text line. Value, unit, reference interval/threshold and abnormal flag extraction must be bounded to the corresponding analyte window so neighboring tests cannot contaminate each other.
+
+For quantitative extraction, digits that are part of an analyte label/suffix (for example the `3` in `Vitamin D3`) must not be mistaken for the measured result. When numeric context is ambiguous, prefer the value directly associated with the reported unit, lower parser confidence, and visually flag the row for Care Team review until it is confirmed. Laboratory legends such as `H:High` / `L:Low` are not themselves patient-result flags and must not contaminate the preceding observation.
 
 - glycemia: glucose, FBS, 2hPP, HbA1c;
 - lipid: total cholesterol, LDL, HDL, TG, non-HDL where available;
