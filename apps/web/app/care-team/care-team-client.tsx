@@ -135,6 +135,53 @@ function labValueInput(lab: PatientHandoffLab) {
   return "";
 }
 
+function draftFingerprint(input: {
+  patientCodeKind: PatientCodeKind;
+  patientCode: string;
+  firstName: string;
+  lastName: string;
+  vitals: typeof EMPTY_VITALS;
+  flags: PatientHandoffClinicalFlags;
+  medications: MedicationDraft[];
+  labs: PatientHandoffLab[];
+  ocrText: string;
+  nurseNotes: string;
+}) {
+  return JSON.stringify(
+    {
+      patientCodeKind: input.patientCodeKind,
+      patientCode: input.patientCode,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      vitals: input.vitals,
+      flags: Object.entries(input.flags)
+        .filter(([, value]) => Boolean(value))
+        .map(([key]) => key)
+        .sort(),
+      medications: input.medications,
+      labs: input.labs,
+      ocrText: input.ocrText,
+      nurseNotes: input.nurseNotes,
+    },
+    (key, value) => key === "id" ? undefined : value,
+  );
+}
+
+function emptyDraftFingerprint() {
+  return draftFingerprint({
+    patientCodeKind: "file_number",
+    patientCode: "",
+    firstName: "",
+    lastName: "",
+    vitals: EMPTY_VITALS,
+    flags: EMPTY_FLAGS,
+    medications: [],
+    labs: [],
+    ocrText: "",
+    nurseNotes: "",
+  });
+}
+
 export default function CareTeamClient() {
   const { locale, isRtl } = useGlymizeLocale();
   const fa = locale === "fa";
@@ -154,8 +201,25 @@ export default function CareTeamClient() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [loadedRevision, setLoadedRevision] = useState<number | null>(null);
+  const [newRecordPromptOpen, setNewRecordPromptOpen] = useState(false);
+  const savedDraftFingerprintRef = useRef(emptyDraftFingerprint());
 
   const nationalIdWarning = useMemo(() => patientCodeKind === "national_id" && patientCode.trim() && !validateIranianNationalId(patientCode), [patientCode, patientCodeKind]);
+
+  function currentDraftFingerprint() {
+    return draftFingerprint({
+      patientCodeKind,
+      patientCode,
+      firstName,
+      lastName,
+      vitals,
+      flags,
+      medications,
+      labs,
+      ocrText,
+      nurseNotes,
+    });
+  }
 
   function updateVital(key: keyof typeof EMPTY_VITALS, value: string) {
     setVitals((current) => ({ ...current, [key]: value }));
@@ -250,30 +314,54 @@ function removeLab(id: string) {
   }
 
 
-  function hydrateFromRecord(record: import("@glymize/contracts").PatientHandoffRecord) {
-    setPatientCodeKind(record.patientCodeKind);
-    setFirstName(record.firstName ?? "");
-    setLastName(record.lastName ?? "");
-    setVitals({
+  function hydrateFromRecord(
+    record: import("@glymize/contracts").PatientHandoffRecord,
+    code: string,
+  ) {
+    const nextVitals = {
       weightKg: record.vitals.weightKg !== undefined ? String(record.vitals.weightKg) : "",
       heightCm: record.vitals.heightCm !== undefined ? String(record.vitals.heightCm) : "",
       systolicBp: record.vitals.systolicBp !== undefined ? String(record.vitals.systolicBp) : "",
       diastolicBp: record.vitals.diastolicBp !== undefined ? String(record.vitals.diastolicBp) : "",
       pulseBpm: record.vitals.pulseBpm !== undefined ? String(record.vitals.pulseBpm) : "",
-    });
-    setFlags(record.clinicalFlags ?? {});
-    setLabs(record.labs ?? []);
-    setMedications((record.medications ?? []).map((item) => ({
+    };
+    const nextFlags = record.clinicalFlags ?? {};
+    const nextLabs = record.labs ?? [];
+    const nextMedications = (record.medications ?? []).map((item) => ({
       id: crypto.randomUUID(),
       genericName: item.genericName,
       doseAmount: item.doseAmount !== undefined ? String(item.doseAmount) : "",
       doseUnit: item.doseUnit ?? "mg",
       frequencyPerDay: frequencyInputFromStored(item),
       verification: item.verification,
-    })));
-    setNurseNotes(record.nurseNotes ?? "");
-    setOcrText(record.ocrText ?? "");
+    }));
+    const nextNurseNotes = record.nurseNotes ?? "";
+    const nextOcrText = record.ocrText ?? "";
+
+    setPatientCodeKind(record.patientCodeKind);
+    setPatientCode(code);
+    setFirstName(record.firstName ?? "");
+    setLastName(record.lastName ?? "");
+    setVitals(nextVitals);
+    setFlags(nextFlags);
+    setLabs(nextLabs);
+    setMedications(nextMedications);
+    setNurseNotes(nextNurseNotes);
+    setOcrText(nextOcrText);
     setLoadedRevision(record.revision);
+
+    savedDraftFingerprintRef.current = draftFingerprint({
+      patientCodeKind: record.patientCodeKind,
+      patientCode: code,
+      firstName: record.firstName ?? "",
+      lastName: record.lastName ?? "",
+      vitals: nextVitals,
+      flags: nextFlags,
+      medications: nextMedications,
+      labs: nextLabs,
+      ocrText: nextOcrText,
+      nurseNotes: nextNurseNotes,
+    });
   }
 
   async function loadExisting(explicitCode?: string) {
@@ -289,8 +377,7 @@ function removeLab(id: string) {
         setStatus(fa ? "پرونده‌ای با این کد پیدا نشد." : "No handoff was found for this patient code.");
         return;
       }
-      setPatientCode(code);
-      hydrateFromRecord(result.record);
+      hydrateFromRecord(result.record, code);
       setStatus(fa
         ? `پرونده نسخه ${result.record.revision} برای ویرایش باز شد. ذخیره بعدی یک نسخه جدید ایجاد می‌کند.`
         : `Revision ${result.record.revision} opened for editing. The next save creates a new revision.`);
@@ -316,6 +403,68 @@ function removeLab(id: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
+
+  function resetForNewRecord(nextStatus: string) {
+    setPatientCodeKind("file_number");
+    setPatientCode("");
+    setFirstName("");
+    setLastName("");
+    setVitals(EMPTY_VITALS);
+    setFlags(EMPTY_FLAGS);
+    setMedications([]);
+    setLabs([]);
+    setOcrText("");
+    setNurseNotes("");
+    setOcrProgress(null);
+    setLoadedRevision(null);
+    setNewRecordPromptOpen(false);
+    savedDraftFingerprintRef.current = emptyDraftFingerprint();
+    setStatus(nextStatus);
+
+    if (cameraRef.current) cameraRef.current.value = "";
+    if (fileRef.current) fileRef.current.value = "";
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function requestNewRecord() {
+    if (busy) return;
+
+    const hasUnsavedChanges =
+      currentDraftFingerprint() !== savedDraftFingerprintRef.current;
+
+    if (hasUnsavedChanges) {
+      setNewRecordPromptOpen(true);
+      return;
+    }
+
+    resetForNewRecord(
+      fa
+        ? "فرم برای پرونده بیمار جدید آماده شد."
+        : "Ready for a new patient handoff.",
+    );
+  }
+
+  function discardAndStartNew() {
+    resetForNewRecord(
+      fa
+        ? "تغییرات ذخیره‌نشده کنار گذاشته شد؛ فرم پرونده جدید آماده است."
+        : "Unsaved changes were discarded; the new patient form is ready.",
+    );
+  }
+
+  async function saveAndStartNew() {
+    setNewRecordPromptOpen(false);
+    const saved = await save();
+    if (!saved) return;
+
+    resetForNewRecord(
+      fa
+        ? "پرونده قبلی ذخیره شد؛ فرم پرونده جدید آماده است."
+        : "The previous handoff was saved; the new patient form is ready.",
+    );
+  }
 
   async function processFile(file?: File) {
     if (!file) return;
@@ -359,16 +508,17 @@ function removeLab(id: string) {
     }
   }
 
-  async function save() {
+  async function save(): Promise<boolean> {
     if (!patientCode.trim()) {
       setStatus(fa ? "کد بیمار الزامی است." : "Patient code is required.");
-      return;
+      return false;
     }
     if (nationalIdWarning) {
       setStatus(fa ? "کد ملی واردشده از نظر ساختار/رقم کنترل معتبر نیست؛ برای تست می‌توانید نوع کد را «شماره پرونده» انتخاب کنید." : "The national ID checksum is invalid. For synthetic testing, use File number instead.");
-      return;
+      return false;
     }
 
+    const fingerprintAtSaveStart = currentDraftFingerprint();
     setBusy(true);
     try {
       const mappedVitals: PatientHandoffVitals = {
@@ -402,9 +552,13 @@ function removeLab(id: string) {
         nurseNotes,
         ocrText,
       });
+
+      setLoadedRevision(record.revision);
+      savedDraftFingerprintRef.current = fingerprintAtSaveStart;
       setStatus(fa
         ? `پرونده برای پزشک آماده شد · نسخه ${record.revision} · کد نمایشی ${record.patientCodeDisplay}`
         : `Handoff ready for physician · revision ${record.revision} · ${record.patientCodeDisplay}`);
+      return true;
     } catch (error) {
       const code = error instanceof Error ? error.message : "SAVE_FAILED";
       setStatus(code === "HANDOFF_UNAUTHORIZED"
@@ -414,6 +568,7 @@ function removeLab(id: string) {
           : code === "HANDOFF_INPUT_INVALID"
             ? (fa ? "شناسه بیمار معتبر نیست؛ نوع کد و مقدار آن را بررسی کنید." : "The patient identifier is invalid; review its type and value.")
             : (fa ? "ذخیره پرونده انجام نشد." : "Could not save the patient handoff."));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -660,9 +815,53 @@ function removeLab(id: string) {
 
       <section className={styles.handoffBar}>
         <div><strong>{fa ? "آماده‌سازی برای پزشک" : "Prepare physician handoff"}</strong><p>{fa ? "فقط آزمایش‌هایی که با ✓ تأیید شده‌اند هنگام Apply به Type 2 منتقل می‌شوند." : "Only labs confirmed with ✓ are transferred when the physician applies this handoff to Type 2."}</p></div>
-        <button type="button" disabled={busy} onClick={() => void save()}>{busy ? (fa ? "در حال پردازش…" : "Working…") : (fa ? "ذخیره و آماده‌سازی" : "Save handoff")}</button>
+        <div className={styles.handoffActions}>
+          <button type="button" disabled={busy} onClick={() => void save()}>{busy ? (fa ? "در حال پردازش…" : "Working…") : (fa ? "ذخیره و آماده‌سازی" : "Save handoff")}</button>
+          <button
+            type="button"
+            disabled={busy}
+            className={styles.newRecordButton}
+            onClick={requestNewRecord}
+          >
+            + {fa ? "ایجاد پرونده جدید" : "New patient handoff"}
+          </button>
+        </div>
       </section>
       {status && <div className={styles.status} role="status">{status}</div>}
+
+      {newRecordPromptOpen && (
+        <div className={styles.dialogBackdrop}>
+          <section
+            className={styles.newRecordDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-record-dialog-title"
+          >
+            <span className={styles.dialogEyebrow}>
+              {fa ? "تغییرات ذخیره‌نشده" : "UNSAVED CHANGES"}
+            </span>
+            <h2 id="new-record-dialog-title">
+              {fa ? "قبل از ایجاد پرونده جدید چه کار کنم؟" : "What should happen before starting a new patient?"}
+            </h2>
+            <p>
+              {fa
+                ? "اطلاعات پرونده فعلی هنوز از آخرین ذخیره تغییر کرده است. می‌توانید ابتدا آن را ذخیره کنید، بدون ذخیره کنار بگذارید، یا به فرم برگردید."
+                : "The current handoff has changed since its last save. Save it first, discard the unsaved changes, or return to the form."}
+            </p>
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.dialogPrimary} onClick={() => void saveAndStartNew()}>
+                {fa ? "ذخیره و ایجاد پرونده جدید" : "Save & start new"}
+              </button>
+              <button type="button" className={styles.dialogDiscard} onClick={discardAndStartNew}>
+                {fa ? "بدون ذخیره، پرونده جدید" : "Discard & start new"}
+              </button>
+              <button type="button" className={styles.dialogCancel} onClick={() => setNewRecordPromptOpen(false)}>
+                {fa ? "انصراف" : "Cancel"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

@@ -162,4 +162,22 @@ expect(contracts).toContain(
     expect(careTeamStyles).toContain(".addLabRow");
   });
 
+  it("starts the next patient without leaving Care Team and protects unsaved draft data", () => {
+    expect(careTeam).toContain("savedDraftFingerprintRef");
+    expect(careTeam).toContain("currentDraftFingerprint");
+    expect(careTeam).toContain("requestNewRecord");
+    expect(careTeam).toContain("saveAndStartNew");
+    expect(careTeam).toContain("discardAndStartNew");
+    expect(careTeam).toContain("resetForNewRecord");
+    expect(careTeam).toContain("Promise<boolean>");
+    expect(careTeam).toContain("setLoadedRevision(record.revision)");
+    expect(careTeam).toContain("New patient handoff");
+    expect(careTeam).toContain("Save & start new");
+    expect(careTeam).toContain("Discard & start new");
+    expect(careTeam).toContain("aria-modal=\"true\"");
+    expect(careTeamStyles).toContain(".handoffActions");
+    expect(careTeamStyles).toContain(".newRecordDialog");
+    expect(careTeamStyles).toContain(".dialogDiscard");
+  });
+
 });

@@ -157,6 +157,16 @@ Care-team workflow for a returning patient:
 4. Carry forward stable information where appropriate.
 5. Require review/reconfirmation of current medication and new labs/vitals.
 
+
+Sequential Care Team intake for different patients:
+
+- provide an explicit `Create new patient handoff` action without requiring navigation away from Care Team;
+- compare the current draft with the last successfully saved/loaded state before clearing it;
+- when unsaved changes exist, require an explicit choice between `Save and start new`, `Discard and start new`, and `Cancel`;
+- the `Save and start new` path may clear the form only after the save succeeds; a failed save must retain the current draft;
+- a clean/already-saved draft may reset immediately;
+- resetting for a different patient must clear patient identity, vitals, flags, medications, labs, OCR text, notes and loaded revision state.
+
 Physician workflow:
 
 - load latest prepared visit;
