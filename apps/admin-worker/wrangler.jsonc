@@ -3,6 +3,7 @@
 	"name": "shiny-block-9d4a",
 	"main": "src/platform-v3.ts",
 	"compatibility_date": "2026-07-29",
+	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
 		"ADMIN_ORIGIN": "https://abbaselotfi.github.io",
 		"ADMIN_PATH_PREFIX": "/GLYMIZE/admin",
