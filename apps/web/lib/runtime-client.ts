@@ -339,6 +339,23 @@ export async function updateTeamMember(memberId: string, input: { permissions: A
   return result;
 }
 
+
+export async function removeTeamMember(memberId: string) {
+  const response = await runtimeFetch(
+    `/v1/team/members/${encodeURIComponent(memberId)}`,
+    { method: "DELETE" },
+  );
+  const result = await response.json() as {
+    removed?: boolean;
+    error?: string;
+  };
+  if (!response.ok || result.removed !== true) {
+    throw new Error(result.error ?? "TEAM_MEMBER_REMOVE_FAILED");
+  }
+  return result;
+}
+
+
 export async function logoutRuntime() {
   const refreshToken = getRefreshToken();
   try {

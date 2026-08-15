@@ -10,6 +10,7 @@ import {
   getTeamMembers,
   inviteTeamMember,
   logoutRuntime,
+  removeTeamMember,
   updateRuntimeProfile,
   updateTeamMember,
 } from "../../lib/runtime-client";
@@ -137,6 +138,40 @@ export default function ProfilePage() {
     finally { setBusy(false); }
   }
 
+
+  async function removeMember(member: TeamMember) {
+    const name = `${member.firstName} ${member.lastName}`;
+    const confirmed = window.confirm(
+      fa
+        ? `\u00ab${name}\u00bb \u0627\u0632 \u062a\u06cc\u0645 \u0645\u0631\u0627\u0642\u0628\u062a \u062d\u0630\u0641 \u0634\u0648\u062f\u061f \u062f\u0633\u062a\u0631\u0633\u06cc \u0627\u0648 \u0628\u0647 \u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0647\u0627\u06cc \u0627\u06cc\u0646 \u0645\u0637\u0628 \u0641\u0648\u0631\u0627\u064b \u0642\u0637\u0639 \u0645\u06cc\u200c\u0634\u0648\u062f.`
+        : `Remove ${name} from this care team? Access to this practice will be revoked immediately.`,
+    );
+    if (!confirmed) return;
+
+    setBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await removeTeamMember(member.id);
+      setTeam(await getTeamMembers());
+      setMessage(
+        fa
+          ? "\u062f\u0633\u062a\u06cc\u0627\u0631 \u0627\u0632 \u062a\u06cc\u0645 \u062d\u0630\u0641 \u0634\u062f \u0648 \u062f\u0633\u062a\u0631\u0633\u06cc \u0627\u0648 \u0628\u0647 \u0627\u06cc\u0646 \u0645\u0637\u0628 \u0642\u0637\u0639 \u0634\u062f."
+          : "The care-team member was removed and access to this practice was revoked.",
+      );
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "TEAM_MEMBER_REMOVE_FAILED",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+
   if (!user) return <main className={styles.page} dir={isRtl ? "rtl" : "ltr"}><section className={styles.card}><h1>{fa ? "پروفایل" : "Profile"}</h1><p>{busy ? (fa ? "در حال بارگذاری…" : "Loading…") : error || (fa ? "برای مشاهده پروفایل وارد شوید." : "Sign in to view your profile.")}</p></section></main>;
 
   return (
@@ -188,7 +223,31 @@ export default function ProfilePage() {
         <section className={styles.card}>
           <div className={styles.heading}><div><span>ACCESS CONTROL</span><h2>{fa ? "تیم و سطح دسترسی" : "Care team & permissions"}</h2><p>{fa ? "تغییر مجوز یا غیرفعال‌کردن عضو در درخواست بعدی Backend اعمال می‌شود." : "Permission or status changes are enforced by the backend on the next request."}</p></div></div>
           <div className={styles.teamList}>{team.length === 0 ? <p className={styles.muted}>{fa ? "هنوز دستیاری اضافه نشده است." : "No care-team member has been added yet."}</p> : team.map((member) => <article key={member.id}>
-            <div className={styles.memberTop}><div className={styles.smallAvatar}>{member.profilePhoto ? <img alt="" src={member.profilePhoto} /> : member.firstName.slice(0,1)}</div><div><strong>{member.firstName} {member.lastName}</strong><small>{member.email ?? member.mobile ?? "—"}</small></div><select value={member.status} onChange={(e) => void patchMember(member, member.permissions, e.target.value as "active" | "disabled")}><option value="active">Active</option><option value="disabled">Disabled</option></select></div>
+            <div className={styles.memberTop}><div className={styles.smallAvatar}>{member.profilePhoto ? <img alt="" src={member.profilePhoto} /> : member.firstName.slice(0,1)}</div><div><strong>{member.firstName} {member.lastName}</strong><small>{member.email ?? member.mobile ?? "—"}</small></div><div className={styles.memberActions}>
+              <select
+                value={member.status}
+                onChange={(e) => void patchMember(
+                  member,
+                  member.permissions,
+                  e.target.value as "active" | "disabled",
+                )}
+              >
+                <option value="active">
+                  {fa ? "\u0641\u0639\u0627\u0644" : "Active"}
+                </option>
+                <option value="disabled">
+                  {fa ? "\u063a\u06cc\u0631\u0641\u0639\u0627\u0644" : "Disabled"}
+                </option>
+              </select>
+              <button
+                type="button"
+                className={styles.dangerAction}
+                disabled={busy}
+                onClick={() => void removeMember(member)}
+              >
+                {fa ? "\u062d\u0630\u0641 \u0627\u0632 \u062a\u06cc\u0645" : "Remove from team"}
+              </button>
+            </div></div>
             <div className={styles.permissionGrid}>{PERMISSIONS.map((permission) => { const checked = member.permissions.includes(permission.key); return <label key={permission.key} data-active={checked}><input type="checkbox" checked={checked} disabled={busy} onChange={() => void patchMember(member, checked ? member.permissions.filter((item) => item !== permission.key) : [...member.permissions, permission.key])} /><span>{permission[locale]}</span></label>; })}</div>
           </article>)}</div>
         </section>

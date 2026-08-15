@@ -140,7 +140,7 @@ export default function AdminAuthGuard({
             <b>Local Admin Preview</b> — فقط برای تست روی این دستگاه
           </span>
           <span>
-            انتشار مرکزی و نشست GitHub در حالت development غیرفعال است.
+            انتشار مرکزی و نشست مدیریت در حالت development غیرفعال است.
           </span>
         </section>
         {children}
@@ -155,9 +155,8 @@ export default function AdminAuthGuard({
           <span className="eyebrow">Admin authentication</span>
           <h1>سرویس امن مدیریت هنوز متصل نشده است</h1>
           <p>
-            نشانی Cloudflare Worker باید در متغیر{" "}
-            <code>NEXT_PUBLIC_ADMIN_API_URL</code> ثبت و برنامه دوباره منتشر
-            شود.
+            سرویس امن مدیریت در این محیط پیکربندی نشده است.
+            تنظیمات بخش مدیریت را بررسی کنید.
           </p>
         </section>
       </main>
@@ -171,7 +170,7 @@ export default function AdminAuthGuard({
           <span className="eyebrow">Admin access</span>
           <h1>ورود به بخش مدیریت GLYMIZE</h1>
           <p>
-            مالک سیستم می‌تواند با GitHub به‌عنوان Superadmin وارد شود. حساب‌های
+            مالک سیستم می‌تواند از مسیر امن مدیریت وارد شود. حساب‌های
             GLYMIZE نیز در صورت داشتن مجوز همان صفحه می‌توانند وارد بخش‌های
             مدیریت تعیین‌شده شوند.
           </p>
@@ -179,7 +178,7 @@ export default function AdminAuthGuard({
             className="primary-button"
             href={getAdminLoginUrl(window.location.href)}
           >
-            ورود Superadmin با GitHub
+            ورود مالک سیستم
           </a>
           <p>
             <Link href="/account">ورود با حساب GLYMIZE</Link>
@@ -218,13 +217,13 @@ export default function AdminAuthGuard({
     <>
       <section className="admin-session-bar">
         <span>
-          {runtimeAdmin ? "مدیر GLYMIZE" : "Superadmin GitHub"}:{" "}
+          {runtimeAdmin ? "مدیر GLYMIZE" : "مالک سیستم"}:{" "}
           <b>@{auth.identity.login}</b>
         </span>
         {runtimeAdmin && (
           <span>
             سطح دسترسی این حساب محدود به صفحات انتخاب‌شده است. انتشار مستقیم
-            تغییرات در GitHub همچنان فقط برای Superadmin GitHub مجاز است.
+            تغییرات همچنان فقط برای مالک سیستم مجاز است.
           </span>
         )}
         {publishMessage && <span role="status">{publishMessage}</span>}

@@ -1031,6 +1031,68 @@ async function updateTeamMember(request: Request, env: Env, auth: AuthContext, m
   return json(request,env,{updated:true});
 }
 
+
+async function removeTeamMember(
+  request: Request,
+  env: Env,
+  auth: AuthContext,
+  memberId: string,
+) {
+  if (auth.user.role !== "physician") {
+    return json(request, env, { error: "physician_required" }, 403);
+  }
+
+  const member = await db(env).prepare(
+    `SELECT role, status
+     FROM practice_memberships
+     WHERE practice_id=? AND user_id=?`,
+  ).bind(
+    auth.user.practiceId,
+    memberId,
+  ).first<{ role: RuntimeRole; status: MembershipStatus }>();
+
+  if (!member || member.role !== "assistant") {
+    return json(request, env, { error: "team_member_not_found" }, 404);
+  }
+
+  const now = nowIso();
+
+  const removed = await db(env).prepare(
+    `DELETE FROM practice_memberships
+     WHERE practice_id=? AND user_id=? AND role='assistant'`,
+  ).bind(
+    auth.user.practiceId,
+    memberId,
+  ).run();
+
+  if ((removed.meta.changes ?? 0) !== 1) {
+    return json(request, env, { error: "team_member_remove_failed" }, 409);
+  }
+
+  await db(env).prepare(
+    `UPDATE refresh_tokens
+     SET revoked_at=COALESCE(revoked_at, ?), last_used_at=?
+     WHERE practice_id=? AND user_id=?`,
+  ).bind(
+    now,
+    now,
+    auth.user.practiceId,
+    memberId,
+  ).run();
+
+  await audit(
+    env,
+    auth.user.id,
+    auth.user.practiceId,
+    "team.member_removed",
+    "user",
+    memberId,
+    { previousStatus: member.status },
+  );
+
+  return json(request, env, { removed: true });
+}
+
 function validPatientPayload(value: unknown) {
   if (!value || typeof value!=="object") return false;
   const body=value as Record<string,unknown>;
@@ -1221,6 +1283,7 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
   if (url.pathname==="/v1/team/invitations" && request.method==="POST") return createTeamInvitation(request,env,auth);
   const memberMatch=url.pathname.match(/^\/v1\/team\/members\/([^/]+)$/);
   if (memberMatch && request.method==="PATCH") return updateTeamMember(request,env,auth,decodeURIComponent(memberMatch[1]!));
+  if (memberMatch && request.method==="DELETE") return removeTeamMember(request,env,auth,decodeURIComponent(memberMatch[1]!));
 
   if (url.pathname==="/v1/patient-handoff/upsert" && request.method==="POST") return upsertHandoff(request,env,auth);
   if (url.pathname==="/v1/patient-handoff/lookup" && request.method==="POST") return lookupHandoff(request,env,auth);
