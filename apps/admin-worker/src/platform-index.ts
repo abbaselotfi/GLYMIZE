@@ -1,6 +1,10 @@
 
 import adminHandler from "./index";
 import {
+  assistantInvitationEmailEnabled,
+  resolvePublicAppBaseUrl,
+} from "./platform-team-invitation-policy";
+import {
   defaultAssistantPermissions,
   defaultPhysicianPermissions,
   constantTimeEqual,
@@ -51,6 +55,7 @@ interface Env {
   GLYMIZE_DB?: D1Database;
   CLINICAL_DATA_MASTER_KEY?: string;
   IRIMC_VERIFY_ENDPOINT?: string;
+  PUBLIC_APP_URL?: string;
 }
 
 type UserStatus = "active" | "disabled";
@@ -521,7 +526,7 @@ async function requestLoginOtp(request: Request, env: Env) {
   if (found) {
     const config = await readCommunications(env);
     if (email && config.email?.enabled === true) {
-      delivered = await sendEmail(env, email, "GLYMIZE · Login code", `Your GLYMIZE login code is ${code}. It expires in 10 minutes.`);
+      delivered = await sendEmail(env, email, "GLYMIZE ┬╖ Login code", `Your GLYMIZE login code is ${code}. It expires in 10 minutes.`);
     } else if (mobile && config.sms?.enabled === true && config.sms?.loginOtp === true) {
       delivered = await sendSmsCode(env, mobile, code);
     }
@@ -805,11 +810,11 @@ async function createTeamInvitation(request: Request, env: Env, auth: AuthContex
     tokenHash, expiresAt, nowIso(),
   ).run();
 
-  const inviteUrl=`${env.ADMIN_ORIGIN}/GLYMIZE/account/?invite=${encodeURIComponent(token)}`;
+  const inviteUrl=`${resolvePublicAppBaseUrl(env)}/account/?invite=${encodeURIComponent(token)}`;
   const config=await readCommunications(env);
   let delivered=false;
-  if (email && config.email?.enabled === true) {
-    delivered=await sendEmail(env,email,"GLYMIZE · Care team invitation",
+  if (email && assistantInvitationEmailEnabled(config)) {
+    delivered=await sendEmail(env,email,"GLYMIZE ┬╖ Care team invitation",
       `${auth.user.firstName} ${auth.user.lastName} invited you to the GLYMIZE care team.\n\nOpen this link:\n${inviteUrl}\n\nThis invitation expires in 7 days.`);
   }
   await audit(env,auth.user.id,auth.user.practiceId,"team.invited","invitation",inviteId,{delivered});
