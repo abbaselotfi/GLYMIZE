@@ -103,6 +103,10 @@ function storeSession(session: RuntimeSessionResponse, rememberMe: boolean) {
   emitAuthChange();
 }
 
+export function adoptRuntimeSession(session: RuntimeSessionResponse, rememberMe: boolean) {
+  storeSession(session, rememberMe);
+}
+
 function clearSession() {
   if (!browser()) return;
   window.sessionStorage.removeItem(accessKey);
