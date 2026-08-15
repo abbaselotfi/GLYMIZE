@@ -180,4 +180,19 @@ expect(contracts).toContain(
     expect(careTeamStyles).toContain(".dialogDiscard");
   });
 
+  it("keeps new-patient access near identity, hides generic other-code creation, and reviews OCR demographics", () => {
+    expect(careTeam).toContain("inlineNewRecord");
+    expect(careTeam).toContain("requestNewRecord");
+    expect(careTeam).not.toContain('<option value="other">');
+    expect(careTeam).toContain("Legacy identifier (compatibility only)");
+    expect(careTeam).toContain("patientFieldSuggestions");
+    expect(careTeam).toContain("applyPatientFieldSuggestion");
+    expect(careTeam).toContain("Existing fields are never overwritten automatically");
+    expect(careTeam).toContain("reportedAgeYears");
+    expect(careTeam).toContain("patientFieldProvenance");
+    expect(careTeamStyles).toContain(".patientOcrReview");
+    expect(careTeamStyles).toContain(".patientOcrSuggestionGrid");
+    expect(careTeamStyles).toContain(".inlineNewRecord");
+  });
+
 });

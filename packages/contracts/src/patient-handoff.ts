@@ -46,6 +46,35 @@ export interface PatientHandoffVitals {
   pulseBpm?: number;
 }
 
+export interface PatientHandoffDemographics {
+  /**
+   * Encounter-reported age from a source such as a laboratory report.
+   * Patient Record v2 should prefer a verified date of birth when available.
+   */
+  reportedAgeYears?: number;
+}
+
+export type PatientHandoffStructuredField =
+  | "firstName"
+  | "lastName"
+  | "nationalId"
+  | "reportedAgeYears"
+  | "weightKg"
+  | "heightCm";
+
+export interface PatientHandoffFieldProvenance {
+  sourceKind: "manual" | "ocr" | "pdf_text" | "import";
+  sourceDocumentName?: string;
+  sourcePage?: number;
+  ocrConfidence?: number;
+  parserConfidence?: number;
+  verification: VerificationState;
+}
+
+export type PatientHandoffFieldProvenanceMap = Partial<
+  Record<PatientHandoffStructuredField, PatientHandoffFieldProvenance>
+>;
+
 export interface PatientHandoffClinicalFlags {
   ascvd?: boolean;
   heartFailure?: boolean;
@@ -66,6 +95,8 @@ export interface PatientHandoffRecord {
   createdAt: string;
   updatedAt: string;
   revision: number;
+  demographics?: PatientHandoffDemographics;
+  patientFieldProvenance?: PatientHandoffFieldProvenanceMap;
   vitals: PatientHandoffVitals;
   clinicalFlags: PatientHandoffClinicalFlags;
   labs: PatientHandoffLab[];
@@ -95,6 +126,8 @@ export interface PatientHandoffUpsertInput {
   firstName?: string;
   lastName?: string;
   status?: PatientHandoffStatus;
+  demographics?: PatientHandoffDemographics;
+  patientFieldProvenance?: PatientHandoffFieldProvenanceMap;
   vitals?: PatientHandoffVitals;
   clinicalFlags?: PatientHandoffClinicalFlags;
   labs?: PatientHandoffLab[];

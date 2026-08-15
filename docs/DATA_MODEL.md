@@ -101,6 +101,8 @@ AuditEvent --> any versioned aggregate
 
 `PatientSnapshot` یک snapshot حداقلی و immutable از داده‌های مؤثر بر محاسبه است؛ در صورت امکان به شناسهٔ pseudonymous پرونده اشاره می‌کند، نه مشخصات مستقیم. داده‌ها به شکل ساخت‌یافته همراه با کد، مقدار، واحد، زمان مشاهده و provenance ذخیره می‌شوند.
 
+در Care Team، مقادیر هویتی/پایه‌ای که از OCR یا متن PDF به دست می‌آیند ابتدا suggestion هستند. اعمال انسانی آن‌ها باید provenance شامل source kind، سند/صفحه، confidence موجود و وضعیت verification را حفظ کند. نام، نام خانوادگی، کد ملی، سن گزارش‌شده در encounter، قد و وزن نباید صرفاً به دلیل OCR بودن خودکار روی مقدار موجود نوشته شوند. برای هویت طولی، تاریخ تولد تأییدشده بر سن ثابت ارجح است و کد ملی/شماره پرونده در مدل نهایی شناسه‌های متعدد یک Patient هستند، نه دو Patient جدا.
+
 `DecisionRecord` شامل موارد زیر است:
 
 - `patient_snapshot_id`, `organization_id`, `requested_by`, `evaluated_at`؛

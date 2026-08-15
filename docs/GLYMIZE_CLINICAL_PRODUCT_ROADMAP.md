@@ -117,7 +117,9 @@ A patient may have multiple identifiers at the same time:
 
 - practice file number;
 - Iranian national ID;
-- other local identifier.
+- another specifically defined local identifier only when a real source/use-case exists.
+
+The current Care Team creation UI exposes only file number and Iranian national ID. A generic `Other code` choice is not shown. Legacy/backend support may remain until Patient Record v2 migration so historical records are not broken.
 
 Both file number and national ID must be usable for lookup. They must resolve to the same patient rather than creating duplicate longitudinal records.
 
@@ -129,7 +131,16 @@ Privacy design:
 - UI uses masked identifier when full value is unnecessary;
 - names/contact/demographics remain protected clinical data.
 
-Date of birth is preferred over storing a static age. Age is derived at encounter time.
+Date of birth is preferred over storing a static age. Age is derived at encounter time. When a source document reports only age, GLYMIZE may preserve it explicitly as encounter-level `reportedAgeYears`; it must not be treated as a permanent patient-master age.
+
+Laboratory/PDF OCR may also detect explicit patient-header fields such as first name, last name, national ID, reported age, height and weight. These detections are **review suggestions**, not authoritative identity or clinical data:
+
+- never overwrite an existing user-entered value automatically;
+- national ID suggestions require checksum validation before being offered;
+- an OCR national ID must not silently replace an already-entered file number;
+- applying a suggestion records source/provenance and human confirmation;
+- raw OCR and structured identity/demographic fields remain protected clinical data;
+- Patient Record v2 should prefer verified date of birth and support multiple identifiers without forcing one to replace another.
 
 ---
 

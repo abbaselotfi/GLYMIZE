@@ -5,8 +5,10 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import type {
   PatientCodeKind,
   PatientHandoffClinicalFlags,
+  PatientHandoffFieldProvenanceMap,
   PatientHandoffLab,
   PatientHandoffMedication,
+  PatientHandoffStructuredField,
   PatientHandoffVitals,
 } from "@glymize/contracts";
 import {
@@ -14,7 +16,11 @@ import {
   normalizeLabUnit,
   resolveLabMasterEntry,
 } from "@glymize/clinical-engine/lab-text-parser";
-import { recognizeClinicalDocument, type OcrProgress } from "../../lib/client-ocr";
+import {
+  recognizeClinicalDocument,
+  type OcrPatientFieldSuggestion,
+  type OcrProgress,
+} from "../../lib/client-ocr";
 import { lookupPatientHandoff, savePatientHandoff, validateIranianNationalId } from "../../lib/patient-handoff-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import styles from "./care-team.module.css";
@@ -144,6 +150,8 @@ function draftFingerprint(input: {
   flags: PatientHandoffClinicalFlags;
   medications: MedicationDraft[];
   labs: PatientHandoffLab[];
+  reportedAgeYears: string;
+  patientFieldProvenance: PatientHandoffFieldProvenanceMap;
   ocrText: string;
   nurseNotes: string;
 }) {
@@ -160,6 +168,10 @@ function draftFingerprint(input: {
         .sort(),
       medications: input.medications,
       labs: input.labs,
+      reportedAgeYears: input.reportedAgeYears,
+      patientFieldProvenance: Object.entries(
+        input.patientFieldProvenance,
+      ).sort(([a], [b]) => a.localeCompare(b)),
       ocrText: input.ocrText,
       nurseNotes: input.nurseNotes,
     },
@@ -177,6 +189,8 @@ function emptyDraftFingerprint() {
     flags: EMPTY_FLAGS,
     medications: [],
     labs: [],
+    reportedAgeYears: "",
+    patientFieldProvenance: {},
     ocrText: "",
     nurseNotes: "",
   });
@@ -191,6 +205,11 @@ export default function CareTeamClient() {
   const [patientCode, setPatientCode] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [reportedAgeYears, setReportedAgeYears] = useState("");
+  const [patientFieldProvenance, setPatientFieldProvenance] =
+    useState<PatientHandoffFieldProvenanceMap>({});
+  const [patientFieldSuggestions, setPatientFieldSuggestions] =
+    useState<OcrPatientFieldSuggestion[]>([]);
   const [vitals, setVitals] = useState(EMPTY_VITALS);
   const [flags, setFlags] = useState<PatientHandoffClinicalFlags>(EMPTY_FLAGS);
   const [medications, setMedications] = useState<MedicationDraft[]>([]);
@@ -216,13 +235,175 @@ export default function CareTeamClient() {
       flags,
       medications,
       labs,
+      reportedAgeYears,
+      patientFieldProvenance,
       ocrText,
       nurseNotes,
     });
   }
 
+  function clearPatientFieldProvenance(
+    field: PatientHandoffStructuredField,
+  ) {
+    setPatientFieldProvenance((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   function updateVital(key: keyof typeof EMPTY_VITALS, value: string) {
     setVitals((current) => ({ ...current, [key]: value }));
+    if (key === "weightKg" || key === "heightCm") {
+      clearPatientFieldProvenance(key);
+    }
+  }
+
+  function suggestionProvenance(
+    suggestion: OcrPatientFieldSuggestion,
+  ) {
+    return {
+      sourceKind: suggestion.sourceKind,
+      sourceDocumentName: suggestion.sourceDocumentName,
+      sourcePage: suggestion.sourcePage,
+      ocrConfidence: suggestion.ocrConfidence,
+      parserConfidence: suggestion.parserConfidence,
+      verification: "confirmed" as const,
+    };
+  }
+
+  function setSuggestionProvenance(
+    field: PatientHandoffStructuredField,
+    suggestion: OcrPatientFieldSuggestion,
+  ) {
+    setPatientFieldProvenance((current) => ({
+      ...current,
+      [field]: suggestionProvenance(suggestion),
+    }));
+  }
+
+  function splitReviewedFullName(value: string) {
+    const parts = value.trim().split(/\s+/).filter(Boolean);
+    if (parts.length < 2) return null;
+    return {
+      firstName: parts[0]!,
+      lastName: parts.slice(1).join(" "),
+    };
+  }
+
+  function applyPatientFieldSuggestion(
+    suggestion: OcrPatientFieldSuggestion,
+  ) {
+    const textValue = String(suggestion.value);
+
+    if (suggestion.field === "first_name") {
+      if (firstName.trim() && firstName.trim() !== textValue.trim()) {
+        setStatus(fa
+          ? "نام فعلی حفظ شد؛ برای جایگزینی، ابتدا فیلد نام را پاک یا دستی ویرایش کنید."
+          : "Existing first name was preserved. Clear or edit it manually before replacing it.");
+        return;
+      }
+      setFirstName(textValue);
+      setSuggestionProvenance("firstName", suggestion);
+      return;
+    }
+
+    if (suggestion.field === "last_name") {
+      if (lastName.trim() && lastName.trim() !== textValue.trim()) {
+        setStatus(fa
+          ? "نام خانوادگی فعلی حفظ شد؛ برای جایگزینی، ابتدا فیلد را پاک یا دستی ویرایش کنید."
+          : "Existing last name was preserved. Clear or edit it manually before replacing it.");
+        return;
+      }
+      setLastName(textValue);
+      setSuggestionProvenance("lastName", suggestion);
+      return;
+    }
+
+    if (suggestion.field === "full_name") {
+      const split = splitReviewedFullName(textValue);
+      if (!split) {
+        setStatus(fa
+          ? "نام کامل OCR نیاز به بازبینی دستی دارد."
+          : "The OCR full name needs manual review.");
+        return;
+      }
+      if (firstName.trim() || lastName.trim()) {
+        setStatus(fa
+          ? "نام/نام خانوادگی فعلی حفظ شد؛ نام کامل OCR خودکار جایگزین نشد."
+          : "Existing name fields were preserved; OCR full name was not auto-replaced.");
+        return;
+      }
+      setFirstName(split.firstName);
+      setLastName(split.lastName);
+      setSuggestionProvenance("firstName", suggestion);
+      setSuggestionProvenance("lastName", suggestion);
+      return;
+    }
+
+    if (suggestion.field === "national_id") {
+      if (patientCode.trim()) {
+        setStatus(fa
+          ? "شناسه فعلی بیمار حفظ شد. کد ملی OCR به‌طور خودکار جای شماره پرونده را نمی‌گیرد."
+          : "The current patient identifier was preserved. OCR National ID will not silently replace a file number.");
+        return;
+      }
+      setPatientCodeKind("national_id");
+      setPatientCode(textValue);
+      setSuggestionProvenance("nationalId", suggestion);
+      return;
+    }
+
+    if (suggestion.field === "reported_age_years") {
+      if (reportedAgeYears.trim() && reportedAgeYears.trim() !== textValue) {
+        setStatus(fa
+          ? "سن فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+          : "Existing age was preserved; OCR did not overwrite it.");
+        return;
+      }
+      setReportedAgeYears(textValue);
+      setSuggestionProvenance("reportedAgeYears", suggestion);
+      return;
+    }
+
+    if (suggestion.field === "weight_kg") {
+      if (vitals.weightKg.trim() && vitals.weightKg.trim() !== textValue) {
+        setStatus(fa
+          ? "وزن فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+          : "Existing weight was preserved; OCR did not overwrite it.");
+        return;
+      }
+      setVitals((current) => ({ ...current, weightKg: textValue }));
+      setSuggestionProvenance("weightKg", suggestion);
+      return;
+    }
+
+    if (suggestion.field === "height_cm") {
+      if (vitals.heightCm.trim() && vitals.heightCm.trim() !== textValue) {
+        setStatus(fa
+          ? "قد فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+          : "Existing height was preserved; OCR did not overwrite it.");
+        return;
+      }
+      setVitals((current) => ({ ...current, heightCm: textValue }));
+      setSuggestionProvenance("heightCm", suggestion);
+    }
+  }
+
+  function patientSuggestionLabel(
+    suggestion: OcrPatientFieldSuggestion,
+  ) {
+    const labels: Record<OcrPatientFieldSuggestion["field"], string> = {
+      first_name: fa ? "نام" : "First name",
+      last_name: fa ? "نام خانوادگی" : "Last name",
+      full_name: fa ? "نام کامل" : "Full name",
+      national_id: fa ? "کد ملی" : "National ID",
+      reported_age_years: fa ? "سن گزارش‌شده" : "Reported age",
+      weight_kg: fa ? "وزن" : "Weight",
+      height_cm: fa ? "قد" : "Height",
+    };
+    return labels[suggestion.field];
   }
 
   function toggleFlag(key: keyof PatientHandoffClinicalFlags) {
@@ -325,6 +506,12 @@ function removeLab(id: string) {
       diastolicBp: record.vitals.diastolicBp !== undefined ? String(record.vitals.diastolicBp) : "",
       pulseBpm: record.vitals.pulseBpm !== undefined ? String(record.vitals.pulseBpm) : "",
     };
+    const nextReportedAgeYears =
+      record.demographics?.reportedAgeYears !== undefined
+        ? String(record.demographics.reportedAgeYears)
+        : "";
+    const nextPatientFieldProvenance =
+      record.patientFieldProvenance ?? {};
     const nextFlags = record.clinicalFlags ?? {};
     const nextLabs = record.labs ?? [];
     const nextMedications = (record.medications ?? []).map((item) => ({
@@ -342,6 +529,9 @@ function removeLab(id: string) {
     setPatientCode(code);
     setFirstName(record.firstName ?? "");
     setLastName(record.lastName ?? "");
+    setReportedAgeYears(nextReportedAgeYears);
+    setPatientFieldProvenance(nextPatientFieldProvenance);
+    setPatientFieldSuggestions([]);
     setVitals(nextVitals);
     setFlags(nextFlags);
     setLabs(nextLabs);
@@ -359,6 +549,8 @@ function removeLab(id: string) {
       flags: nextFlags,
       medications: nextMedications,
       labs: nextLabs,
+      reportedAgeYears: nextReportedAgeYears,
+      patientFieldProvenance: nextPatientFieldProvenance,
       ocrText: nextOcrText,
       nurseNotes: nextNurseNotes,
     });
@@ -410,6 +602,9 @@ function removeLab(id: string) {
     setPatientCode("");
     setFirstName("");
     setLastName("");
+    setReportedAgeYears("");
+    setPatientFieldProvenance({});
+    setPatientFieldSuggestions([]);
     setVitals(EMPTY_VITALS);
     setFlags(EMPTY_FLAGS);
     setMedications([]);
@@ -474,6 +669,22 @@ function removeLab(id: string) {
     try {
       const result = await recognizeClinicalDocument(file, setOcrProgress);
       setOcrText((current) => [current, result.rawText].filter(Boolean).join("\n\n"));
+      setPatientFieldSuggestions((current) => {
+        const seen = new Set(
+          current.map(
+            (item) =>
+              `${item.field}|${String(item.value)}|${item.sourceDocumentName}|${item.sourcePage ?? ""}`,
+          ),
+        );
+        const additions = result.patientFields.filter((item) => {
+          const identity =
+            `${item.field}|${String(item.value)}|${item.sourceDocumentName}|${item.sourcePage ?? ""}`;
+          if (seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        });
+        return [...current, ...additions];
+      });
       setLabs((current) => {
   const existing = new Set(
     current.map(labObservationIdentity),
@@ -545,6 +756,10 @@ function removeLab(id: string) {
         firstName,
         lastName,
         status: "ready_for_physician",
+        demographics: {
+          reportedAgeYears: numberOrUndefined(reportedAgeYears),
+        },
+        patientFieldProvenance,
         vitals: mappedVitals,
         clinicalFlags: flags,
         labs,
@@ -606,9 +821,84 @@ function removeLab(id: string) {
       <section className={styles.card}>
         <div className={styles.sectionTitle}><b>1</b><div><h2>{fa ? "شناسه بیمار" : "Patient identity"}</h2><p>{fa ? "نام و نام خانوادگی اختیاری است؛ کد بیمار کلید handoff است." : "Name is optional; the patient code is the handoff key."}</p></div></div>
         <div className={styles.grid3}>
-          <label><span>{fa ? "نوع کد" : "Code type"}</span><select value={patientCodeKind} onChange={(event) => setPatientCodeKind(event.target.value as PatientCodeKind)}><option value="file_number">{fa ? "شماره پرونده" : "File number"}</option><option value="national_id">{fa ? "کد ملی" : "National ID"}</option><option value="other">{fa ? "کد دیگر" : "Other code"}</option></select></label>
-          <label><span>{fa ? "کد بیمار *" : "Patient code *"}</span><div className={styles.patientCodeAction}><input value={patientCode} onChange={(event) => { setPatientCode(event.target.value); setLoadedRevision(null); }} autoComplete="off" inputMode={patientCodeKind === "national_id" ? "numeric" : "text"} /><button type="button" disabled={busy} onClick={() => void loadExisting()}>{fa ? "باز کردن / ویرایش" : "Open / edit"}</button></div>{loadedRevision !== null && <small className={styles.revisionBadge}>{fa ? `نسخه بازشده: ${loadedRevision}` : `Loaded revision: ${loadedRevision}`}</small>}</label>
-          <div className={styles.nameGrid}><label><span>{fa ? "نام (اختیاری)" : "First name (optional)"}</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label><label><span>{fa ? "نام خانوادگی (اختیاری)" : "Last name (optional)"}</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} /></label></div>
+          <label>
+            <span>{fa ? "نوع کد" : "Code type"}</span>
+            {patientCodeKind === "other" ? (
+              <input
+                value={fa ? "شناسه قدیمی (فقط سازگاری)" : "Legacy identifier (compatibility only)"}
+                disabled
+                className={styles.legacyCodeKind}
+              />
+            ) : (
+              <select
+                value={patientCodeKind}
+                onChange={(event) => {
+                  setPatientCodeKind(event.target.value as PatientCodeKind);
+                  clearPatientFieldProvenance("nationalId");
+                }}
+              >
+                <option value="file_number">
+                  {fa ? "شماره پرونده" : "File number"}
+                </option>
+                <option value="national_id">
+                  {fa ? "کد ملی" : "National ID"}
+                </option>
+              </select>
+            )}
+          </label>
+          <label>
+            <span>{fa ? "کد بیمار *" : "Patient code *"}</span>
+            <div className={styles.patientCodeAction}>
+              <input
+                value={patientCode}
+                onChange={(event) => {
+                  setPatientCode(event.target.value);
+                  setLoadedRevision(null);
+                  clearPatientFieldProvenance("nationalId");
+                }}
+                autoComplete="off"
+                inputMode={patientCodeKind === "national_id" ? "numeric" : "text"}
+              />
+              <button type="button" disabled={busy} onClick={() => void loadExisting()}>
+                {fa ? "باز کردن / ویرایش" : "Open / edit"}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className={styles.inlineNewRecord}
+                onClick={requestNewRecord}
+              >
+                + {fa ? "پرونده جدید" : "New patient"}
+              </button>
+            </div>
+            {loadedRevision !== null && (
+              <small className={styles.revisionBadge}>
+                {fa ? `نسخه بازشده: ${loadedRevision}` : `Loaded revision: ${loadedRevision}`}
+              </small>
+            )}
+          </label>
+          <div className={styles.nameGrid}>
+            <label>
+              <span>{fa ? "نام (اختیاری)" : "First name (optional)"}</span>
+              <input
+                value={firstName}
+                onChange={(event) => {
+                  setFirstName(event.target.value);
+                  clearPatientFieldProvenance("firstName");
+                }}
+              />
+            </label>
+            <label>
+              <span>{fa ? "نام خانوادگی (اختیاری)" : "Last name (optional)"}</span>
+              <input
+                value={lastName}
+                onChange={(event) => {
+                  setLastName(event.target.value);
+                  clearPatientFieldProvenance("lastName");
+                }}
+              />
+            </label>
+          </div>
         </div>
         {nationalIdWarning && <p className={styles.warning}>{fa ? "کد ملی فعلی checksum معتبر ندارد." : "The current national ID checksum is invalid."}</p>}
       </section>
@@ -631,6 +921,60 @@ function removeLab(id: string) {
         </div>
         {ocrProgress && <div className={styles.progress}><div style={{ width: `${progressPercent}%` }} /><span>{progressPercent}% · {ocrProgress.message}</span></div>}
         <p className={styles.privacy}>{fa ? "در حالت OCR مرورگری، تصویر برای سرویس OCR خارجی آپلود نمی‌شود؛ مدل‌های زبان فارسی/انگلیسی در اولین استفاده ممکن است دانلود شوند." : "Browser OCR does not upload the image to a third-party OCR service; Persian/English language models may download on first use."}</p>
+
+        {patientFieldSuggestions.length > 0 && (
+          <div className={styles.patientOcrReview}>
+            <div className={styles.patientOcrReviewHeader}>
+              <div>
+                <strong>
+                  {fa
+                    ? "اطلاعات بیمار استخراج‌شده از برگه"
+                    : "Patient details detected on the document"}
+                </strong>
+                <small>
+                  {fa
+                    ? "این موارد پیشنهاد OCR هستند و هیچ فیلد موجودی را خودکار جایگزین نمی‌کنند. هر مورد را پس از تطبیق با برگه اعمال کنید."
+                    : "These are OCR suggestions. Existing fields are never overwritten automatically; apply each item only after checking the document."}
+                </small>
+              </div>
+            </div>
+            <div className={styles.patientOcrSuggestionGrid}>
+              {patientFieldSuggestions.map((suggestion, index) => (
+                <div
+                  className={styles.patientOcrSuggestion}
+                  key={`${suggestion.field}:${String(suggestion.value)}:${suggestion.sourcePage ?? 0}:${index}`}
+                >
+                  <div>
+                    <span>{patientSuggestionLabel(suggestion)}</span>
+                    <strong>
+                      {String(suggestion.value)}
+                      {suggestion.field === "reported_age_years"
+                        ? (fa ? " سال" : " years")
+                        : suggestion.field === "weight_kg"
+                          ? " kg"
+                          : suggestion.field === "height_cm"
+                            ? " cm"
+                            : ""}
+                    </strong>
+                    <small>
+                      {fa ? "صفحه" : "page"} {suggestion.sourcePage ?? 1}
+                      {" · "}
+                      {fa ? "اطمینان parser" : "parser confidence"}{" "}
+                      {Math.round(suggestion.parserConfidence * 100)}%
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => applyPatientFieldSuggestion(suggestion)}
+                  >
+                    {fa ? "اعمال پس از بررسی" : "Apply after review"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <datalist id="glymize-lab-catalog">
   {LAB_DATALIST_OPTIONS.map((option) => (
@@ -778,7 +1122,18 @@ function removeLab(id: string) {
 
       <section className={styles.card}>
         <div className={styles.sectionTitle}><b>3</b><div><h2>{fa ? "اطلاعات بالینی پایه" : "Basic clinical data"}</h2><p>{fa ? "این داده‌ها پس از اعمال توسط پزشک، فرم Type 2 را prefill می‌کنند." : "After physician review/apply, these values prefill the Type 2 form."}</p></div></div>
-        <div className={styles.grid5}>
+        <div className={styles.grid6}>
+          <label>
+            <span>{fa ? "سن گزارش‌شده (سال)" : "Reported age (years)"}</span>
+            <input
+              inputMode="numeric"
+              value={reportedAgeYears}
+              onChange={(event) => {
+                setReportedAgeYears(event.target.value);
+                clearPatientFieldProvenance("reportedAgeYears");
+              }}
+            />
+          </label>
           <label><span>{fa ? "وزن kg" : "Weight kg"}</span><input inputMode="decimal" value={vitals.weightKg} onChange={(e) => updateVital("weightKg", e.target.value)} /></label>
           <label><span>{fa ? "قد cm" : "Height cm"}</span><input inputMode="decimal" value={vitals.heightCm} onChange={(e) => updateVital("heightCm", e.target.value)} /></label>
           <label><span>{fa ? "فشار سیستول" : "Systolic BP"}</span><input inputMode="numeric" value={vitals.systolicBp} onChange={(e) => updateVital("systolicBp", e.target.value)} /></label>

@@ -20,6 +20,10 @@
     "./lab-text-parser": {
       "types": "./dist/lab-text-parser.d.ts",
       "default": "./dist/lab-text-parser.js"
+    },
+    "./patient-document-parser": {
+      "types": "./dist/patient-document-parser.d.ts",
+      "default": "./dist/patient-document-parser.js"
     }
   },
   "scripts": {

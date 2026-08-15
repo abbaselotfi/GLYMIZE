@@ -2,6 +2,10 @@
 
 import type { PatientHandoffLab } from "@glymize/contracts";
 import { parseClinicalLabText } from "@glymize/clinical-engine/lab-text-parser";
+import {
+  parsePatientDocumentFields,
+  type PatientDocumentFieldSuggestion,
+} from "@glymize/clinical-engine/patient-document-parser";
 import { withBasePath } from "./base-path";
 
 export interface OcrProgress {
@@ -12,9 +16,17 @@ export interface OcrProgress {
   message: string;
 }
 
+export interface OcrPatientFieldSuggestion
+  extends PatientDocumentFieldSuggestion {
+  sourceKind: "ocr" | "pdf_text";
+  sourceDocumentName: string;
+  ocrConfidence?: number;
+}
+
 export interface OcrDocumentResult {
   rawText: string;
   labs: PatientHandoffLab[];
+  patientFields: OcrPatientFieldSuggestion[];
   processedPageCount: number;
   sourcePageCount: number;
   truncated: boolean;
@@ -177,21 +189,41 @@ confidenceByPage.set(
     .join("\n\n")
     .trim();
   onProgress({ stage: "parse", progress: 1, message: "Parsing clinical fields for review" });
-const labs = pages
-  .sort((a, b) => a.pageNumber - b.pageNumber)
-  .flatMap((page) => {
-    const pageText = `--- page ${page.pageNumber} ---\n${(textByPage.get(page.pageNumber) ?? "").trim()}`;
-    return parseClinicalLabText(
-      pageText,
-      file.name,
-      confidenceByPage.get(page.pageNumber),
-      page.canvas ? "ocr" : "pdf_text",
-    );
-  });
+const sortedPages = pages.sort(
+  (a, b) => a.pageNumber - b.pageNumber,
+);
+
+const labs = sortedPages.flatMap((page) => {
+  const pageText = `--- page ${page.pageNumber} ---\n${(textByPage.get(page.pageNumber) ?? "").trim()}`;
+  return parseClinicalLabText(
+    pageText,
+    file.name,
+    confidenceByPage.get(page.pageNumber),
+    page.canvas ? "ocr" : "pdf_text",
+  );
+});
+
+const patientFields = sortedPages.flatMap((page) => {
+  const pageText =
+    (textByPage.get(page.pageNumber) ?? "").trim();
+  const sourceKind =
+    page.canvas ? "ocr" as const : "pdf_text" as const;
+
+  return parsePatientDocumentFields(
+    pageText,
+    page.pageNumber,
+  ).map((suggestion) => ({
+    ...suggestion,
+    sourceKind,
+    sourceDocumentName: file.name,
+    ocrConfidence: confidenceByPage.get(page.pageNumber),
+  }));
+});
 
 return {
   rawText,
   labs,
+  patientFields,
 processedPageCount: pages.length,
     sourcePageCount: originalPages,
     truncated: originalPages > pages.length,
