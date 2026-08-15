@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { normalizeOcrDigits, parseClinicalLabText } from "../src/lab-text-parser.js";
+import {
+  extractClinicalDocumentDate,
+  normalizeOcrDigits,
+  parseClinicalLabText,
+} from "../src/lab-text-parser.js";
 
 describe("pre-visit OCR lab parser", () => {
   it("normalizes Persian and Arabic digits", () => {
@@ -27,9 +31,24 @@ describe("pre-visit OCR lab parser", () => {
     expect(labs.find((x) => x.canonicalKey === "fbs")?.value).toBe(148);
   });
 
-  it("preserves a document date when recognizable", () => {
-    const [lab] = parseClinicalLabText("Date 2026/08/09\nCreatinine 1.2 mg/dL");
-    expect(lab?.observedAt).toBe("2026/08/09");
+  it("preserves and normalizes a Gregorian document date when recognizable", () => {
+    const [lab] = parseClinicalLabText(
+      "Date 2026/08/09\nCreatinine 1.2 mg/dL",
+    );
+    expect(lab?.observedAt).toBe("2026-08-09");
+  });
+
+  it("preserves a Persian-calendar lab date as reported", () => {
+    expect(
+      extractClinicalDocumentDate(
+        "تاریخ آزمایش: ۱۴۰۵/۰۵/۱۰",
+      ),
+    ).toBe("1405/05/10");
+
+    const [lab] = parseClinicalLabText(
+      "تاریخ آزمایش: ۱۴۰۵/۰۵/۱۰\nCreatinine 1.2 mg/dL",
+    );
+    expect(lab?.observedAt).toBe("1405/05/10");
   });
 
   it("does not invent a lab when no numeric value follows the test name", () => {

@@ -173,7 +173,7 @@ export function parsePatientDocumentFields(
   }
 
   const age = text.match(
-    /(?:^|[| ])(?:سن|Age)\s*[:\-]?\s*([0-9]{1,3})(?:\s*(?:سال|years?|yrs?))?/i,
+    /(?:^|[| ])(?:سن(?:\s*\/\s*(?:جنسیت|جنس))?|Age(?:\s*\/\s*(?:Sex|Gender))?)\s*[:\-]?\s*([0-9]{1,3})(?:\s*(?:سال|years?|yrs?))?/i,
   );
   if (age?.[1]) {
     const value = Number(age[1]);

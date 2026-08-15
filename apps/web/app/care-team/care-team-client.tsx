@@ -141,6 +141,31 @@ function labValueInput(lab: PatientHandoffLab) {
   return "";
 }
 
+function isPersianCalendarDate(value?: string) {
+  const normalized = (value ?? "")
+    .trim()
+    .replace(/[۰-۹٠-٩]/g, (digit) => {
+      const persian = "۰۱۲۳۴۵۶۷۸۹";
+      const arabic = "٠١٢٣٤٥٦٧٨٩";
+      const p = persian.indexOf(digit);
+      if (p >= 0) return String(p);
+      const a = arabic.indexOf(digit);
+      return a >= 0 ? String(a) : digit;
+    });
+
+  return /^(?:13|14)\d{2}[/-]\d{1,2}[/-]\d{1,2}$/.test(
+    normalized,
+  );
+}
+
+function labDateInputValue(value?: string) {
+  const text = (value ?? "").trim();
+  if (!text) return "";
+  return isPersianCalendarDate(text)
+    ? text
+    : text.replace(/\//g, "-");
+}
+
 function draftFingerprint(input: {
   patientCodeKind: PatientCodeKind;
   patientCode: string;
@@ -694,12 +719,18 @@ function removeLab(id: string) {
   );
   return [...current, ...additions];
 });
+      const headerOcrFa = result.patientHeaderOcrPages > 0
+        ? ` · ${result.patientHeaderOcrPages} هدر بیمار OCR تصویری`
+        : "";
+      const headerOcrEn = result.patientHeaderOcrPages > 0
+        ? ` · ${result.patientHeaderOcrPages} patient-header OCR`
+        : "";
       const extractionModeFa = result.ocrPages > 0
-        ? (result.embeddedTextPages > 0 ? ` · ${result.embeddedTextPages} صفحه متن PDF + ${result.ocrPages} صفحه OCR` : ` · ${result.ocrPages} صفحه OCR`)
-        : (result.embeddedTextPages > 0 ? ` · متن ساختاری PDF بدون OCR تصویری` : "");
+        ? (result.embeddedTextPages > 0 ? ` · ${result.embeddedTextPages} صفحه متن PDF + ${result.ocrPages} صفحه OCR${headerOcrFa}` : ` · ${result.ocrPages} صفحه OCR${headerOcrFa}`)
+        : (result.embeddedTextPages > 0 ? ` · متن ساختاری PDF${headerOcrFa}` : headerOcrFa);
       const extractionModeEn = result.ocrPages > 0
-        ? (result.embeddedTextPages > 0 ? ` · ${result.embeddedTextPages} PDF text + ${result.ocrPages} OCR page(s)` : ` · ${result.ocrPages} OCR page(s)`)
-        : (result.embeddedTextPages > 0 ? ` · embedded PDF text (no image OCR needed)` : "");
+        ? (result.embeddedTextPages > 0 ? ` · ${result.embeddedTextPages} PDF text + ${result.ocrPages} OCR page(s)${headerOcrEn}` : ` · ${result.ocrPages} OCR page(s)${headerOcrEn}`)
+        : (result.embeddedTextPages > 0 ? ` · embedded PDF text${headerOcrEn}` : headerOcrEn);
       setStatus(fa
         ? `${result.processedPageCount}${result.truncated ? ` از ${result.sourcePageCount}` : ""} صفحه/تصویر پردازش شد${result.truncated ? " (سقف ایمن پیش‌نمایش: ۱۰ صفحه)" : ""}${extractionModeFa}. مقادیر استخراج‌شده تا زمان تأیید شما وارد موتور درمان نمی‌شوند.`
         : `${result.processedPageCount}${result.truncated ? ` of ${result.sourcePageCount}` : ""} page(s)/image processed${result.truncated ? " (safe preview cap: 10 pages)" : ""}${extractionModeEn}. Extracted values remain excluded from the treatment engine until you confirm them.`);
@@ -1045,11 +1076,30 @@ function removeLab(id: string) {
               )}
             />
             <input
-              type="date"
-              value={(lab.observedAt ?? "").slice(0, 10)}
+              type={
+                isPersianCalendarDate(lab.observedAt)
+                  ? "text"
+                  : "date"
+              }
+              value={labDateInputValue(lab.observedAt)}
+              placeholder={
+                fa
+                  ? "مثلاً 1405/05/10"
+                  : "YYYY-MM-DD"
+              }
+              title={
+                isPersianCalendarDate(lab.observedAt)
+                  ? (fa
+                    ? "تاریخ شمسی همان‌طور که روی برگه گزارش شده"
+                    : "Persian-calendar date as reported on the document")
+                  : undefined
+              }
               onChange={(event) => updateLab(
                 lab.id,
-                { observedAt: event.target.value || undefined },
+                {
+                  observedAt:
+                    event.target.value || undefined,
+                },
               )}
             />
             <select

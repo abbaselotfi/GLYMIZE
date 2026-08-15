@@ -72,4 +72,26 @@ describe("patient document OCR field parser", () => {
     );
   });
 
+  it("extracts a synthetic Persian lab header with combined age and sex", () => {
+    const fields = parsePatientDocumentFields(
+      "نام بیمار: بیمار نمونه سن / جنسیت: 60 سال / مرد تاریخ آزمایش: 1405/05/10 شماره پذیرش: LAB-SYNTHETIC-14",
+      1,
+    );
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "full_name",
+          value: "بیمار نمونه",
+          sourcePage: 1,
+        }),
+        expect.objectContaining({
+          field: "reported_age_years",
+          value: 60,
+          sourcePage: 1,
+        }),
+      ]),
+    );
+  });
+
 });

@@ -141,6 +141,8 @@ Laboratory/PDF OCR may also detect explicit patient-header fields such as first 
 - applying a suggestion records source/provenance and human confirmation;
 - raw OCR and structured identity/demographic fields remain protected clinical data;
 - Patient Record v2 should prefer verified date of birth and support multiple identifiers without forcing one to replace another.
+- A long PDF text layer is not evidence that patient-header text is usable. If embedded text is sufficient for laboratory values but patient identity/demographics or the report date cannot be recovered, GLYMIZE must use a rendered visual header OCR fallback without discarding the better embedded-text lab extraction path.
+- The laboratory/report date must be propagated to extracted observations when it is explicitly present. In the pre-v2 handoff, a Persian-calendar source date may be preserved exactly as reported for human review; Patient Record v2 must model the source calendar/provenance explicitly before longitudinal date arithmetic.
 
 ---
 

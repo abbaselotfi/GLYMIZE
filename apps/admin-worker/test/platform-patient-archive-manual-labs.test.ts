@@ -14,6 +14,10 @@ describe("patient archive and manual lab contracts", () => {
     new URL("../../web/app/care-team/care-team-client.tsx", import.meta.url),
     "utf8",
   );
+  const clientOcr = fs.readFileSync(
+    new URL("../../web/lib/client-ocr.ts", import.meta.url),
+    "utf8",
+  );
   const records = fs.readFileSync(
     new URL("../../web/app/records/records-client.tsx", import.meta.url),
     "utf8",
@@ -193,6 +197,18 @@ expect(contracts).toContain(
     expect(careTeamStyles).toContain(".patientOcrReview");
     expect(careTeamStyles).toContain(".patientOcrSuggestionGrid");
     expect(careTeamStyles).toContain(".inlineNewRecord");
+  });
+
+  it("uses visual header OCR when embedded PDF text loses patient metadata or date", () => {
+    expect(clientOcr).toContain("patientHeaderCanvas");
+    expect(clientOcr).toContain("patientMetadataMissing");
+    expect(clientOcr).toContain("createPatientHeaderCanvas");
+    expect(clientOcr).toContain("Reading patient header from rendered page");
+    expect(clientOcr).toContain("fallbackDateByPage");
+    expect(clientOcr).toContain("patientHeaderOcrPages");
+    expect(careTeam).toContain("isPersianCalendarDate");
+    expect(careTeam).toContain("labDateInputValue");
+    expect(careTeam).toContain("مثلاً 1405/05/10");
   });
 
 });

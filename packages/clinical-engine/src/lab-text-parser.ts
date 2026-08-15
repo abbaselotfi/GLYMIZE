@@ -40,11 +40,26 @@ function normalizeLine(value: string) {
     .trim();
 }
 
-function extractDate(text: string) {
-  const match = normalizeLine(text).match(
+export function extractClinicalDocumentDate(text: string) {
+  const normalized = normalizeLine(text);
+
+  const labeled = normalized.match(
+    /(?:تاریخ\s*(?:آزمایش|نمونه|پذیرش)?|Lab\s*Date|Test\s*Date|Collection\s*Date|Specimen\s*Date|Date)\s*[:\-]?\s*((?:13|14|19|20)\d{2})[/-](\d{1,2})[/-](\d{1,2})/i,
+  );
+
+  const fallback = normalized.match(
     /\b((?:13|14|19|20)\d{2})[/-](\d{1,2})[/-](\d{1,2})\b/,
   );
-  return match?.[0];
+
+  const match = labeled ?? fallback;
+  if (!match) return undefined;
+
+  const year = match[1]!;
+  const month = match[2]!.padStart(2, "0");
+  const day = match[3]!.padStart(2, "0");
+  const separator = Number(year) < 1500 ? "/" : "-";
+
+  return `${year}${separator}${month}${separator}${day}`;
 }
 
 function escapeRegex(value: string) {
@@ -318,7 +333,7 @@ export function parseClinicalLabText(
     .map(normalizeLine)
     .filter(Boolean);
 
-  const documentDate = extractDate(rawText);
+  const documentDate = extractClinicalDocumentDate(rawText);
   const labs: PatientHandoffLab[] = [];
   let sourcePage = 1;
 
