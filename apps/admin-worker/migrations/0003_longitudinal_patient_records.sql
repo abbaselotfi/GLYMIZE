@@ -7,6 +7,7 @@
 --   * no plaintext patient identifier requirement for lookup/indexing;
 --   * append-only encounter history instead of overwriting prior visits;
 --   * encrypted full clinical snapshots suitable for later authorized longitudinal display/export;
+--   * searchable observation keys with encrypted observation values for efficient trends;
 --   * separate physician final-prescription records;
 --   * preserve legacy patient_handoffs during staged migration.
 --
@@ -102,6 +103,33 @@ CREATE TABLE IF NOT EXISTS patient_encounter_snapshots (
 );
 CREATE INDEX IF NOT EXISTS patient_encounter_snapshots_patient_idx
   ON patient_encounter_snapshots(patient_id, created_at DESC);
+
+-- Searchable observation index for trends and rule-engine retrieval.
+-- `canonical_key` and timestamps are intentionally indexable; the actual value, unit, lab reference
+-- interval/text, raw test name, abnormal flag, source metadata and OCR/human-verification details
+-- are stored inside the encrypted payload. This allows fast queries such as "all hba1c observations
+-- for patient X" without exposing the clinical value in plaintext storage.
+CREATE TABLE IF NOT EXISTS patient_observations (
+  id TEXT PRIMARY KEY,
+  encounter_id TEXT NOT NULL REFERENCES patient_encounters(id) ON DELETE CASCADE,
+  patient_id TEXT NOT NULL REFERENCES patient_registry(id) ON DELETE CASCADE,
+  practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
+  canonical_key TEXT NOT NULL,
+  observed_at TEXT NOT NULL,
+  verification TEXT NOT NULL DEFAULT 'unverified' CHECK (verification IN ('unverified','confirmed','rejected')),
+  payload_ciphertext TEXT NOT NULL,
+  payload_iv TEXT NOT NULL,
+  payload_auth_tag TEXT NOT NULL,
+  schema_version TEXT NOT NULL DEFAULT 'observation-v1',
+  created_by TEXT NOT NULL REFERENCES runtime_users(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS patient_observations_patient_key_time_idx
+  ON patient_observations(patient_id, canonical_key, observed_at DESC);
+CREATE INDEX IF NOT EXISTS patient_observations_practice_key_time_idx
+  ON patient_observations(practice_id, canonical_key, observed_at DESC);
+CREATE INDEX IF NOT EXISTS patient_observations_encounter_idx
+  ON patient_observations(encounter_id, created_at);
 
 -- Physician's final medication plan is intentionally separate from engine recommendations.
 -- The encrypted payload should retain canonical medication IDs, drug names, strength/form,
