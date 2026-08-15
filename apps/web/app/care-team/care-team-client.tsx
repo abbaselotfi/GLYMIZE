@@ -10,6 +10,7 @@ import type {
   PatientHandoffMedication,
   PatientHandoffStructuredField,
   PatientHandoffVitals,
+  PatientReportedSex,
 } from "@glymize/contracts";
 import {
   LAB_MASTER_REGISTRY,
@@ -176,6 +177,7 @@ function draftFingerprint(input: {
   medications: MedicationDraft[];
   labs: PatientHandoffLab[];
   reportedAgeYears: string;
+  reportedSex: PatientReportedSex | "";
   patientFieldProvenance: PatientHandoffFieldProvenanceMap;
   ocrText: string;
   nurseNotes: string;
@@ -194,6 +196,7 @@ function draftFingerprint(input: {
       medications: input.medications,
       labs: input.labs,
       reportedAgeYears: input.reportedAgeYears,
+      reportedSex: input.reportedSex,
       patientFieldProvenance: Object.entries(
         input.patientFieldProvenance,
       ).sort(([a], [b]) => a.localeCompare(b)),
@@ -215,6 +218,7 @@ function emptyDraftFingerprint() {
     medications: [],
     labs: [],
     reportedAgeYears: "",
+    reportedSex: "",
     patientFieldProvenance: {},
     ocrText: "",
     nurseNotes: "",
@@ -231,6 +235,8 @@ export default function CareTeamClient() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [reportedAgeYears, setReportedAgeYears] = useState("");
+  const [reportedSex, setReportedSex] =
+    useState<PatientReportedSex | "">("");
   const [patientFieldProvenance, setPatientFieldProvenance] =
     useState<PatientHandoffFieldProvenanceMap>({});
   const [patientFieldSuggestions, setPatientFieldSuggestions] =
@@ -261,6 +267,7 @@ export default function CareTeamClient() {
       medications,
       labs,
       reportedAgeYears,
+      reportedSex,
       patientFieldProvenance,
       ocrText,
       nurseNotes,
@@ -310,10 +317,10 @@ export default function CareTeamClient() {
 
   function splitReviewedFullName(value: string) {
     const parts = value.trim().split(/\s+/).filter(Boolean);
-    if (parts.length < 2) return null;
+    if (parts.length !== 2) return null;
     return {
       firstName: parts[0]!,
-      lastName: parts.slice(1).join(" "),
+      lastName: parts[1]!,
     };
   }
 
@@ -350,8 +357,8 @@ export default function CareTeamClient() {
       const split = splitReviewedFullName(textValue);
       if (!split) {
         setStatus(fa
-          ? "نام کامل OCR نیاز به بازبینی دستی دارد."
-          : "The OCR full name needs manual review.");
+          ? "نام کامل OCR چندبخشی یا مبهم است؛ برای جلوگیری از تفکیک اشتباه، نام و نام خانوادگی را پس از مشاهده پیشنهاد دستی وارد کنید."
+          : "The OCR full name is multipart or ambiguous; enter first and last name manually after reviewing the suggestion to avoid a wrong split.");
         return;
       }
       if (firstName.trim() || lastName.trim()) {
@@ -392,6 +399,25 @@ export default function CareTeamClient() {
       return;
     }
 
+    if (suggestion.field === "reported_sex") {
+      const nextSex: PatientReportedSex | "" =
+        textValue === "male" || textValue === "female"
+          ? textValue
+          : "";
+      if (!nextSex) return;
+
+      if (reportedSex && reportedSex !== nextSex) {
+        setStatus(fa
+          ? "جنس گزارش‌شده فعلی حفظ شد؛ مقدار OCR خودکار جایگزین نشد."
+          : "Existing reported sex was preserved; OCR did not overwrite it.");
+        return;
+      }
+
+      setReportedSex(nextSex);
+      setSuggestionProvenance("reportedSex", suggestion);
+      return;
+    }
+
     if (suggestion.field === "weight_kg") {
       if (vitals.weightKg.trim() && vitals.weightKg.trim() !== textValue) {
         setStatus(fa
@@ -425,10 +451,25 @@ export default function CareTeamClient() {
       full_name: fa ? "نام کامل" : "Full name",
       national_id: fa ? "کد ملی" : "National ID",
       reported_age_years: fa ? "سن گزارش‌شده" : "Reported age",
+      reported_sex: fa ? "جنس گزارش‌شده" : "Reported sex",
       weight_kg: fa ? "وزن" : "Weight",
       height_cm: fa ? "قد" : "Height",
     };
     return labels[suggestion.field];
+  }
+
+  function patientSuggestionValue(
+    suggestion: OcrPatientFieldSuggestion,
+  ) {
+    if (suggestion.field === "reported_sex") {
+      if (suggestion.value === "male") {
+        return fa ? "مرد" : "Male";
+      }
+      if (suggestion.value === "female") {
+        return fa ? "زن" : "Female";
+      }
+    }
+    return String(suggestion.value);
   }
 
   function toggleFlag(key: keyof PatientHandoffClinicalFlags) {
@@ -535,6 +576,8 @@ function removeLab(id: string) {
       record.demographics?.reportedAgeYears !== undefined
         ? String(record.demographics.reportedAgeYears)
         : "";
+    const nextReportedSex =
+      record.demographics?.reportedSex ?? "";
     const nextPatientFieldProvenance =
       record.patientFieldProvenance ?? {};
     const nextFlags = record.clinicalFlags ?? {};
@@ -555,6 +598,7 @@ function removeLab(id: string) {
     setFirstName(record.firstName ?? "");
     setLastName(record.lastName ?? "");
     setReportedAgeYears(nextReportedAgeYears);
+    setReportedSex(nextReportedSex);
     setPatientFieldProvenance(nextPatientFieldProvenance);
     setPatientFieldSuggestions([]);
     setVitals(nextVitals);
@@ -575,6 +619,7 @@ function removeLab(id: string) {
       medications: nextMedications,
       labs: nextLabs,
       reportedAgeYears: nextReportedAgeYears,
+      reportedSex: nextReportedSex,
       patientFieldProvenance: nextPatientFieldProvenance,
       ocrText: nextOcrText,
       nurseNotes: nextNurseNotes,
@@ -628,6 +673,7 @@ function removeLab(id: string) {
     setFirstName("");
     setLastName("");
     setReportedAgeYears("");
+    setReportedSex("");
     setPatientFieldProvenance({});
     setPatientFieldSuggestions([]);
     setVitals(EMPTY_VITALS);
@@ -789,6 +835,7 @@ function removeLab(id: string) {
         status: "ready_for_physician",
         demographics: {
           reportedAgeYears: numberOrUndefined(reportedAgeYears),
+          reportedSex: reportedSex || undefined,
         },
         patientFieldProvenance,
         vitals: mappedVitals,
@@ -978,7 +1025,7 @@ function removeLab(id: string) {
                   <div>
                     <span>{patientSuggestionLabel(suggestion)}</span>
                     <strong>
-                      {String(suggestion.value)}
+                      {patientSuggestionValue(suggestion)}
                       {suggestion.field === "reported_age_years"
                         ? (fa ? " سال" : " years")
                         : suggestion.field === "weight_kg"
@@ -1172,7 +1219,7 @@ function removeLab(id: string) {
 
       <section className={styles.card}>
         <div className={styles.sectionTitle}><b>3</b><div><h2>{fa ? "اطلاعات بالینی پایه" : "Basic clinical data"}</h2><p>{fa ? "این داده‌ها پس از اعمال توسط پزشک، فرم Type 2 را prefill می‌کنند." : "After physician review/apply, these values prefill the Type 2 form."}</p></div></div>
-        <div className={styles.grid6}>
+        <div className={styles.gridClinical}>
           <label>
             <span>{fa ? "سن گزارش‌شده (سال)" : "Reported age (years)"}</span>
             <input
@@ -1183,6 +1230,24 @@ function removeLab(id: string) {
                 clearPatientFieldProvenance("reportedAgeYears");
               }}
             />
+          </label>
+          <label>
+            <span>{fa ? "جنس گزارش‌شده" : "Reported sex"}</span>
+            <select
+              value={reportedSex}
+              onChange={(event) => {
+                setReportedSex(
+                  event.target.value as PatientReportedSex | "",
+                );
+                clearPatientFieldProvenance("reportedSex");
+              }}
+            >
+              <option value="">
+                {fa ? "نامشخص / ثبت نشده" : "Unknown / not recorded"}
+              </option>
+              <option value="male">{fa ? "مرد" : "Male"}</option>
+              <option value="female">{fa ? "زن" : "Female"}</option>
+            </select>
           </label>
           <label><span>{fa ? "وزن kg" : "Weight kg"}</span><input inputMode="decimal" value={vitals.weightKg} onChange={(e) => updateVital("weightKg", e.target.value)} /></label>
           <label><span>{fa ? "قد cm" : "Height cm"}</span><input inputMode="decimal" value={vitals.heightCm} onChange={(e) => updateVital("heightCm", e.target.value)} /></label>

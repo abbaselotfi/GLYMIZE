@@ -1,3 +1,4 @@
+import type { PatientReportedSex } from "@glymize/contracts";
 import { normalizeOcrDigits } from "./lab-text-parser.js";
 
 export type PatientDocumentField =
@@ -6,6 +7,7 @@ export type PatientDocumentField =
   | "full_name"
   | "national_id"
   | "reported_age_years"
+  | "reported_sex"
   | "weight_kg"
   | "height_cm";
 
@@ -17,8 +19,13 @@ export interface PatientDocumentFieldSuggestion {
   sourcePage?: number;
 }
 
-function normalizeDocumentText(raw: string) {
-  return normalizeOcrDigits(raw)
+export function normalizePatientDocumentText(raw: string) {
+  return normalizeOcrDigits(raw.normalize("NFKC"))
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+    .replace(/\u0640+/g, "")
+    .replace(/[يى]/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/[ۀة]/g, "ه")
     .replace(/[：]/g, ":")
     .replace(/[–—]/g, "-")
     .replace(/[ \t]+/g, " ")
@@ -51,9 +58,69 @@ function validIranianNationalId(value: string) {
 
 function cleanName(value: string) {
   return value
-    .replace(/[|,:;]+$/g, "")
+    .replace(/[|,:;،]+$/g, "")
+    .replace(
+      /^(?:(?:سرکار\s+خانم|آقای|آقا|خانم)\s+)+/i,
+      "",
+    )
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function reversedPatientFullName(text: string) {
+  const marker = /نام\s*بیمار\s*[:\-]?/i.exec(text);
+  if (!marker || marker.index === undefined) return undefined;
+
+  const before = text.slice(
+    Math.max(0, marker.index - 120),
+    marker.index,
+  );
+  const segment = (
+    before.split(/[|,:;،0-9]/).pop() ?? ""
+  ).trim();
+  const value = cleanName(segment);
+  const words = value.split(/\s+/).filter(Boolean);
+
+  if (
+    !value ||
+    value.length > 80 ||
+    words.length < 2 ||
+    words.length > 6 ||
+    !/^[آ-یA-Za-z][آ-یA-Za-z‌ .'\-]+$/.test(value)
+  ) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function normalizeReportedSex(
+  value: string,
+): PatientReportedSex | undefined {
+  const normalized = normalizePatientDocumentText(value)
+    .toLowerCase()
+    .trim();
+
+  if (
+    normalized === "مرد" ||
+    normalized === "مذکر" ||
+    normalized === "male" ||
+    normalized === "m"
+  ) {
+    return "male";
+  }
+
+  if (
+    normalized === "زن" ||
+    normalized === "مونث" ||
+    normalized === "مؤنث" ||
+    normalized === "female" ||
+    normalized === "f"
+  ) {
+    return "female";
+  }
+
+  return undefined;
 }
 
 function pushUnique(
@@ -98,7 +165,7 @@ export function parsePatientDocumentFields(
   rawText: string,
   sourcePage?: number,
 ): PatientDocumentFieldSuggestion[] {
-  const text = normalizeDocumentText(rawText);
+  const text = normalizePatientDocumentText(rawText);
   const output: PatientDocumentFieldSuggestion[] = [];
 
   captureName(
@@ -148,12 +215,23 @@ export function parsePatientDocumentFields(
         item.field === "last_name",
     )
   ) {
+    const reversedName = reversedPatientFullName(text);
+    if (reversedName) {
+      pushUnique(output, {
+        field: "full_name",
+        value: reversedName,
+        rawLabel: "Patient name (RTL text order)",
+        parserConfidence: 0.74,
+        sourcePage,
+      });
+    }
+
     captureName(
       text,
-      /(?:^|[| ])(?:نام\s*و\s*نام\s*خانوادگی|نام\s*بیمار|Patient\s*Name|Full\s*Name)\s*[:\-]?\s*([آ-یA-Za-z][آ-یA-Za-z‌A-Za-z .'\-]{2,75}?)(?=\s+(?:کد\s*ملی|سن|وزن|قد)(?=\s|:|\-|$)|\s+(?:National\s*(?:ID|Code)|Age|Weight|Height)\b|\s*\||$)/i,
+      /(?:^|[| ])(?:نام\s*و\s*نام\s*خانوادگی|نام\s*بیمار|Patient\s*Name|Full\s*Name)\s*[:\-]?\s*([آ-یA-Za-z][آ-یA-Za-z‌A-Za-z .'\-]{2,75}?)(?=\s+(?:کد\s*ملی|سن(?:\s*\/\s*(?:جنسیت|جنس))?|جنس(?:یت)?|وزن|قد)(?=\s|:|\/|\-|$)|\s+(?:National\s*(?:ID|Code)|Age(?:\s*\/\s*(?:Sex|Gender))?|Sex|Gender|Weight|Height)\b|\s*\||$)/i,
       "full_name",
       "Patient name",
-      0.76,
+      0.78,
       output,
       sourcePage,
     );
@@ -186,6 +264,25 @@ export function parsePatientDocumentFields(
         sourcePage,
       });
     }
+  }
+
+  const combinedSex = text.match(
+    /(?:^|[| ])(?:سن(?:\s*\/\s*(?:جنسیت|جنس))?|Age(?:\s*\/\s*(?:Sex|Gender))?)\s*[:\-]?\s*[0-9]{1,3}(?:\s*(?:سال|years?|yrs?))?\s*\/\s*(مرد|زن|مذکر|مونث|مؤنث|male|female|m|f)(?=\s|[|,:;،\-]|$)/i,
+  );
+  const standaloneSex = text.match(
+    /(?:^|[| ])(?:جنس(?:یت)?|Sex|Gender)\s*[:\-]?\s*(مرد|زن|مذکر|مونث|مؤنث|male|female|m|f)(?=\s|[|,:;،\-]|$)/i,
+  );
+  const reportedSex = normalizeReportedSex(
+    combinedSex?.[1] ?? standaloneSex?.[1] ?? "",
+  );
+  if (reportedSex) {
+    pushUnique(output, {
+      field: "reported_sex",
+      value: reportedSex,
+      rawLabel: "Sex",
+      parserConfidence: 0.92,
+      sourcePage,
+    });
   }
 
   const weight = text.match(

@@ -38,6 +38,10 @@ describe("patient archive and manual lab contracts", () => {
     new URL("../../../packages/clinical-engine/src/lab-text-parser.ts", import.meta.url),
     "utf8",
   );
+  const patientParser = fs.readFileSync(
+    new URL("../../../packages/clinical-engine/src/patient-document-parser.ts", import.meta.url),
+    "utf8",
+  );
   const profile = fs.readFileSync(
     new URL("../../web/app/profile/page.tsx", import.meta.url),
     "utf8",
@@ -209,6 +213,20 @@ expect(contracts).toContain(
     expect(careTeam).toContain("isPersianCalendarDate");
     expect(careTeam).toContain("labDateInputValue");
     expect(careTeam).toContain("مثلاً 1405/05/10");
+  });
+
+  it("normalizes presentation-form Persian patient headers and carries reported sex safely", () => {
+    expect(patientParser).toContain('raw.normalize("NFKC")');
+    expect(patientParser).toContain('.replace(/\\u0640+/g, "")');
+    expect(patientParser).toContain("reversedPatientFullName");
+    expect(patientParser).toContain('"reported_sex"');
+    expect(patientParser).toContain("normalizeReportedSex");
+    expect(contracts).toContain("PatientReportedSex");
+    expect(contracts).toContain('reportedSex?: PatientReportedSex');
+    expect(careTeam).toContain("reportedSex");
+    expect(careTeam).toContain("patientSuggestionValue");
+    expect(careTeam).toContain("جنس گزارش‌شده");
+    expect(careTeamStyles).toContain(".gridClinical");
   });
 
 });

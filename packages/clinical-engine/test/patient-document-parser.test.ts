@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parsePatientDocumentFields } from "../src/patient-document-parser";
+import {
+  normalizePatientDocumentText,
+  parsePatientDocumentFields,
+} from "../src/patient-document-parser";
 
 describe("patient document OCR field parser", () => {
   it("extracts explicit Persian identity and basic measurements from a flattened lab header", () => {
@@ -88,6 +91,42 @@ describe("patient document OCR field parser", () => {
         expect.objectContaining({
           field: "reported_age_years",
           value: 60,
+          sourcePage: 1,
+        }),
+        expect.objectContaining({
+          field: "reported_sex",
+          value: "male",
+          sourcePage: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("normalizes Arabic Presentation Forms and RTL value-before-label patient headers", () => {
+    const raw =
+      "ﺁﻗﺎﻱ ﻋﻠﻲ ﺭﺿﺎﻳﻲ ﻧﺎﻡ ﺑﻴﻤﺎﺭ : ﺱــﻥ/ﺟﻨﺲ :73 ﺳﺎﻝ / ﻣﺮﺩ 1405/04/24";
+
+    expect(normalizePatientDocumentText(raw)).toContain(
+      "آقای علی رضایی نام بیمار : سن/جنس :73 سال / مرد",
+    );
+
+    const fields = parsePatientDocumentFields(raw, 1);
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "full_name",
+          value: "علی رضایی",
+          sourcePage: 1,
+        }),
+        expect.objectContaining({
+          field: "reported_age_years",
+          value: 73,
+          sourcePage: 1,
+        }),
+        expect.objectContaining({
+          field: "reported_sex",
+          value: "male",
           sourcePage: 1,
         }),
       ]),

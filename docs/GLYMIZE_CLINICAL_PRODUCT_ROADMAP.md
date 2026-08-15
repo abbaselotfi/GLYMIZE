@@ -133,7 +133,7 @@ Privacy design:
 
 Date of birth is preferred over storing a static age. Age is derived at encounter time. When a source document reports only age, GLYMIZE may preserve it explicitly as encounter-level `reportedAgeYears`; it must not be treated as a permanent patient-master age.
 
-Laboratory/PDF OCR may also detect explicit patient-header fields such as first name, last name, national ID, reported age, height and weight. These detections are **review suggestions**, not authoritative identity or clinical data:
+Laboratory/PDF OCR may also detect explicit patient-header fields such as first name, last name/full name, national ID, reported age, reported sex, height and weight. These detections are **review suggestions**, not authoritative identity or clinical data:
 
 - never overwrite an existing user-entered value automatically;
 - national ID suggestions require checksum validation before being offered;
@@ -141,6 +141,8 @@ Laboratory/PDF OCR may also detect explicit patient-header fields such as first 
 - applying a suggestion records source/provenance and human confirmation;
 - raw OCR and structured identity/demographic fields remain protected clinical data;
 - Patient Record v2 should prefer verified date of birth and support multiple identifiers without forcing one to replace another.
+- Persian patient-header parsing must normalize Unicode Arabic Presentation Forms, Arabic/Persian Yeh/Kaf variants, tatweel and bidi controls before semantic matching. The parser must tolerate both logical `label: value` order and RTL PDF text layers that expose `value label:` order.
+- Reported sex from a source document is encounter-level source data (`male`/`female` when explicit), not an inferred gender identity and not a substitute for a verified longitudinal demographic field.
 - A long PDF text layer is not evidence that patient-header text is usable. If embedded text is sufficient for laboratory values but patient identity/demographics or the report date cannot be recovered, GLYMIZE must use a rendered visual header OCR fallback without discarding the better embedded-text lab extraction path.
 - The laboratory/report date must be propagated to extracted observations when it is explicitly present. In the pre-v2 handoff, a Persian-calendar source date may be preserved exactly as reported for human review; Patient Record v2 must model the source calendar/provenance explicitly before longitudinal date arithmetic.
 

@@ -3,6 +3,7 @@ export type PatientHandoffStatus = "draft" | "ready_for_physician" | "reviewed";
 export type VerificationState = "unverified" | "confirmed" | "rejected";
 export type LabInterpretation = "N" | "H" | "L" | "HH" | "LL" | "A";
 export type LabObservationSource = "manual" | "ocr" | "pdf_text" | "import";
+export type PatientReportedSex = "male" | "female";
 
 export interface PatientHandoffMedication {
   genericMedicationId?: string;
@@ -52,6 +53,11 @@ export interface PatientHandoffDemographics {
    * Patient Record v2 should prefer a verified date of birth when available.
    */
   reportedAgeYears?: number;
+  /**
+   * Sex explicitly reported on an encounter/source document.
+   * This is not a substitute for a verified longitudinal demographic field.
+   */
+  reportedSex?: PatientReportedSex;
 }
 
 export type PatientHandoffStructuredField =
@@ -59,6 +65,7 @@ export type PatientHandoffStructuredField =
   | "lastName"
   | "nationalId"
   | "reportedAgeYears"
+  | "reportedSex"
   | "weightKg"
   | "heightCm";
 
