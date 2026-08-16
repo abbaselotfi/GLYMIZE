@@ -28,6 +28,7 @@ Core safety rule: **GLYMIZE may store a broad clinical dataset, but no datum may
 - RC acceptance before production.
 - No silent production Worker deployment.
 - No merge of the current release PR until acceptance gates are complete.
+- Applied database migrations are immutable release artifacts. After a migration has run on an RC/production database it is never edited in place; later schema changes use a new numbered migration.
 - All clinical rules must be versioned and source-bound.
 - Clinical recommendation, physician decision and physician override must be separate concepts.
 - Patient identifiers must not be exposed in analytics/research exports.
@@ -227,6 +228,14 @@ Support two encrypted note scopes:
 - **Encounter note** — note specific to one visit.
 
 Physician note edits are revisioned/append-only; a newer revision supersedes the prior display version without erasing history. Notes record author and timestamp. Default visibility is physician-only; sharing with Care Team, if enabled, is an explicit visibility decision and authorization check.
+
+### 4.6 Patient Record v2 rollout safety
+
+The isolated RC D1 migration rehearsal for `0001`–`0003` is complete. Migration `0003` is now frozen: future schema changes require `0004+`; Production has not received Patient Record v2.
+
+Runtime rollout remains additive until encounter draft revision semantics are complete. The current Care Team handoff UI must not be switched to a create-only v2 encounter endpoint in a way that turns repeated saves of one draft into duplicate visits. Before UI cutover, editing a prepared visit must append/revise snapshots for the same `encounter_id` under optimistic concurrency, while `Start new visit` must always create a new `encounter_id`.
+
+Legacy handoffs remain compatibility data during this bridge. Because their raw identifier was intentionally not retained outside encrypted handoff input, a legacy handoff must never be silently linked/promoted by guessing. Any future promotion requires the operator-supplied raw identifier to be normalized, HMAC-verified against that legacy row, and explicitly confirmed.
 
 
 Care-team workflow for a returning patient:
@@ -639,13 +648,14 @@ Trend presentation contract:
 - medication starts/stops/dose changes and relevant signed-plan events may be shown as timeline annotations without implying causality;
 - the expanded chart preserves exact measurement dates and allows opening the source encounter.
 
-Patient Workspace presentation reuses physician layout preferences:
+Patient Workspace reuses the existing physician `layoutPreset`; GLYMIZE must not create a second competing workspace-preference system:
 
-- `focus` — latest status, `What changed`, pinned trends, current medication reconciliation and pending orders;
-- `standard` — adds recent encounter timeline and broader trend cards;
-- `comprehensive` — full encounter/history/order/trend detail.
+- `auto` — responsive/default presentation selected from available space and workflow context;
+- `focused_workflow` — focus-style longitudinal view emphasizing latest status, `What changed`, pinned trends, medication reconciliation and pending orders;
+- `compact_cards` — condensed cards for rapid review with details progressively disclosed;
+- `command_center` — broad longitudinal workspace with encounter/history/order/trend detail visible earlier.
 
-Layout mode changes **presentation only**. It must never alter stored data, rule inputs, clinical thresholds or engine output.
+The existing preset changes **presentation only**. It must never alter stored data, rule inputs, clinical thresholds or engine output.
 
 The longitudinal view should distinguish ordered investigations from completed results and surface pending physician orders to authorized Care Team users.
 
@@ -839,16 +849,18 @@ Specialty-specific logic belongs in versioned domain rule packs, not duplicated 
 
 ### P1 — Longitudinal patient foundation
 
-- [ ] Complete Patient Record v2 schema/contracts before any migration is applied.
-- [ ] Multi-identifier patient master with national-ID-default smart lookup and practice file number as an alternate identifier.
+- [x] Complete Patient Record v2 schema/contracts before runtime rollout.
+- [x] Rehearse migrations `0001`–`0003` on an isolated RC D1 with Production verified unchanged; freeze applied migration `0003`.
+- [ ] Multi-identifier patient master with national-ID-default smart lookup, later identifier attachment, and practice file number as an alternate identifier.
 - [ ] Practice-scoped monotonic file-number allocator/high-water mark with explicit legacy initialization and atomic allocation.
 - [ ] Append-only encounters/snapshots: Patient ≠ Encounter and every visit is independently dated.
 - [ ] Full lab observation storage model.
+- [ ] Add optimistic draft/snapshot revision semantics before Care Team UI cutover so repeated saves cannot create duplicate encounters.
 - [ ] Medication reconciliation/history separated from post-visit signed orders.
 - [ ] Revisioned encrypted physician notes at patient and encounter scope.
 - [ ] Patient Workspace: header, expandable encounter timeline, pending/completed orders.
 - [ ] Verified/compatible longitudinal mini/expanded trend charts and deterministic `What changed since last visit`.
-- [ ] Apply/migrate Patient Record v2 schema only after RC migration rehearsal and rollback gate.
+- [ ] Apply Patient Record v2 to Production only after runtime RC/browser acceptance and explicit migration/rollback gate.
 
 ### P2 — Data-entry quality
 
@@ -859,7 +871,7 @@ Specialty-specific logic belongs in versioned domain rule packs, not duplicated 
 - [ ] Same component in physician and assistant workflows.
 - [ ] Profile-photo preview and provenance preservation.
 - [ ] Focused Workflow patient step with skip/care-team alternatives.
-- [ ] Reuse physician `focus` / `standard` / `comprehensive` presentation preferences in Patient Workspace without changing clinical logic.
+- [ ] Reuse the existing physician `auto` / `focused_workflow` / `compact_cards` / `command_center` layout preset in Patient Workspace without creating a second preference system or changing clinical logic.
 
 ### P3 — Integrated clinical intelligence
 

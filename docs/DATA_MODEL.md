@@ -114,6 +114,12 @@ AuditEvent --> any versioned aggregate
 
 Patient Workspace یک read model است، نه aggregate جدیدِ دارای حقیقت موازی. header از Patient/Demographics/Identifiers، timeline از Encounterها، داروی قبل ویزیت از medication reconciliation، تصمیم بعد ویزیت از signed Final Plan/Orders، و trend از `patient_observations` ساخته می‌شود. برای trend، زمان observation و encounter جدا می‌ماند، unit/specimen compatibility رعایت می‌شود و دادهٔ unverified به‌صورت trusted point نمایش داده نمی‌شود.
 
+Migration `0003_longitudinal_patient_records.sql` پس از rehearsal موفق روی D1 ایزولهٔ RC یک artifact اعمال‌شده و frozen است؛ تغییر همین فایل ممنوع است و هر schema delta جدید باید `0004+` باشد. این RC rehearsal به‌معنای مجوز migration Production نیست.
+
+در bridge runtime، ایجاد Patient/Identifier/Encounter باید practice-scoped و fail-closed باشد. یک identifier جدید می‌تواند بعداً به همان `patient_id` متصل شود (برای مثال افزودن کد ملی به بیماری که ابتدا فقط شماره پرونده داشته)، اما duplicate identifier در Patient Record v2 یا legacy handoff باید conflict بدهد. legacy handoff بدون raw identifier قابل promotion حدسی نیست؛ promotion آینده باید raw identifier ورودی را با HMAC همان legacy row verify کند.
+
+برای draft encounter، create و revise دو intent جدا هستند. create فقط برای `Start new visit` است؛ save مجدد همان ویزیت باید revision جدید snapshot را برای همان `encounter_id` با optimistic concurrency اضافه کند. این constraint قبل از cutover رابط Care Team الزامی است.
+
 
 در Care Team، مقادیر هویتی/پایه‌ای که از OCR یا متن PDF به دست می‌آیند ابتدا suggestion هستند. اعمال انسانی آن‌ها باید provenance شامل source kind، سند/صفحه، confidence موجود و وضعیت verification را حفظ کند. نام، نام خانوادگی/نام کامل، کد ملی، سن گزارش‌شده در encounter، جنس گزارش‌شده، قد و وزن نباید صرفاً به دلیل OCR بودن خودکار روی مقدار موجود نوشته شوند. برای هویت طولی، تاریخ تولد تأییدشده بر سن ثابت ارجح است و کد ملی/شماره پرونده در مدل نهایی شناسه‌های متعدد یک Patient هستند، نه دو Patient جدا.
 

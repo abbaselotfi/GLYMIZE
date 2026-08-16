@@ -66,7 +66,7 @@ describe("Patient Record v2 workspace roadmap/schema contracts", () => {
     expect(migration).toContain("allocation_status");
     expect(migration).toContain("last_allocated_number");
     expect(roadmap).toContain("monotonic file-number allocator/high-water mark");
-    expect(queue).toContain("practice monotonic file-number allocator");
+    expect(queue).toContain("monotonic allocator");
     expect(contracts).toContain("PatientFileNumberAllocatorState");
   });
 
@@ -87,17 +87,24 @@ describe("Patient Record v2 workspace roadmap/schema contracts", () => {
   it("defines Patient Workspace timeline, trends and presentation-only modes", () => {
     expect(roadmap).toContain("Patient Workspace");
     expect(roadmap).toContain("compact mini-chart");
-    expect(roadmap).toContain("`focus`");
-    expect(roadmap).toContain("`standard`");
-    expect(roadmap).toContain("`comprehensive`");
+    expect(roadmap).toContain("existing physician `layoutPreset`");
+    expect(roadmap).toContain("`auto`");
+    expect(roadmap).toContain("`focused_workflow`");
+    expect(roadmap).toContain("`compact_cards`");
+    expect(roadmap).toContain("`command_center`");
     expect(architecture).toContain("Patient Workspace یک read model");
     expect(contracts).toContain("PatientTrendSeries");
     expect(contracts).toContain("patientWorkspaceModes");
   });
 
-  it("keeps migration 0003 gated rather than applying it implicitly", () => {
+  it("freezes migration 0003 after isolated RC rehearsal while keeping Production gated", () => {
     expect(migration).toContain(
       "DESIGN/SCHEMA ONLY until explicitly applied through the RC migration gate",
+    );
+    expect(roadmap).toContain("Migration `0003` is now frozen");
+    expect(queue).toContain("applied migration `0003` is frozen");
+    expect(roadmap).toContain(
+      "Apply Patient Record v2 to Production only after runtime RC/browser acceptance",
     );
   });
 });

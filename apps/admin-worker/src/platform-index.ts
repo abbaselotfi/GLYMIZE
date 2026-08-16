@@ -8,6 +8,7 @@ import {
   buildSequentialFileCodeCandidates,
   resolvePatientHandoffWriteMode,
 } from "./patient-handoff-code-policy";
+import { patientRecordV2Route } from "./platform-patient-record-v2";
 import { createCredential, validCredentialValue } from "./platform-v3-credential";
 import {
   defaultAssistantPermissions,
@@ -2094,6 +2095,18 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
   const memberMatch=url.pathname.match(/^\/v1\/team\/members\/([^/]+)$/);
   if (memberMatch && request.method==="PATCH") return updateTeamMember(request,env,auth,decodeURIComponent(memberMatch[1]!));
   if (memberMatch && request.method==="DELETE") return removeTeamMember(request,env,auth,decodeURIComponent(memberMatch[1]!));
+
+  if (url.pathname.startsWith("/v1/patients")) {
+    const patientRecord=await patientRecordV2Route(request,{
+      database:db(env),
+      clinicalSecret:clinicalSecret(env),
+      user:auth.user,
+      respond:(body,status=200)=>json(request,env,body,status),
+      audit:(action,targetType,targetId,meta)=>
+        audit(env,auth.user.id,auth.user.practiceId,action,targetType,targetId,meta),
+    });
+    if (patientRecord) return patientRecord;
+  }
 
   if (url.pathname==="/v1/patient-handoff/upsert" && request.method==="POST") return upsertHandoff(request,env,auth);
   if (url.pathname==="/v1/patient-handoff/code-status" && request.method==="POST") return codeStatusHandoff(request,env,auth);

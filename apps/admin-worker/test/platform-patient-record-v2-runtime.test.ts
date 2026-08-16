@@ -1,0 +1,288 @@
+import fs from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const runtime = fs.readFileSync(
+  new URL("../src/platform-patient-record-v2.ts", import.meta.url),
+  "utf8",
+);
+const platform = fs.readFileSync(
+  new URL("../src/platform-index.ts", import.meta.url),
+  "utf8",
+);
+const roadmap = fs.readFileSync(
+  new URL(
+    "../../../docs/GLYMIZE_CLINICAL_PRODUCT_ROADMAP.md",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const queue = fs.readFileSync(
+  new URL(
+    "../../../docs/IMPLEMENTATION_QUEUE_2026-08-15.md",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const client = fs.readFileSync(
+  new URL("../../web/lib/patient-record-v2-client.ts", import.meta.url),
+  "utf8",
+);
+const runtimeSecurity = fs.readFileSync(
+  new URL("../src/runtime-security.ts", import.meta.url),
+  "utf8",
+);
+const handoffClient = fs.readFileSync(
+  new URL("../../web/lib/patient-handoff-client.ts", import.meta.url),
+  "utf8",
+);
+
+type PrepareBind = {
+  sql: string;
+  bindCount: number;
+};
+
+function topLevelArgumentCount(source: string) {
+  let depth = 0;
+  let count = 0;
+  let segmentStart = 0;
+  let quote = "";
+  let escaped = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]!;
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = "";
+      }
+      continue;
+    }
+
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "(" || char === "[" || char === "{") {
+      depth += 1;
+      continue;
+    }
+    if (char === ")" || char === "]" || char === "}") {
+      depth -= 1;
+      continue;
+    }
+    if (char === "," && depth === 0) {
+      if (source.slice(segmentStart, index).trim()) count += 1;
+      segmentStart = index + 1;
+    }
+  }
+
+  if (source.slice(segmentStart).trim()) count += 1;
+  return count;
+}
+
+function scanPrepareBindCalls(source: string): PrepareBind[] {
+  const marker = "context.database.prepare(";
+  const calls: PrepareBind[] = [];
+  let cursor = 0;
+
+  while (true) {
+    const start = source.indexOf(marker, cursor);
+    if (start < 0) break;
+
+    let index = start + marker.length;
+    while (/\s/.test(source[index] ?? "")) index += 1;
+    if (source[index] !== "`") {
+      throw new Error("Patient Record v2 prepare() must use a static template");
+    }
+
+    index += 1;
+    const sqlStart = index;
+    while (index < source.length) {
+      if (source[index] === "`" && source[index - 1] !== "\\") break;
+      index += 1;
+    }
+    const sql = source.slice(sqlStart, index);
+    if (sql.includes("${")) {
+      throw new Error("Dynamic SQL interpolation is not allowed");
+    }
+
+    const bindMarker = ".bind(";
+    const bindStart = source.indexOf(bindMarker, index);
+    if (bindStart < 0 || bindStart - index > 120) {
+      throw new Error("prepare() without a nearby bind()");
+    }
+
+    let argIndex = bindStart + bindMarker.length;
+    const argsStart = argIndex;
+    let depth = 1;
+    let quote = "";
+    let escaped = false;
+
+    while (argIndex < source.length && depth > 0) {
+      const char = source[argIndex]!;
+      if (quote) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === "\\") {
+          escaped = true;
+        } else if (char === quote) {
+          quote = "";
+        }
+      } else if (char === "'" || char === '"' || char === "`") {
+        quote = char;
+      } else if (char === "(" || char === "[" || char === "{") {
+        depth += 1;
+      } else if (char === ")" || char === "]" || char === "}") {
+        depth -= 1;
+      }
+      argIndex += 1;
+    }
+
+    const args = source.slice(argsStart, argIndex - 1);
+    calls.push({
+      sql,
+      bindCount: topLevelArgumentCount(args),
+    });
+    cursor = argIndex;
+  }
+
+  return calls;
+}
+
+describe("Patient Record v2 runtime vertical slice", () => {
+  it("uses one shared patient-code normalizer/checksum implementation", () => {
+    expect(runtimeSecurity).toContain('from "@glymize/contracts"');
+    expect(handoffClient).toContain('from "@glymize/contracts"');
+    expect(runtimeSecurity).not.toContain("const PERSIAN_DIGITS");
+    expect(handoffClient).not.toContain("const PERSIAN_DIGITS");
+  });
+
+  it("wires one authenticated v2 route without replacing the legacy handoff path", () => {
+    expect(platform).toContain(
+      'import { patientRecordV2Route } from "./platform-patient-record-v2"',
+    );
+    expect(platform).toContain('url.pathname.startsWith("/v1/patients")');
+    expect(platform).toContain("patientRecordV2Route(request");
+    expect(platform).toContain('"/v1/patient-handoff/upsert"');
+    expect(platform).toContain('"/v1/patient-handoff/lookup"');
+  });
+
+  it("exposes the bounded Patient Record v2 foundation endpoints", () => {
+    for (const marker of [
+      '"/v1/patients/file-number-allocator"',
+      '"/v1/patients/file-number-allocator/initialize"',
+      '"/v1/patients/resolve"',
+      '"/v1/patients"',
+      "/identifiers",
+      "/encounters",
+      "/workspace",
+    ]) {
+      expect(runtime).toContain(marker);
+    }
+    expect(runtime).not.toContain("patient_handoff_legacy_links");
+  });
+
+  it("keeps one typed web client aligned with the new runtime endpoints", () => {
+    for (const marker of [
+      "getPatientFileNumberAllocator",
+      "initializePatientFileNumberAllocator",
+      "resolvePatient",
+      "createPatient",
+      "attachPatientIdentifier",
+      "createPatientEncounter",
+      "getPatientWorkspace",
+    ]) {
+      expect(client).toContain(marker);
+    }
+    expect(client).toContain('"/v1/patients/resolve"');
+    expect(client).toContain('"/v1/patients"');
+  });
+
+  it("keeps patient operations practice-scoped and legacy promotion explicit", () => {
+    expect(runtime).toContain("context.user.practiceId");
+    expect(runtime).toContain("legacyHandoff");
+    expect(runtime).toContain('"legacy_handoff" as const');
+    expect(runtime).not.toContain("silentLegacy");
+    expect(runtime).not.toContain("autoMigrateLegacy");
+  });
+
+  it("uses a monotonic allocator with server-side conflict and concurrency guards", () => {
+    expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_UNINITIALIZED");
+    expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_OUT_OF_SYNC");
+    expect(runtime).toContain("FILE_NUMBER_ALLOCATION_RETRY_REQUIRED");
+    expect(runtime).toContain("context.database.batch(statements)");
+    expect(runtime).toContain(
+      "AND CAST(last_allocated_number AS TEXT)=?",
+    );
+    expect(runtime).toContain(
+      "patient_file_number_allocators",
+    );
+    expect(runtime).not.toContain("first-free");
+  });
+
+  it("can attach a later identifier to the same patient without creating a duplicate patient", () => {
+    expect(runtime).toContain("attachPatientIdentifier");
+    expect(runtime).toContain("PATIENT_IDENTIFIER_KIND_EXISTS");
+    expect(runtime).toContain('"patient.identifier_attached"');
+    expect(runtime).toContain("readPatientIdentifierKinds");
+    expect(runtime).toContain(
+      "INSERT INTO patient_identifiers",
+    );
+  });
+
+  it("creates a separate encounter and append-only revision-1 snapshot", () => {
+    expect(runtime).toContain("INSERT INTO patient_encounters");
+    expect(runtime).toContain("INSERT INTO patient_encounter_snapshots");
+    expect(runtime).toContain(
+      "VALUES (?,?,?,?,1,?,?,?,?,?,?,?)",
+    );
+    expect(runtime).toContain('"patient.encounter_created"');
+    expect(runtime).not.toContain("UPDATE patient_encounter_snapshots");
+  });
+
+  it("encrypts observations and marks timestamp fallback instead of inventing a source date", () => {
+    expect(runtime).toContain("INSERT INTO patient_observations");
+    expect(runtime).toContain("encryptClinicalPayload(");
+    expect(runtime).toContain('basis: "source_timestamp" as const');
+    expect(runtime).toContain('basis: "encounter_fallback" as const');
+    expect(runtime).toContain("sourceObservedAt");
+    expect(runtime).toContain("invalid_laboratory_observation");
+  });
+
+  it("does not put a patient file number into audit metadata", () => {
+    expect(runtime).toContain("allocatedFileNumber: true");
+    expect(runtime).not.toContain("fileNumber: code");
+  });
+
+  it("reuses the existing runtime layout preset for Patient Workspace", () => {
+    expect(runtime).toContain("mode: context.user.layoutPreset");
+    expect(roadmap).toContain(
+      "existing physician `layoutPreset`",
+    );
+    expect(roadmap).toContain("`focused_workflow`");
+    expect(roadmap).toContain("`compact_cards`");
+    expect(roadmap).toContain("`command_center`");
+  });
+
+  it("freezes migration 0003 after isolated RC rehearsal", () => {
+    expect(roadmap).toContain("Migration `0003` is now frozen");
+    expect(queue).toContain("applied migration `0003` is frozen");
+    expect(queue).toContain("Production is unchanged");
+  });
+
+  it("keeps every static D1 prepare placeholder aligned with bind arity", () => {
+    const calls = scanPrepareBindCalls(runtime);
+    expect(calls.length).toBeGreaterThanOrEqual(20);
+
+    for (const [index, call] of calls.entries()) {
+      const placeholders = [...call.sql.matchAll(/\?/g)].length;
+      expect(
+        call.bindCount,
+        `prepare/bind #${index + 1}: ${call.sql.replace(/\s+/g, " ").slice(0, 120)}`,
+      ).toBe(placeholders);
+    }
+  });
+});

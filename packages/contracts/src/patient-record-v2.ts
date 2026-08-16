@@ -6,6 +6,14 @@
  * never the database primary key.
  */
 
+import type {
+  PatientHandoffClinicalFlags,
+  PatientHandoffFieldProvenanceMap,
+  PatientHandoffLab,
+  PatientHandoffMedication,
+  PatientHandoffVitals,
+} from "./patient-handoff.js";
+
 export const patientIdentifierKinds = [
   "file_number",
   "national_id",
@@ -14,10 +22,15 @@ export const patientIdentifierKinds = [
 export type PatientIdentifierKind =
   (typeof patientIdentifierKinds)[number];
 
+/**
+ * Patient Workspace reuses the physician's existing layout preset. We do not
+ * create a second, competing preference system for longitudinal records.
+ */
 export const patientWorkspaceModes = [
-  "focus",
-  "standard",
-  "comprehensive",
+  "auto",
+  "command_center",
+  "focused_workflow",
+  "compact_cards",
 ] as const;
 export type PatientWorkspaceMode =
   (typeof patientWorkspaceModes)[number];
@@ -50,7 +63,6 @@ export interface PatientLongitudinalDemographics {
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;
-  reportedSex?: "male" | "female";
 }
 
 export interface PatientLongitudinalSummary {
@@ -68,6 +80,86 @@ export interface PatientFileNumberAllocatorState {
   /** Advisory display value. Allocation is rechecked atomically server-side. */
   nextProposedNumber?: string;
   displayWidth: number;
+  initializedAt?: string;
+}
+
+export interface PatientFileNumberAllocatorInitializeInput {
+  /**
+   * Practice-confirmed latest assigned file number. Existing legacy HMAC-only
+   * rows cannot be used to infer this value.
+   */
+  lastAllocatedNumber: string;
+  displayWidth?: number;
+}
+
+export interface PatientIdentifierInput {
+  kind: PatientIdentifierKind;
+  value: string;
+  isPrimary?: boolean;
+}
+
+export interface PatientResolveInput {
+  identifier: string;
+  /**
+   * Optional override. When omitted, a checksum-valid Iranian national ID is
+   * preferred; otherwise the value is treated as a practice file number.
+   */
+  kind?: PatientIdentifierKind;
+}
+
+export interface PatientLegacyHandoffReference {
+  id: string;
+  kind: PatientIdentifierKind;
+  displayMask: string;
+  revision: number;
+  updatedAt: string;
+}
+
+export interface PatientResolveResult {
+  found: boolean;
+  resolvedKind: PatientIdentifierKind;
+  matchedIdentifier?: PatientIdentifierSummary;
+  patient?: PatientLongitudinalSummary;
+  /**
+   * Transitional compatibility signal. The v2 runtime never silently guesses
+   * that a legacy handoff and an existing v2 patient are the same person.
+   */
+  legacyHandoff?: PatientLegacyHandoffReference;
+}
+
+export interface PatientCreateInput {
+  identifiers?: PatientIdentifierInput[];
+  /**
+   * Ask the server to allocate the current monotonic next file number in the
+   * same transaction as patient creation. Do not also send a file_number.
+   */
+  allocateFileNumber?: boolean;
+  demographics?: Pick<
+    PatientLongitudinalDemographics,
+    "firstName" | "lastName" | "dateOfBirth"
+  >;
+}
+
+export interface PatientCreateResult {
+  patient: PatientLongitudinalSummary;
+  assignedFileNumber?: string;
+  allocator: PatientFileNumberAllocatorState;
+}
+
+export interface PatientIdentifierAttachInput {
+  /**
+   * Attach one explicit identifier to an existing patient. Omit this only
+   * when allocateFileNumber is true.
+   */
+  identifier?: PatientIdentifierInput;
+  /** Allocate the next monotonic practice file number server-side. */
+  allocateFileNumber?: boolean;
+}
+
+export interface PatientIdentifierAttachResult {
+  patient: PatientLongitudinalSummary;
+  assignedFileNumber?: string;
+  allocator: PatientFileNumberAllocatorState;
 }
 
 export interface PatientEncounterSummary {
@@ -79,6 +171,32 @@ export interface PatientEncounterSummary {
   status: PatientEncounterStatus;
   latestSnapshotRevision?: number;
   latestSignedPlanId?: string;
+}
+
+export interface PatientEncounterClinicalSnapshot {
+  vitals?: PatientHandoffVitals;
+  clinicalFlags?: PatientHandoffClinicalFlags;
+  labs?: PatientHandoffLab[];
+  medications?: PatientHandoffMedication[];
+  patientFieldProvenance?: PatientHandoffFieldProvenanceMap;
+  demographics?: {
+    reportedAgeYears?: number;
+    reportedSex?: "male" | "female";
+  };
+  nurseNotes?: string;
+  ocrText?: string;
+}
+
+export interface PatientEncounterCreateInput {
+  encounterAt?: string;
+  encounterKind?: PatientEncounterKind;
+  status?: PatientEncounterStatus;
+  snapshot?: PatientEncounterClinicalSnapshot;
+}
+
+export interface PatientEncounterCreateResult {
+  encounter: PatientEncounterSummary;
+  observationCount: number;
 }
 
 export type PhysicianNoteScope = "patient" | "encounter";

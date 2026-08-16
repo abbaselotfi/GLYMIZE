@@ -19,6 +19,10 @@ importers:
         version: 5.9.3
 
   apps/admin-worker:
+    dependencies:
+      '@glymize/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20260730.1

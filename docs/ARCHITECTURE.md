@@ -53,7 +53,9 @@ Patient Workspace یک read model ترکیبی است:
 - trends از observationهای canonical و تاریخ‌دار؛
 - physician notes از note thread/revisionهای encrypted.
 
-یادداشت پزشک با revision append-only ذخیره می‌شود؛ visibility پیش‌فرض physician-only است. Focus/Standard/Comprehensive فقط projection و progressive disclosure رابط را تغییر می‌دهند و نباید روی clinical rule input/output یا دادهٔ ذخیره‌شده اثر بگذارند.
+یادداشت پزشک با revision append-only ذخیره می‌شود؛ visibility پیش‌فرض physician-only است. Patient Workspace باید همان `layoutPreset` موجود پزشک (`auto`, `focused_workflow`, `compact_cards`, `command_center`) را مصرف کند؛ یک preference موازی جدید ساخته نمی‌شود و preset فقط projection/progressive disclosure رابط را تغییر می‌دهد، نه clinical rule input/output یا دادهٔ ذخیره‌شده.
+
+پس از اجرای migration `0003` روی D1 ایزولهٔ RC، فایل `0003` immutable/frozen است و هر تغییر schema بعدی باید migration جدید `0004+` باشد. Production تا عبور runtime/browser gate نباید Patient Record v2 را دریافت کند. در rollout تدریجی، legacy `patient_handoffs` و مسیر v2 هم‌زمان باقی می‌مانند؛ تا وقتی optimistic snapshot revision برای draft encounter کامل نشده، Care Team UI نباید repeated save را به create encounter جدید نگاشت کند.
 
 
 ### سرویس تصمیم بالینی و موتور قوانین

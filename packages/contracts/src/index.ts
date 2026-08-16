@@ -742,6 +742,7 @@ export interface Type2AssessmentResult {
   medications: Type2MedicationConsideration[];
 }
 
+export * from "./patient-identifier.js";
 export * from "./patient-handoff.js";
 export * from "./patient-record-v2.js";
 export * from "./physician-orders.js";
