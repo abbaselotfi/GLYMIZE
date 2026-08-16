@@ -122,6 +122,14 @@ A patient may have multiple identifiers at the same time:
 The current Care Team creation UI exposes only file number and Iranian national ID. A generic `Other code` choice is not shown. Legacy/backend support may remain until Patient Record v2 migration so historical records are not broken.
 
 Both file number and national ID must be usable for lookup. They must resolve to the same patient rather than creating duplicate longitudinal records.
+Pre-v2 Care Team write safety is fail-closed:
+
+- entering an already assigned identifier in a **new-patient** form must never silently update or overwrite the existing handoff;
+- create and update are separate write intents at the API boundary; a missing/legacy intent is treated as create-only, never overwrite;
+- updating an existing handoff requires the exact loaded record plus its expected revision so stale or mismatched saves fail with a conflict;
+- an authorized same-practice Care Team member may see a minimal collision summary (name, reported age/sex when present, revision) solely to resolve the identifier collision;
+- for a numeric practice file number, GLYMIZE may offer the first free number after the contiguous occupied sequence beginning at the collided number. This is an advisory convenience, **not** a claim about the global maximum file number in the practice, and it must be rechecked atomically on save;
+- national IDs must never be auto-generated or incremented as suggestions.
 
 Privacy design:
 

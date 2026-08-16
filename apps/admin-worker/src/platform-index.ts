@@ -4,6 +4,10 @@ import {
   assistantInvitationEmailEnabled,
   resolvePublicAppBaseUrl,
 } from "./platform-team-invitation-policy";
+import {
+  buildSequentialFileCodeCandidates,
+  resolvePatientHandoffWriteMode,
+} from "./patient-handoff-code-policy";
 import { createCredential, validCredentialValue } from "./platform-v3-credential";
 import {
   defaultAssistantPermissions,
@@ -1094,94 +1098,758 @@ async function removeTeamMember(
 }
 
 function validPatientPayload(value: unknown) {
-  if (!value || typeof value!=="object") return false;
-  const body=value as Record<string,unknown>;
-  const code=String(body.patientCode ?? "").trim();
-  return code.length>=3 && code.length<=64 &&
-    ["file_number","national_id","other"].includes(String(body.patientCodeKind)) &&
-    JSON.stringify(value).length<=250_000;
+  if (!value || typeof value !== "object") return false;
+  const body = value as Record<string, unknown>;
+  const code = normalizePatientCode(
+    String(body.patientCode ?? ""),
+  );
+  return code.length >= 3 && code.length <= 64 &&
+    ["file_number", "national_id", "other"].includes(
+      String(body.patientCodeKind),
+    ) &&
+    JSON.stringify(value).length <= 250_000;
 }
 
-async function upsertHandoff(request: Request, env: Env, auth: AuthContext) {
-  if (!hasPermission(auth.user,"handoff.write")) return json(request,env,{error:"permission_denied"},403);
-  let body:any;
-  try { body=await request.json(); }
-  catch { return json(request,env,{error:"invalid_json"},400); }
-  if (!validPatientPayload(body)) return json(request,env,{error:"invalid_handoff"},422);
-  const code=normalizePatientCode(String(body.patientCode));
-  if (body.patientCodeKind==="national_id" && !validateIranianNationalId(code)) {
-    return json(request,env,{error:"invalid_national_id"},422);
+type PatientHandoffDbRow = {
+  id: string;
+  patient_code_hash: string;
+  patient_code_kind: string;
+  patient_code_display: string;
+  ciphertext: string;
+  iv: string;
+  auth_tag: string;
+  status: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+};
+
+async function readHandoffByHash(
+  env: Env,
+  practiceId: string,
+  patientCodeHash: string,
+) {
+  return db(env).prepare(
+    `SELECT id,patient_code_hash,patient_code_kind,
+            patient_code_display,ciphertext,iv,auth_tag,
+            status,revision,created_at,updated_at
+     FROM patient_handoffs
+     WHERE practice_id=? AND patient_code_hash=?`,
+  ).bind(
+    practiceId,
+    patientCodeHash,
+  ).first<PatientHandoffDbRow>();
+}
+
+function patientSummaryFromPayload(
+  row: PatientHandoffDbRow,
+  payload: any,
+) {
+  const firstName = safeName(payload?.firstName);
+  const lastName = safeName(payload?.lastName);
+  const rawAge = payload?.demographics?.reportedAgeYears;
+  const age = typeof rawAge === "number" &&
+      Number.isFinite(rawAge) &&
+      rawAge >= 0 &&
+      rawAge <= 130
+    ? rawAge
+    : undefined;
+  const rawSex = payload?.demographics?.reportedSex;
+  const reportedSex =
+    rawSex === "male" || rawSex === "female"
+      ? rawSex
+      : undefined;
+
+  return {
+    id: row.id,
+    patientCodeKind: row.patient_code_kind,
+    patientCodeDisplay: row.patient_code_display,
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
+    ...(
+      age !== undefined || reportedSex
+        ? {
+            demographics: {
+              ...(age !== undefined
+                ? { reportedAgeYears: age }
+                : {}),
+              ...(reportedSex
+                ? { reportedSex }
+                : {}),
+            },
+          }
+        : {}
+    ),
+    revision: row.revision,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function sequentialFileCodeSuggestion(
+  env: Env,
+  practiceId: string,
+  secret: string,
+  occupiedCode: string,
+) {
+  const candidates =
+    buildSequentialFileCodeCandidates(
+      occupiedCode,
+      128,
+    );
+  if (!candidates.length) return undefined;
+
+  const candidateHashes = await Promise.all(
+    candidates.map((candidate) =>
+      hmacHex(
+        secret,
+        `${practiceId}:file_number:${candidate}`,
+      ),
+    ),
+  );
+
+  const placeholders = candidateHashes
+    .map(() => "?")
+    .join(",");
+  const occupied = await db(env).prepare(
+    `SELECT patient_code_hash
+     FROM patient_handoffs
+     WHERE practice_id=?
+       AND patient_code_hash IN (${placeholders})`,
+  ).bind(
+    practiceId,
+    ...candidateHashes,
+  ).all<{ patient_code_hash: string }>();
+
+  const occupiedHashes = new Set(
+    occupied.results.map(
+      (row) => row.patient_code_hash,
+    ),
+  );
+
+  for (
+    let index = 0;
+    index < candidates.length;
+    index += 1
+  ) {
+    if (!occupiedHashes.has(candidateHashes[index]!)) {
+      return {
+        lastOccupiedCode:
+          index === 0
+            ? occupiedCode
+            : candidates[index - 1]!,
+        suggestedCode: candidates[index]!,
+        checkedAt: nowIso(),
+      };
+    }
   }
-  const secret=clinicalSecret(env);
-  const patientCodeHash=await hmacHex(secret,`${auth.user.practiceId}:${String(body.patientCodeKind)}:${code}`);
-  const recordId=crypto.randomUUID();
-  const aad=`${auth.user.practiceId}:${patientCodeHash}`;
-  const protectedPayload={...body};
+
+  return undefined;
+}
+
+async function occupiedHandoffCodeStatus(
+  env: Env,
+  auth: AuthContext,
+  code: string,
+  patientCodeKind: string,
+  patientCodeHash: string,
+  row: PatientHandoffDbRow,
+  secret: string,
+) {
+  const payload = await decryptClinicalPayload<any>(
+    {
+      iv: row.iv,
+      ciphertext: row.ciphertext,
+      authTag: row.auth_tag,
+    },
+    secret,
+    `${auth.user.practiceId}:${patientCodeHash}`,
+  );
+  if (!payload) {
+    throw new Error("handoff_decryption_failed");
+  }
+
+  const suggestion =
+    patientCodeKind === "file_number" &&
+    /^\d+$/.test(code)
+      ? await sequentialFileCodeSuggestion(
+          env,
+          auth.user.practiceId,
+          secret,
+          code,
+        )
+      : undefined;
+
+  return {
+    available: false,
+    patientCodeKind,
+    existing: patientSummaryFromPayload(
+      row,
+      payload,
+    ),
+    ...(suggestion ? { suggestion } : {}),
+  };
+}
+
+async function codeStatusHandoff(
+  request: Request,
+  env: Env,
+  auth: AuthContext,
+) {
+  if (
+    !hasPermission(auth.user, "handoff.read") ||
+    !hasPermission(auth.user, "handoff.write")
+  ) {
+    return json(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
+  let body: {
+    patientCode?: unknown;
+    patientCodeKind?: unknown;
+  };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json(
+      request,
+      env,
+      { error: "invalid_json" },
+      400,
+    );
+  }
+
+  const patientCodeKind = String(
+    body.patientCodeKind ?? "",
+  );
+  if (
+    !["file_number", "national_id", "other"].includes(
+      patientCodeKind,
+    )
+  ) {
+    return json(
+      request,
+      env,
+      { error: "invalid_patient_code_kind" },
+      422,
+    );
+  }
+
+  const code = normalizePatientCode(
+    String(body.patientCode ?? ""),
+  );
+  if (code.length < 3 || code.length > 64) {
+    return json(
+      request,
+      env,
+      { error: "invalid_patient_code" },
+      422,
+    );
+  }
+  if (
+    patientCodeKind === "national_id" &&
+    !validateIranianNationalId(code)
+  ) {
+    return json(
+      request,
+      env,
+      { error: "invalid_national_id" },
+      422,
+    );
+  }
+
+  const secret = clinicalSecret(env);
+  const patientCodeHash = await hmacHex(
+    secret,
+    `${auth.user.practiceId}:${patientCodeKind}:${code}`,
+  );
+  const row = await readHandoffByHash(
+    env,
+    auth.user.practiceId,
+    patientCodeHash,
+  );
+
+  if (!row) {
+    return json(request, env, {
+      available: true,
+      patientCodeKind,
+    });
+  }
+
+  return json(
+    request,
+    env,
+    await occupiedHandoffCodeStatus(
+      env,
+      auth,
+      code,
+      patientCodeKind,
+      patientCodeHash,
+      row,
+      secret,
+    ),
+  );
+}
+
+async function upsertHandoff(
+  request: Request,
+  env: Env,
+  auth: AuthContext,
+) {
+  if (!hasPermission(auth.user, "handoff.write")) {
+    return json(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return json(
+      request,
+      env,
+      { error: "invalid_json" },
+      400,
+    );
+  }
+  if (!validPatientPayload(body)) {
+    return json(
+      request,
+      env,
+      { error: "invalid_handoff" },
+      422,
+    );
+  }
+
+  const writeMode =
+    resolvePatientHandoffWriteMode(body.writeMode);
+  if (!writeMode) {
+    return json(
+      request,
+      env,
+      { error: "invalid_handoff_write_mode" },
+      422,
+    );
+  }
+
+  const patientCodeKind = String(
+    body.patientCodeKind,
+  );
+  const code = normalizePatientCode(
+    String(body.patientCode),
+  );
+  if (
+    patientCodeKind === "national_id" &&
+    !validateIranianNationalId(code)
+  ) {
+    return json(
+      request,
+      env,
+      { error: "invalid_national_id" },
+      422,
+    );
+  }
+
+  const secret = clinicalSecret(env);
+  const patientCodeHash = await hmacHex(
+    secret,
+    `${auth.user.practiceId}:${patientCodeKind}:${code}`,
+  );
+  const aad =
+    `${auth.user.practiceId}:${patientCodeHash}`;
+  const protectedPayload = { ...body };
   delete protectedPayload.patientCode;
-  const encrypted=await encryptClinicalPayload(protectedPayload,secret,aad);
-  const now=nowIso();
-  const result=await db(env).prepare(
-    `INSERT INTO patient_handoffs
-     (id,practice_id,patient_code_hash,patient_code_kind,patient_code_display,ciphertext,iv,auth_tag,
-      status,revision,created_by,updated_by,created_at,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?)
-     ON CONFLICT(practice_id,patient_code_hash) DO UPDATE SET
-       patient_code_kind=excluded.patient_code_kind,
-       patient_code_display=excluded.patient_code_display,
-       ciphertext=excluded.ciphertext,
-       iv=excluded.iv,
-       auth_tag=excluded.auth_tag,
-       status=excluded.status,
-       revision=patient_handoffs.revision+1,
-       updated_by=excluded.updated_by,
-       updated_at=excluded.updated_at
+  delete protectedPayload.writeMode;
+  delete protectedPayload.expectedRecordId;
+  delete protectedPayload.expectedRevision;
+
+  const encrypted = await encryptClinicalPayload(
+    protectedPayload,
+    secret,
+    aad,
+  );
+  const now = nowIso();
+
+  if (writeMode === "create") {
+    const existing = await readHandoffByHash(
+      env,
+      auth.user.practiceId,
+      patientCodeHash,
+    );
+    if (existing) {
+      const canRevealSummary =
+        hasPermission(auth.user, "handoff.read");
+      const codeStatus = canRevealSummary
+        ? await occupiedHandoffCodeStatus(
+            env,
+            auth,
+            code,
+            patientCodeKind,
+            patientCodeHash,
+            existing,
+            secret,
+          )
+        : undefined;
+      return json(
+        request,
+        env,
+        {
+          error: "PATIENT_CODE_EXISTS",
+          ...(codeStatus
+            ? { codeStatus }
+            : {}),
+        },
+        409,
+      );
+    }
+
+    const recordId = crypto.randomUUID();
+    const result = await db(env).prepare(
+      `INSERT INTO patient_handoffs
+       (id,practice_id,patient_code_hash,
+        patient_code_kind,patient_code_display,
+        ciphertext,iv,auth_tag,status,revision,
+        created_by,updated_by,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?)
+       ON CONFLICT(practice_id,patient_code_hash)
+       DO NOTHING
+       RETURNING id,revision,created_at,updated_at`,
+    ).bind(
+      recordId,
+      auth.user.practiceId,
+      patientCodeHash,
+      patientCodeKind,
+      maskIdentifier(code),
+      encrypted.ciphertext,
+      encrypted.iv,
+      encrypted.authTag,
+      String(
+        body.status ?? "ready_for_physician",
+      ),
+      auth.user.id,
+      auth.user.id,
+      now,
+      now,
+    ).first<{
+      id: string;
+      revision: number;
+      created_at: string;
+      updated_at: string;
+    }>();
+
+    if (!result) {
+      const raced = await readHandoffByHash(
+        env,
+        auth.user.practiceId,
+        patientCodeHash,
+      );
+      const canRevealSummary =
+        Boolean(raced) &&
+        hasPermission(auth.user, "handoff.read");
+      const codeStatus =
+        raced && canRevealSummary
+          ? await occupiedHandoffCodeStatus(
+              env,
+              auth,
+              code,
+              patientCodeKind,
+              patientCodeHash,
+              raced,
+              secret,
+            )
+          : undefined;
+      return json(
+        request,
+        env,
+        {
+          error: "PATIENT_CODE_EXISTS",
+          ...(codeStatus
+            ? { codeStatus }
+            : {}),
+        },
+        409,
+      );
+    }
+
+    await audit(
+      env,
+      auth.user.id,
+      auth.user.practiceId,
+      "handoff.upsert",
+      "patient_handoff",
+      result.id,
+      {
+        revision: result.revision,
+        writeMode,
+      },
+    );
+
+    return json(request, env, {
+      ...protectedPayload,
+      id: result.id,
+      patientCodeKind,
+      patientCodeDisplay: maskIdentifier(code),
+      status: String(
+        body.status ?? "ready_for_physician",
+      ),
+      revision: result.revision,
+      createdAt: result.created_at,
+      updatedAt: result.updated_at,
+    });
+  }
+
+  const expectedRecordId = String(
+    body.expectedRecordId ?? "",
+  ).trim();
+  const expectedRevision = Number(
+    body.expectedRevision,
+  );
+  if (
+    !/^[A-Za-z0-9-]{8,80}$/.test(
+      expectedRecordId,
+    ) ||
+    !Number.isSafeInteger(expectedRevision) ||
+    expectedRevision < 1
+  ) {
+    return json(
+      request,
+      env,
+      { error: "invalid_handoff_update_target" },
+      422,
+    );
+  }
+
+  const result = await db(env).prepare(
+    `UPDATE patient_handoffs
+     SET ciphertext=?,
+         iv=?,
+         auth_tag=?,
+         status=?,
+         revision=revision+1,
+         updated_by=?,
+         updated_at=?
+     WHERE practice_id=?
+       AND patient_code_hash=?
+       AND id=?
+       AND revision=?
      RETURNING id,revision,created_at,updated_at`,
   ).bind(
-    recordId,auth.user.practiceId,patientCodeHash,String(body.patientCodeKind),maskIdentifier(code),
-    encrypted.ciphertext,encrypted.iv,encrypted.authTag,String(body.status ?? "ready_for_physician"),
-    auth.user.id,auth.user.id,now,now,
-  ).first<{id:string;revision:number;created_at:string;updated_at:string}>();
-  if (!result) return json(request,env,{error:"handoff_save_failed"},500);
-  await audit(env,auth.user.id,auth.user.practiceId,"handoff.upsert","patient_handoff",result.id,{revision:result.revision});
-  return json(request,env,{
+    encrypted.ciphertext,
+    encrypted.iv,
+    encrypted.authTag,
+    String(
+      body.status ?? "ready_for_physician",
+    ),
+    auth.user.id,
+    now,
+    auth.user.practiceId,
+    patientCodeHash,
+    expectedRecordId,
+    expectedRevision,
+  ).first<{
+    id: string;
+    revision: number;
+    created_at: string;
+    updated_at: string;
+  }>();
+
+  if (!result) {
+    const current = await readHandoffByHash(
+      env,
+      auth.user.practiceId,
+      patientCodeHash,
+    );
+
+    if (
+      current &&
+      current.id === expectedRecordId &&
+      current.revision !== expectedRevision
+    ) {
+      return json(
+        request,
+        env,
+        {
+          error: "HANDOFF_REVISION_CONFLICT",
+          currentRevision: current.revision,
+        },
+        409,
+      );
+    }
+
+    return json(
+      request,
+      env,
+      { error: "HANDOFF_UPDATE_TARGET_MISMATCH" },
+      409,
+    );
+  }
+
+  await audit(
+    env,
+    auth.user.id,
+    auth.user.practiceId,
+    "handoff.upsert",
+    "patient_handoff",
+    result.id,
+    {
+      revision: result.revision,
+      writeMode,
+    },
+  );
+
+  return json(request, env, {
     ...protectedPayload,
-    id:result.id,
-    patientCodeKind:String(body.patientCodeKind),
-    patientCodeDisplay:maskIdentifier(code),
-    status:String(body.status ?? "ready_for_physician"),
-    revision:result.revision,
-    createdAt:result.created_at,
-    updatedAt:result.updated_at,
+    id: result.id,
+    patientCodeKind,
+    patientCodeDisplay: maskIdentifier(code),
+    status: String(
+      body.status ?? "ready_for_physician",
+    ),
+    revision: result.revision,
+    createdAt: result.created_at,
+    updatedAt: result.updated_at,
   });
 }
 
-async function lookupHandoff(request: Request, env: Env, auth: AuthContext) {
-  if (!hasPermission(auth.user,"handoff.read")) return json(request,env,{error:"permission_denied"},403);
-  let body:{patientCode?:unknown};
-  try { body=await request.json() as typeof body; }
-  catch { return json(request,env,{error:"invalid_json"},400); }
-  const code=normalizePatientCode(String(body.patientCode ?? ""));
-  if (!code) return json(request,env,{found:false});
-  const secret=clinicalSecret(env);
-  const hashes=await Promise.all(["file_number","national_id","other"].map((kind)=>hmacHex(secret,`${auth.user.practiceId}:${kind}:${code}`)));
-  const placeholders=hashes.map(()=>"?").join(",");
-  const results=await db(env).prepare(
-    `SELECT id,patient_code_hash,patient_code_kind,patient_code_display,ciphertext,iv,auth_tag,status,revision,created_at,updated_at
-     FROM patient_handoffs
-     WHERE practice_id=? AND patient_code_hash IN (${placeholders})`,
-  ).bind(auth.user.practiceId,...hashes).all<any>();
-  if (results.results.length>1) return json(request,env,{error:"AMBIGUOUS_PATIENT_CODE"},409);
-  const row=results.results[0];
-  if (!row) return json(request,env,{found:false},404);
-  const payload=await decryptClinicalPayload<any>(
-    {iv:row.iv,ciphertext:row.ciphertext,authTag:row.auth_tag},
-    secret,`${auth.user.practiceId}:${row.patient_code_hash}`,
+async function lookupHandoff(
+  request: Request,
+  env: Env,
+  auth: AuthContext,
+) {
+  if (!hasPermission(auth.user, "handoff.read")) {
+    return json(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
+  let body: {
+    patientCode?: unknown;
+    patientCodeKind?: unknown;
+  };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json(
+      request,
+      env,
+      { error: "invalid_json" },
+      400,
+    );
+  }
+
+  const code = normalizePatientCode(
+    String(body.patientCode ?? ""),
   );
-  if (!payload) return json(request,env,{error:"handoff_decryption_failed"},500);
-  return json(request,env,{found:true,record:{
-    ...payload,id:row.id,patientCodeKind:row.patient_code_kind,patientCodeDisplay:row.patient_code_display,
-    status:row.status,revision:row.revision,createdAt:row.created_at,updatedAt:row.updated_at,
-  }});
+  if (!code) {
+    return json(request, env, { found: false });
+  }
+
+  const secret = clinicalSecret(env);
+  const requestedKind =
+    body.patientCodeKind === undefined
+      ? undefined
+      : String(body.patientCodeKind);
+
+  if (
+    requestedKind !== undefined &&
+    !["file_number", "national_id", "other"].includes(
+      requestedKind,
+    )
+  ) {
+    return json(
+      request,
+      env,
+      { error: "invalid_patient_code_kind" },
+      422,
+    );
+  }
+
+  const kinds = requestedKind
+    ? [requestedKind]
+    : ["file_number", "national_id", "other"];
+  const hashes = await Promise.all(
+    kinds.map((kind) =>
+      hmacHex(
+        secret,
+        `${auth.user.practiceId}:${kind}:${code}`,
+      ),
+    ),
+  );
+  const placeholders = hashes
+    .map(() => "?")
+    .join(",");
+  const results = await db(env).prepare(
+    `SELECT id,patient_code_hash,patient_code_kind,
+            patient_code_display,ciphertext,iv,auth_tag,
+            status,revision,created_at,updated_at
+     FROM patient_handoffs
+     WHERE practice_id=?
+       AND patient_code_hash IN (${placeholders})`,
+  ).bind(
+    auth.user.practiceId,
+    ...hashes,
+  ).all<any>();
+
+  if (results.results.length > 1) {
+    return json(
+      request,
+      env,
+      { error: "AMBIGUOUS_PATIENT_CODE" },
+      409,
+    );
+  }
+
+  const row = results.results[0];
+  if (!row) {
+    return json(
+      request,
+      env,
+      { found: false },
+      404,
+    );
+  }
+
+  const payload = await decryptClinicalPayload<any>(
+    {
+      iv: row.iv,
+      ciphertext: row.ciphertext,
+      authTag: row.auth_tag,
+    },
+    secret,
+    `${auth.user.practiceId}:${row.patient_code_hash}`,
+  );
+  if (!payload) {
+    return json(
+      request,
+      env,
+      { error: "handoff_decryption_failed" },
+      500,
+    );
+  }
+
+  return json(request, env, {
+    found: true,
+    record: {
+      ...payload,
+      id: row.id,
+      patientCodeKind: row.patient_code_kind,
+      patientCodeDisplay: row.patient_code_display,
+      status: row.status,
+      revision: row.revision,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    },
+  });
 }
 
 async function getHandoffById(
@@ -1428,6 +2096,7 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
   if (memberMatch && request.method==="DELETE") return removeTeamMember(request,env,auth,decodeURIComponent(memberMatch[1]!));
 
   if (url.pathname==="/v1/patient-handoff/upsert" && request.method==="POST") return upsertHandoff(request,env,auth);
+  if (url.pathname==="/v1/patient-handoff/code-status" && request.method==="POST") return codeStatusHandoff(request,env,auth);
   if (url.pathname==="/v1/patient-handoff/lookup" && request.method==="POST") return lookupHandoff(request,env,auth);
   const handoffRecordMatch=url.pathname.match(/^\/v1\/patient-handoff\/records\/([^/]+)$/);
   if (handoffRecordMatch && request.method==="GET") {

@@ -127,9 +127,50 @@ export interface PatientHandoffArchivePage {
   nextCursor: string | null;
 }
 
+export type PatientHandoffWriteMode = "create" | "update";
+
+export interface PatientHandoffExistingSummary {
+  id: string;
+  patientCodeKind: PatientCodeKind;
+  patientCodeDisplay: string;
+  firstName?: string;
+  lastName?: string;
+  demographics?: PatientHandoffDemographics;
+  revision: number;
+  updatedAt: string;
+}
+
+export interface PatientHandoffCodeSuggestion {
+  /**
+   * Last occupied code in the contiguous sequence probed from the
+   * duplicate code. This is not a global practice-wide maximum.
+   */
+  lastOccupiedCode: string;
+  /** First free numeric file number found immediately after that sequence. */
+  suggestedCode: string;
+  /** Advisory result; the server must recheck on save. */
+  checkedAt: string;
+}
+
+export interface PatientHandoffCodeStatus {
+  available: boolean;
+  patientCodeKind: PatientCodeKind;
+  existing?: PatientHandoffExistingSummary;
+  suggestion?: PatientHandoffCodeSuggestion;
+}
+
 export interface PatientHandoffUpsertInput {
   patientCode: string;
   patientCodeKind: PatientCodeKind;
+  /**
+   * Missing mode is treated by the server as create-only for backward
+   * compatibility. It must never mean blind overwrite.
+   */
+  writeMode?: PatientHandoffWriteMode;
+  /** Required by the server when writeMode is "update". */
+  expectedRecordId?: string;
+  /** Optimistic-concurrency guard required for updates. */
+  expectedRevision?: number;
   firstName?: string;
   lastName?: string;
   status?: PatientHandoffStatus;
@@ -145,7 +186,9 @@ export interface PatientHandoffUpsertInput {
 
 export interface PatientHandoffLookupInput {
   patientCode: string;
+  patientCodeKind?: PatientCodeKind;
 }
+
 
 export interface PatientHandoffLookupResult {
   found: boolean;

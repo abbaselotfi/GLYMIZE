@@ -5,6 +5,7 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import type {
   PatientCodeKind,
   PatientHandoffClinicalFlags,
+  PatientHandoffCodeStatus,
   PatientHandoffFieldProvenanceMap,
   PatientHandoffLab,
   PatientHandoffMedication,
@@ -22,7 +23,13 @@ import {
   type OcrPatientFieldSuggestion,
   type OcrProgress,
 } from "../../lib/client-ocr";
-import { lookupPatientHandoff, savePatientHandoff, validateIranianNationalId } from "../../lib/patient-handoff-client";
+import {
+  checkPatientHandoffCode,
+  lookupPatientHandoff,
+  PatientHandoffCodeConflictError,
+  savePatientHandoff,
+  validateIranianNationalId,
+} from "../../lib/patient-handoff-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import styles from "./care-team.module.css";
 
@@ -264,6 +271,12 @@ export default function CareTeamClient() {
     useState<OcrPatientFieldSuggestion | null>(null);
   const [fullNameReviewFirstName, setFullNameReviewFirstName] = useState("");
   const [fullNameReviewLastName, setFullNameReviewLastName] = useState("");
+  const [loadedRecordId, setLoadedRecordId] = useState<string | null>(null);
+  const [patientCodeCollision, setPatientCodeCollision] =
+    useState<PatientHandoffCodeStatus | null>(null);
+  const [patientCodeCheckBusy, setPatientCodeCheckBusy] = useState(false);
+  const patientCodeCheckRequestRef = useRef(0);
+  const patientCodeInputRef = useRef<HTMLInputElement>(null);
   const savedDraftFingerprintRef = useRef(emptyDraftFingerprint());
 
   const nationalIdWarning = useMemo(() => patientCodeKind === "national_id" && patientCode.trim() && !validateIranianNationalId(patientCode), [patientCode, patientCodeKind]);
@@ -750,6 +763,7 @@ function removeLab(id: string) {
     setMedications(nextMedications);
     setNurseNotes(nextNurseNotes);
     setOcrText(nextOcrText);
+    setLoadedRecordId(record.id);
     setLoadedRevision(record.revision);
 
     savedDraftFingerprintRef.current = draftFingerprint({
@@ -769,34 +783,75 @@ function removeLab(id: string) {
     });
   }
 
-  async function loadExisting(explicitCode?: string) {
-    const code = (explicitCode ?? patientCode).trim();
-    if (!code) {
-      setStatus(fa ? "برای باز کردن پرونده، کد بیمار را وارد کنید." : "Enter the patient code to open the existing handoff.");
+async function loadExisting(
+  explicitCode?: string,
+  explicitKind?: PatientCodeKind,
+) {
+  const code = (
+    explicitCode ?? patientCode
+  ).trim();
+  const kind =
+    explicitKind ?? patientCodeKind;
+
+  if (!code) {
+    setStatus(
+      fa
+        ? "برای باز کردن پرونده، کد بیمار را وارد کنید."
+        : "Enter the patient code to open the existing handoff.",
+    );
+    return;
+  }
+
+  setBusy(true);
+  try {
+    const result = await lookupPatientHandoff(
+      code,
+      kind,
+    );
+    if (!result.found || !result.record) {
+      setStatus(
+        fa
+          ? "پرونده‌ای با این کد پیدا نشد."
+          : "No handoff was found for this patient code.",
+      );
       return;
     }
-    setBusy(true);
-    try {
-      const result = await lookupPatientHandoff(code);
-      if (!result.found || !result.record) {
-        setStatus(fa ? "پرونده‌ای با این کد پیدا نشد." : "No handoff was found for this patient code.");
-        return;
-      }
-      hydrateFromRecord(result.record, code);
-      setStatus(fa
-        ? `پرونده نسخه ${result.record.revision} برای ویرایش باز شد. ذخیره بعدی یک نسخه جدید ایجاد می‌کند.`
-        : `Revision ${result.record.revision} opened for editing. The next save creates a new revision.`);
-    } catch (error) {
-      const codeValue = error instanceof Error ? error.message : "LOOKUP_FAILED";
-      setStatus(codeValue === "AMBIGUOUS_PATIENT_CODE"
-        ? (fa ? "این کد در بیش از یک نوع شناسه وجود دارد." : "This code exists under more than one identifier type.")
+
+    setPatientCodeCollision(null);
+    hydrateFromRecord(result.record, code);
+    setStatus(
+      fa
+        ? `پرونده نسخه ${result.record.revision} برای ویرایش باز شد. ذخیره بعدی فقط همین پرونده و همین نسخه را به‌روزرسانی می‌کند.`
+        : `Revision ${result.record.revision} opened for editing. The next save may update only this loaded record and revision.`,
+    );
+  } catch (error) {
+    const codeValue =
+      error instanceof Error
+        ? error.message
+        : "LOOKUP_FAILED";
+    setStatus(
+      codeValue === "AMBIGUOUS_PATIENT_CODE"
+        ? (
+            fa
+              ? "این کد در بیش از یک نوع شناسه وجود دارد."
+              : "This code exists under more than one identifier type."
+          )
         : codeValue === "HANDOFF_UNAUTHORIZED"
-          ? (fa ? "توکن handoff با API هماهنگ نیست." : "The handoff token does not match the API.")
-          : (fa ? "باز کردن پرونده انجام نشد." : "Could not open the existing handoff."));
-    } finally {
-      setBusy(false);
-    }
+          ? (
+              fa
+                ? "توکن handoff با API هماهنگ نیست."
+                : "The handoff token does not match the API."
+            )
+          : (
+              fa
+                ? "باز کردن پرونده انجام نشد."
+                : "Could not open the existing handoff."
+            ),
+    );
+  } finally {
+    setBusy(false);
   }
+}
 
   useEffect(() => {
     const pendingCode = window.sessionStorage.getItem("glymize:care-team-edit-code");
@@ -826,7 +881,11 @@ function removeLab(id: string) {
     setOcrText("");
     setNurseNotes("");
     setOcrProgress(null);
+    setLoadedRecordId(null);
     setLoadedRevision(null);
+    setPatientCodeCollision(null);
+    setPatientCodeCheckBusy(false);
+    patientCodeCheckRequestRef.current += 1;
     setNewRecordPromptOpen(false);
     setFullNameReviewSuggestion(null);
     setFullNameReviewFirstName("");
@@ -877,6 +936,92 @@ function removeLab(id: string) {
         : "The previous handoff was saved; the new patient form is ready.",
     );
   }
+
+async function checkPatientCodeAvailability() {
+  if (
+    busy ||
+    loadedRevision !== null ||
+    !patientCode.trim() ||
+    nationalIdWarning
+  ) {
+    return;
+  }
+
+  const requestId =
+    patientCodeCheckRequestRef.current + 1;
+  patientCodeCheckRequestRef.current = requestId;
+  const codeAtCheck = patientCode;
+  const kindAtCheck = patientCodeKind;
+  setPatientCodeCheckBusy(true);
+
+  try {
+    const result = await checkPatientHandoffCode(
+      codeAtCheck,
+      kindAtCheck,
+    );
+    if (
+      patientCodeCheckRequestRef.current !== requestId
+    ) {
+      return;
+    }
+    if (!result.available) {
+      setPatientCodeCollision(result);
+      setStatus(
+        fa
+          ? "این کد قبلاً برای یک پرونده ثبت شده است. پیش از ذخیره، پرونده موجود یا یک کد جدید را انتخاب کنید."
+          : "This code is already assigned to a patient record. Choose the existing record or a new code before saving.",
+      );
+    }
+  } catch {
+    if (
+      patientCodeCheckRequestRef.current === requestId
+    ) {
+      setStatus(
+        fa
+          ? "بررسی پیشگیرانه کد انجام نشد؛ هنگام ذخیره، سرور دوباره کد را به‌صورت اجباری کنترل می‌کند."
+          : "The pre-save code check could not complete. The server will still enforce the code collision check on save.",
+      );
+    }
+  } finally {
+    if (
+      patientCodeCheckRequestRef.current === requestId
+    ) {
+      setPatientCodeCheckBusy(false);
+    }
+  }
+}
+
+function useSuggestedPatientCode() {
+  const suggestion =
+    patientCodeCollision?.suggestion;
+  if (!suggestion) return;
+
+  patientCodeCheckRequestRef.current += 1;
+  setPatientCodeKind("file_number");
+  setPatientCode(suggestion.suggestedCode);
+  setLoadedRecordId(null);
+  setLoadedRevision(null);
+  setPatientCodeCollision(null);
+  setPatientCodeCheckBusy(false);
+  clearPatientFieldProvenance("nationalId");
+  setStatus(
+    fa
+      ? `شماره ${suggestion.suggestedCode} در زمان بررسی آزاد بود و برای این فرم انتخاب شد؛ هنگام ذخیره دوباره کنترل می‌شود.`
+      : `File number ${suggestion.suggestedCode} was free when checked and is now selected; it will be checked again on save.`,
+  );
+}
+
+function openExistingFromCollision() {
+  const collision = patientCodeCollision;
+  if (!collision) return;
+
+  patientCodeCheckRequestRef.current += 1;
+  setPatientCodeCollision(null);
+  void loadExisting(
+    patientCode,
+    collision.patientCodeKind,
+  );
+}
 
   async function processFile(file?: File) {
     if (!file) return;
@@ -942,76 +1087,180 @@ function removeLab(id: string) {
     }
   }
 
-  async function save(): Promise<boolean> {
-    if (!patientCode.trim()) {
-      setStatus(fa ? "کد بیمار الزامی است." : "Patient code is required.");
-      return false;
-    }
-    if (nationalIdWarning) {
-      setStatus(fa ? "کد ملی واردشده از نظر ساختار/رقم کنترل معتبر نیست؛ برای تست می‌توانید نوع کد را «شماره پرونده» انتخاب کنید." : "The national ID checksum is invalid. For synthetic testing, use File number instead.");
-      return false;
-    }
+async function save(): Promise<boolean> {
+  if (!patientCode.trim()) {
+    setStatus(
+      fa
+        ? "کد بیمار الزامی است."
+        : "Patient code is required.",
+    );
+    return false;
+  }
+  if (nationalIdWarning) {
+    setStatus(
+      fa
+        ? "کد ملی واردشده از نظر ساختار/رقم کنترل معتبر نیست؛ برای تست می‌توانید نوع کد را «شماره پرونده» انتخاب کنید."
+        : "The national ID checksum is invalid. For synthetic testing, use File number instead.",
+    );
+    return false;
+  }
+  if (
+    loadedRevision !== null &&
+    !loadedRecordId
+  ) {
+    setStatus(
+      fa
+        ? "هدف ویرایش پرونده مشخص نیست؛ پرونده را دوباره با «باز کردن / ویرایش» باز کنید."
+        : "The update target is missing. Re-open the record with Open / edit before saving.",
+    );
+    return false;
+  }
 
-    const fingerprintAtSaveStart = currentDraftFingerprint();
-    setBusy(true);
-    try {
-      const mappedVitals: PatientHandoffVitals = {
-        weightKg: numberOrUndefined(vitals.weightKg),
-        heightCm: numberOrUndefined(vitals.heightCm),
-        systolicBp: numberOrUndefined(vitals.systolicBp),
-        diastolicBp: numberOrUndefined(vitals.diastolicBp),
-        pulseBpm: numberOrUndefined(vitals.pulseBpm),
-      };
-      const mappedMeds: PatientHandoffMedication[] = medications
+  const fingerprintAtSaveStart =
+    currentDraftFingerprint();
+  setBusy(true);
+
+  try {
+    const mappedVitals: PatientHandoffVitals = {
+      weightKg: numberOrUndefined(vitals.weightKg),
+      heightCm: numberOrUndefined(vitals.heightCm),
+      systolicBp: numberOrUndefined(
+        vitals.systolicBp,
+      ),
+      diastolicBp: numberOrUndefined(
+        vitals.diastolicBp,
+      ),
+      pulseBpm: numberOrUndefined(vitals.pulseBpm),
+    };
+    const mappedMeds: PatientHandoffMedication[] =
+      medications
         .filter((item) => item.genericName.trim())
         .map((item) => ({
           genericName: item.genericName.trim(),
-          doseAmount: numberOrUndefined(item.doseAmount),
-          doseUnit: item.doseAmount.trim() ? item.doseUnit : undefined,
-          frequencyPerDay: parseMedicationFrequency(item.frequencyPerDay).timesPerDay,
-          frequencyCode: parseMedicationFrequency(item.frequencyPerDay).code,
+          doseAmount: numberOrUndefined(
+            item.doseAmount,
+          ),
+          doseUnit: item.doseAmount.trim()
+            ? item.doseUnit
+            : undefined,
+          frequencyPerDay:
+            parseMedicationFrequency(
+              item.frequencyPerDay,
+            ).timesPerDay,
+          frequencyCode:
+            parseMedicationFrequency(
+              item.frequencyPerDay,
+            ).code,
           status: "active",
           verification: item.verification,
         }));
-      const record = await savePatientHandoff({
-        patientCode,
-        patientCodeKind,
-        firstName,
-        lastName,
-        status: "ready_for_physician",
-        demographics: {
-          reportedAgeYears: numberOrUndefined(reportedAgeYears),
-          reportedSex: reportedSex || undefined,
-        },
-        patientFieldProvenance,
-        vitals: mappedVitals,
-        clinicalFlags: flags,
-        labs,
-        medications: mappedMeds,
-        nurseNotes,
-        ocrText,
-      });
 
-      setLoadedRevision(record.revision);
-      savedDraftFingerprintRef.current = fingerprintAtSaveStart;
-      setStatus(fa
+    const writeMode =
+      loadedRevision === null
+        ? "create" as const
+        : "update" as const;
+
+    const record = await savePatientHandoff({
+      patientCode,
+      patientCodeKind,
+      writeMode,
+      ...(writeMode === "update"
+        ? {
+            expectedRecordId:
+              loadedRecordId ?? undefined,
+            expectedRevision: loadedRevision ?? undefined,
+          }
+        : {}),
+      firstName,
+      lastName,
+      status: "ready_for_physician",
+      demographics: {
+        reportedAgeYears:
+          numberOrUndefined(reportedAgeYears),
+        reportedSex: reportedSex || undefined,
+      },
+      patientFieldProvenance,
+      vitals: mappedVitals,
+      clinicalFlags: flags,
+      labs,
+      medications: mappedMeds,
+      nurseNotes,
+      ocrText,
+    });
+
+    setLoadedRecordId(record.id);
+    setLoadedRevision(record.revision);
+    setPatientCodeCollision(null);
+    savedDraftFingerprintRef.current =
+      fingerprintAtSaveStart;
+    setStatus(
+      fa
         ? `پرونده برای پزشک آماده شد · نسخه ${record.revision} · کد نمایشی ${record.patientCodeDisplay}`
-        : `Handoff ready for physician · revision ${record.revision} · ${record.patientCodeDisplay}`);
-      return true;
-    } catch (error) {
-      const code = error instanceof Error ? error.message : "SAVE_FAILED";
-      setStatus(code === "HANDOFF_UNAUTHORIZED"
-        ? (fa ? "توکن دسترسی handoff با API هماهنگ نیست." : "The handoff token does not match the API.")
-        : code === "HANDOFF_API_NOT_CONFIGURED"
-          ? (fa ? "API محلی handoff اجرا نشده است. برنامه را با start-local.ps1 اجرا کنید." : "The local handoff API is not running. Start GLYMIZE with start-local.ps1.")
-          : code === "HANDOFF_INPUT_INVALID"
-            ? (fa ? "شناسه بیمار معتبر نیست؛ نوع کد و مقدار آن را بررسی کنید." : "The patient identifier is invalid; review its type and value.")
-            : (fa ? "ذخیره پرونده انجام نشد." : "Could not save the patient handoff."));
+        : `Handoff ready for physician · revision ${record.revision} · ${record.patientCodeDisplay}`,
+    );
+    return true;
+  } catch (error) {
+    if (
+      error instanceof PatientHandoffCodeConflictError
+    ) {
+      if (error.codeStatus) {
+        setPatientCodeCollision(error.codeStatus);
+      }
+      setStatus(
+        fa
+          ? "ذخیره متوقف شد: این کد قبلاً به یک پرونده اختصاص داده شده است."
+          : "Save stopped: this code is already assigned to an existing patient record.",
+      );
       return false;
-    } finally {
-      setBusy(false);
     }
+
+    const code =
+      error instanceof Error
+        ? error.message
+        : "SAVE_FAILED";
+    setStatus(
+      code === "HANDOFF_UNAUTHORIZED"
+        ? (
+            fa
+              ? "توکن دسترسی handoff با API هماهنگ نیست."
+              : "The handoff token does not match the API."
+          )
+        : code === "HANDOFF_API_NOT_CONFIGURED"
+          ? (
+              fa
+                ? "API محلی handoff اجرا نشده است. برنامه را با start-local.ps1 اجرا کنید."
+                : "The local handoff API is not running. Start GLYMIZE with start-local.ps1."
+            )
+          : code === "HANDOFF_INPUT_INVALID"
+            ? (
+                fa
+                  ? "شناسه بیمار یا هدف ویرایش معتبر نیست؛ نوع کد و وضعیت پرونده را بررسی کنید."
+                  : "The patient identifier or update target is invalid; review the code and record state."
+              )
+            : code === "HANDOFF_REVISION_CONFLICT"
+              ? (
+                  fa
+                    ? "این پرونده پس از باز شدن شما تغییر کرده است؛ برای جلوگیری از بازنویسی، دوباره آن را باز کنید."
+                    : "This record changed after you opened it. Re-open it before saving to avoid overwriting a newer revision."
+                )
+              : code ===
+                  "HANDOFF_UPDATE_TARGET_MISMATCH"
+                ? (
+                    fa
+                      ? "کد یا هدف پرونده با پرونده بازشده تطابق ندارد؛ ذخیره متوقف شد."
+                      : "The patient code no longer matches the loaded record; save was blocked."
+                  )
+                : (
+                    fa
+                      ? "ذخیره پرونده انجام نشد."
+                      : "Could not save the patient handoff."
+                  ),
+    );
+    return false;
+  } finally {
+    setBusy(false);
   }
+}
 
   const progressPercent = ocrProgress ? Math.max(0, Math.min(100, Math.round(ocrProgress.progress * 100))) : 0;
 
@@ -1056,7 +1305,12 @@ function removeLab(id: string) {
             ) : (
               <select
                 value={patientCodeKind}
+                disabled={busy || loadedRevision !== null}
                 onChange={(event) => {
+                  patientCodeCheckRequestRef.current += 1;
+                  setPatientCodeCollision(null);
+                  setLoadedRecordId(null);
+                  setLoadedRevision(null);
                   setPatientCodeKind(event.target.value as PatientCodeKind);
                   clearPatientFieldProvenance("nationalId");
                 }}
@@ -1074,16 +1328,22 @@ function removeLab(id: string) {
             <span>{fa ? "کد بیمار *" : "Patient code *"}</span>
             <div className={styles.patientCodeAction}>
               <input
+                ref={patientCodeInputRef}
                 value={patientCode}
+                disabled={busy || loadedRevision !== null}
+                onBlur={() => void checkPatientCodeAvailability()}
                 onChange={(event) => {
+                  patientCodeCheckRequestRef.current += 1;
+                  setPatientCodeCollision(null);
                   setPatientCode(event.target.value);
+                  setLoadedRecordId(null);
                   setLoadedRevision(null);
                   clearPatientFieldProvenance("nationalId");
                 }}
                 autoComplete="off"
                 inputMode={patientCodeKind === "national_id" ? "numeric" : "text"}
               />
-              <button type="button" disabled={busy} onClick={() => void loadExisting()}>
+              <button type="button" disabled={busy || loadedRevision !== null} onClick={() => void loadExisting()}>
                 {fa ? "باز کردن / ویرایش" : "Open / edit"}
               </button>
               <button
@@ -1095,6 +1355,11 @@ function removeLab(id: string) {
                 + {fa ? "پرونده جدید" : "New patient"}
               </button>
             </div>
+            {patientCodeCheckBusy && loadedRevision === null && (
+              <small className={styles.patientCodeChecking}>
+                {fa ? "در حال بررسی آزاد بودن کد…" : "Checking code availability…"}
+              </small>
+            )}
             {loadedRevision !== null && (
               <small className={styles.revisionBadge}>
                 {fa ? `نسخه بازشده: ${loadedRevision}` : `Loaded revision: ${loadedRevision}`}
@@ -1468,6 +1733,115 @@ function removeLab(id: string) {
         </div>
       </section>
       {status && <div className={styles.status} role="status">{status}</div>}
+
+{patientCodeCollision && (
+  <div className={styles.dialogBackdrop}>
+    <section
+      className={styles.duplicateCodeDialog}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="duplicate-code-dialog-title"
+    >
+      <span className={styles.dialogEyebrow}>
+        {fa ? "تداخل شماره پرونده" : "PATIENT CODE COLLISION"}
+      </span>
+      <h2 id="duplicate-code-dialog-title">
+        {fa
+          ? "این کد قبلاً برای یک پرونده ثبت شده است"
+          : "This code is already assigned to a patient record"}
+      </h2>
+      <p>
+        {fa
+          ? "برای جلوگیری از ثبت اطلاعات یک بیمار روی پرونده بیمار دیگر، ذخیره متوقف شده است."
+          : "Save was stopped to prevent one patient's data from being written over another patient's record."}
+      </p>
+
+      {patientCodeCollision.existing && (
+        <div className={styles.duplicatePatientSummary}>
+          <strong>
+            {[
+              patientCodeCollision.existing.firstName,
+              patientCodeCollision.existing.lastName,
+            ].filter(Boolean).join(" ") ||
+              (fa ? "نام ثبت نشده" : "Name not recorded")}
+          </strong>
+          <span>
+            {fa ? "سن" : "Age"}:{" "}
+            {patientCodeCollision.existing.demographics
+              ?.reportedAgeYears ?? (fa ? "ثبت نشده" : "not recorded")}
+          </span>
+          <span>
+            {fa ? "جنس" : "Sex"}:{" "}
+            {patientCodeCollision.existing.demographics
+              ?.reportedSex === "male"
+              ? (fa ? "مرد" : "Male")
+              : patientCodeCollision.existing.demographics
+                  ?.reportedSex === "female"
+                ? (fa ? "زن" : "Female")
+                : (fa ? "ثبت نشده" : "not recorded")}
+          </span>
+          <span>
+            {fa ? "نسخه پرونده" : "Record revision"}:{" "}
+            {patientCodeCollision.existing.revision}
+          </span>
+        </div>
+      )}
+
+      {patientCodeCollision.suggestion && (
+        <div className={styles.codeSuggestionCard}>
+          <span>
+            {fa
+              ? "آخرین شماره اشغال‌شده در دنباله بررسی‌شده"
+              : "Last occupied code in the checked sequence"}
+          </span>
+          <strong>{patientCodeCollision.suggestion.lastOccupiedCode}</strong>
+          <span>
+            {fa ? "اولین شماره آزاد بعدی" : "First free next file number"}
+          </span>
+          <strong>{patientCodeCollision.suggestion.suggestedCode}</strong>
+          <small>
+            {fa
+              ? "این شماره در زمان بررسی آزاد بوده و هنگام ذخیره دوباره توسط سرور کنترل می‌شود."
+              : "This number was free at check time and will be checked again atomically on save."}
+          </small>
+        </div>
+      )}
+
+      <div className={styles.dialogActions}>
+        {patientCodeCollision.suggestion && (
+          <button
+            type="button"
+            className={styles.dialogPrimary}
+            onClick={useSuggestedPatientCode}
+          >
+            {fa
+              ? `استفاده از ${patientCodeCollision.suggestion.suggestedCode}`
+              : `Use ${patientCodeCollision.suggestion.suggestedCode}`}
+          </button>
+        )}
+        <button
+          type="button"
+          className={styles.dialogCancel}
+          onClick={() => {
+            setPatientCodeCollision(null);
+            queueMicrotask(() => patientCodeInputRef.current?.focus());
+          }}
+        >
+          {fa ? "کد دیگری وارد می‌کنم" : "Enter another code"}
+        </button>
+        <button
+          type="button"
+          className={styles.dialogDiscard}
+          onClick={openExistingFromCollision}
+        >
+          {fa
+            ? "باز کردن پرونده موجود و کنار گذاشتن ورودی فعلی"
+            : "Open existing record and discard current entry"}
+        </button>
+      </div>
+    </section>
+  </div>
+)}
 
       {fullNameReviewSuggestion && (
         <div className={styles.dialogBackdrop}>
