@@ -1,7 +1,7 @@
 # GLYMIZE — Clinical Product & Research Roadmap
 
 Status: Living roadmap / architecture contract
-Updated: 2026-08-15
+Updated: 2026-08-16
 Primary release branch: `release/glymize-clinical-ui-auth-v1`
 
 ## 0. Product north star
@@ -128,7 +128,8 @@ Pre-v2 Care Team write safety is fail-closed:
 - create and update are separate write intents at the API boundary; a missing/legacy intent is treated as create-only, never overwrite;
 - updating an existing handoff requires the exact loaded record plus its expected revision so stale or mismatched saves fail with a conflict;
 - an authorized same-practice Care Team member may see a minimal collision summary (name, reported age/sex when present, revision) solely to resolve the identifier collision;
-- for a numeric practice file number, GLYMIZE may offer the first free number after the contiguous occupied sequence beginning at the collided number. This is an advisory convenience, **not** a claim about the global maximum file number in the practice, and it must be rechecked atomically on save;
+- the pre-v2 first-free numeric suggestion is an interim collision aid only. It is **not** the long-term allocator and must not be presented as the practice's authoritative latest file number;
+- Patient Record v2 uses a practice-scoped **monotonic file-number allocator/high-water mark**. Once initialized from a physician/practice-confirmed latest assigned number, GLYMIZE shows the last allocated number and the next proposed number, never reuses gaps automatically, and allocates/rechecks the number atomically when the patient is created;
 - national IDs must never be auto-generated or incremented as suggestions.
 
 Privacy design:
@@ -173,6 +174,60 @@ Target model:
 - Historical trend retrieval
 
 A new visit must not overwrite a previous visit.
+
+### 4.1 Patient and encounter are separate aggregates
+
+**Patient ≠ Encounter.** A stable patient is the longitudinal container; every visit is a separate `encounter_id` with its own encounter date/time, source, status and immutable/revisioned clinical snapshots.
+
+Opening a patient record and starting a new visit are distinct actions. A returning patient must never be represented by overwriting the previous visit. Stable patient facts may be carried forward only as reviewed inputs; current medications, new laboratory results, vitals, adherence/tolerance and encounter-specific facts are reconfirmed for the new encounter.
+
+Medication state must distinguish:
+
+- medication reconciliation / what the patient was actually taking **before** the visit;
+- physician decisions made **during** the visit;
+- signed medication/investigation orders intended **after** the visit or before the next visit.
+
+### 4.2 Patient Workspace replaces a flat archive record
+
+`Archive` evolves into a longitudinal **Patient Workspace**. Authorized users can resolve a patient by national ID or practice file number and then see:
+
+1. patient header and identifiers;
+2. compact treatment-progress/trend cards;
+3. visits ordered by encounter date, newest first;
+4. an expandable strip/card for each visit;
+5. within each visit: incoming labs/vitals, medication reconciliation, physician note, signed medication orders, investigation orders and order/result status.
+
+The newest visit opens by default. Older visits remain collapsed until requested. Search result selection must open the stable patient, not merely one legacy handoff row.
+
+### 4.3 National ID default lookup without making it the database key
+
+National ID is the default/first-priority lookup mode in the clinical UI when available, because it is patient-stable. Practice file number remains a first-class alternate identifier. A single smart lookup field may detect a checksum-valid Iranian national ID and otherwise treat the input as a practice file number, with an explicit user override.
+
+Neither identifier is the primary database key. The authoritative identity remains the practice-scoped random `patient_id`.
+
+### 4.4 Practice file-number allocator
+
+Practice file numbers require an allocator that is independent of national ID:
+
+- practice-scoped monotonic high-water mark;
+- explicit `uninitialized` state for existing practices because legacy HMAC-only rows cannot reveal a trustworthy global maximum;
+- physician/practice-authorized initialization from the latest known assigned number;
+- display `Last allocated` and `Next proposed` in Care Team creation UX;
+- automatic proposals never reuse lower gaps;
+- a manually chosen free number may be accepted after server validation; a manually chosen number above the high-water mark advances it;
+- allocation and patient identifier creation are atomic/concurrency-safe;
+- deleting/archiving a patient does not make that file number reusable;
+- national IDs never use this allocator.
+
+### 4.5 Physician notes
+
+Support two encrypted note scopes:
+
+- **Patient note** — persistent longitudinal note, optionally pinned at the top of Patient Workspace;
+- **Encounter note** — note specific to one visit.
+
+Physician note edits are revisioned/append-only; a newer revision supersedes the prior display version without erasing history. Notes record author and timestamp. Default visibility is physician-only; sharing with Care Team, if enabled, is an explicit visibility decision and authorization check.
+
 
 Care-team workflow for a returning patient:
 
@@ -542,7 +597,9 @@ Target steps:
 
 Patient step supports:
 
-- file number as first-priority entry;
+- national ID as the default/first-priority entry when available;
+- a single smart lookup field that can resolve national ID or practice file number, with explicit type override;
+- practice file number as a first-class alternate identifier;
 - national ID;
 - other supported identifier;
 - `Load patient`;
@@ -570,6 +627,25 @@ Provide simple longitudinal views after sufficient visits exist:
 - other observation trends when clinically useful.
 
 Never interpolate missing values as if measured.
+
+Trend presentation contract:
+
+- a compact mini-chart is shown first and expands on demand;
+- clinicians may pin a small set of preferred trends;
+- chart candidates come from canonical observations, not a hard-coded diabetes-only list;
+- a quantitative series is chartable only when there are at least two compatible observations after unit normalization;
+- unverified/ambiguous OCR values are not silently treated as trusted trend points;
+- do not join incompatible units/specimens as one continuous series;
+- medication starts/stops/dose changes and relevant signed-plan events may be shown as timeline annotations without implying causality;
+- the expanded chart preserves exact measurement dates and allows opening the source encounter.
+
+Patient Workspace presentation reuses physician layout preferences:
+
+- `focus` — latest status, `What changed`, pinned trends, current medication reconciliation and pending orders;
+- `standard` — adds recent encounter timeline and broader trend cards;
+- `comprehensive` — full encounter/history/order/trend detail.
+
+Layout mode changes **presentation only**. It must never alter stored data, rule inputs, clinical thresholds or engine output.
 
 The longitudinal view should distinguish ordered investigations from completed results and surface pending physician orders to authorized Care Team users.
 
@@ -763,13 +839,16 @@ Specialty-specific logic belongs in versioned domain rule packs, not duplicated 
 
 ### P1 — Longitudinal patient foundation
 
-- [ ] Apply/migrate Patient Record v2 schema after RC validation.
-- [ ] Multi-identifier patient master (file number + national ID + other).
-- [ ] Append-only encounters/snapshots.
+- [ ] Complete Patient Record v2 schema/contracts before any migration is applied.
+- [ ] Multi-identifier patient master with national-ID-default smart lookup and practice file number as an alternate identifier.
+- [ ] Practice-scoped monotonic file-number allocator/high-water mark with explicit legacy initialization and atomic allocation.
+- [ ] Append-only encounters/snapshots: Patient ≠ Encounter and every visit is independently dated.
 - [ ] Full lab observation storage model.
-- [ ] Medication reconciliation/history.
-- [ ] Physician final prescription persistence.
-- [ ] Patient timeline and trends.
+- [ ] Medication reconciliation/history separated from post-visit signed orders.
+- [ ] Revisioned encrypted physician notes at patient and encounter scope.
+- [ ] Patient Workspace: header, expandable encounter timeline, pending/completed orders.
+- [ ] Verified/compatible longitudinal mini/expanded trend charts and deterministic `What changed since last visit`.
+- [ ] Apply/migrate Patient Record v2 schema only after RC migration rehearsal and rollback gate.
 
 ### P2 — Data-entry quality
 
@@ -780,6 +859,7 @@ Specialty-specific logic belongs in versioned domain rule packs, not duplicated 
 - [ ] Same component in physician and assistant workflows.
 - [ ] Profile-photo preview and provenance preservation.
 - [ ] Focused Workflow patient step with skip/care-team alternatives.
+- [ ] Reuse physician `focus` / `standard` / `comprehensive` presentation preferences in Patient Workspace without changing clinical logic.
 
 ### P3 — Integrated clinical intelligence
 

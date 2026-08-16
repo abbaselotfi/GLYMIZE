@@ -103,6 +103,18 @@ AuditEvent --> any versioned aggregate
 
 در مدل موقت پیش از Patient Record v2، `patient_handoffs` هنوز یک رکورد جاری برای هر hash شناسه دارد؛ بنابراین intent نوشتن باید صریح باشد. `create` فقط در صورت آزاد بودن `(practice_id, patient_code_hash)` مجاز است و conflict نباید به update تبدیل شود. `update` باید به `record_id` بارگذاری‌شده و `expectedRevision` همان رکورد مقید باشد. پیشنهاد شماره پرونده عددی صرفاً first-free در یک دنباله بررسی‌شده و advisory است؛ چون plaintext شناسه عمداً در جدول نگهداری نمی‌شود، نباید از آن به‌عنوان «بزرگ‌ترین شماره پرونده کل مطب» تعبیر شود. پیشنهاد در زمان ذخیره دوباره کنترل می‌شود و برای کد ملی تولید نمی‌شود.
 
+
+### Patient Record v2 longitudinal workspace contract
+
+در Patient Record v2، `Patient` و `Encounter` دو aggregate مستقل هستند. `patient_id` شناسهٔ داخلی پایدار است و کد ملی/شماره پرونده فقط identifierهای قابل resolve همان بیمارند. هر مراجعه `encounter_id` مستقل و `encounter_at` مستقل دارد؛ ذخیرهٔ مراجعهٔ جدید نباید snapshot یا تصمیم مراجعهٔ قبلی را بازنویسی کند.
+
+کد ملی در UI می‌تواند lookup پیش‌فرض باشد، اما هرگز primary key دیتابیس نیست. شماره پروندهٔ مطب یک namespace محلی برای همان practice است و به allocator monotonic نیاز دارد. چون hashهای legacy اجازهٔ محاسبهٔ قابل اعتماد `max(file_number)` را نمی‌دهند، allocator برای practice موجود ابتدا `uninitialized` است و فقط پس از تأیید آخرین شمارهٔ تخصیص‌یافته فعال می‌شود. پس از فعال‌سازی، `last_allocated_number` high-water mark است: gapهای پایین خودکار reuse نمی‌شوند، archive/delete شماره را آزاد نمی‌کند، و تخصیص بعدی باید با ایجاد identifier به‌صورت اتمی انجام شود.
+
+یادداشت پزشک دو scope دارد: `patient` برای نکتهٔ طولی و `encounter` برای همان جلسه. متن یادداشت encrypted است و edit با revision جدید انجام می‌شود؛ revision قبلی immutable می‌ماند. visibility پیش‌فرض `physician_only` است و نمایش به Care Team نیازمند انتخاب صریح و authorization است.
+
+Patient Workspace یک read model است، نه aggregate جدیدِ دارای حقیقت موازی. header از Patient/Demographics/Identifiers، timeline از Encounterها، داروی قبل ویزیت از medication reconciliation، تصمیم بعد ویزیت از signed Final Plan/Orders، و trend از `patient_observations` ساخته می‌شود. برای trend، زمان observation و encounter جدا می‌ماند، unit/specimen compatibility رعایت می‌شود و دادهٔ unverified به‌صورت trusted point نمایش داده نمی‌شود.
+
+
 در Care Team، مقادیر هویتی/پایه‌ای که از OCR یا متن PDF به دست می‌آیند ابتدا suggestion هستند. اعمال انسانی آن‌ها باید provenance شامل source kind، سند/صفحه، confidence موجود و وضعیت verification را حفظ کند. نام، نام خانوادگی/نام کامل، کد ملی، سن گزارش‌شده در encounter، جنس گزارش‌شده، قد و وزن نباید صرفاً به دلیل OCR بودن خودکار روی مقدار موجود نوشته شوند. برای هویت طولی، تاریخ تولد تأییدشده بر سن ثابت ارجح است و کد ملی/شماره پرونده در مدل نهایی شناسه‌های متعدد یک Patient هستند، نه دو Patient جدا.
 
 پیش از parsing سربرگ فارسی، Unicode باید برای Arabic Presentation Forms، شکل‌های عربی/فارسی ی و ک، کشیده و bidi controls canonical شود. همچنین parser باید وارونگی ترتیب value/label در text layerهای RTL را به‌عنوان artifact سند تحمل کند، بدون اینکه از محتوای نامشخص داده بسازد. جنس گزارش‌شده روی برگه فقط source/encounter demographic است و نباید به gender identity تعبیر شود.

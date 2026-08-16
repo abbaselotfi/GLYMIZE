@@ -37,6 +37,25 @@
 
 API قراردادهای نسخه‌بندی‌شده را ارائه می‌دهد، اعتبارسنجی ساختاری و مجوز را اعمال می‌کند و شناسهٔ همبستگی می‌سازد. برای ایجاد/ویرایش handoff بیمار نیز API مرجع تمامیت است: درخواست create روی شناسهٔ موجود باید با conflict fail-closed شود و هر update باید به رکورد و revision بارگذاری‌شده مقید باشد؛ بررسی زودهنگام در UI فقط کمک UX است و جای guard اتمی سرور را نمی‌گیرد. BFF متن محلی‌شده و اولویت نمایش دارو را ترکیب می‌کند، اما محاسبهٔ بالینی فقط در Clinical Decision Service انجام می‌شود.
 
+
+### پروندهٔ طولی بیمار و Patient Workspace
+
+در Patient Record v2، API/BFF باید identifier ورودی را ابتدا به یک `patient_id` پایدار resolve کند و سپس عملیات مراجعه را با `encounter_id` مستقل انجام دهد. «باز کردن بیمار» و «شروع ویزیت جدید» دو command جدا هستند؛ هیچ مسیر compatibility نباید create encounter را به overwrite رکورد/ویزیت قبلی تبدیل کند.
+
+برای شماره پروندهٔ مطب، یک allocator practice-scoped با high-water mark نگهداری می‌شود. practiceهای legacy تا زمانی که آخرین شمارهٔ تخصیص‌یافته توسط کاربر مجاز تأیید نشده باشد در حالت `uninitialized` می‌مانند؛ سیستم نباید از hashهای identifier ادعای max بسازد. تخصیص شمارهٔ پیشنهادی و درج identifier بیمار باید concurrency-safe و اتمی باشد. کد ملی از این allocator مستقل است و در UI می‌تواند lookup پیش‌فرض باشد بدون اینکه کلید اصلی ذخیره‌سازی شود.
+
+Patient Workspace یک read model ترکیبی است:
+
+- Patient header از patient master/demographics/identifiers؛
+- visit timeline از encounterها؛
+- pre-visit medications از medication reconciliation؛
+- post-visit clinical actions از signed Final Plan و orders؛
+- trends از observationهای canonical و تاریخ‌دار؛
+- physician notes از note thread/revisionهای encrypted.
+
+یادداشت پزشک با revision append-only ذخیره می‌شود؛ visibility پیش‌فرض physician-only است. Focus/Standard/Comprehensive فقط projection و progressive disclosure رابط را تغییر می‌دهند و نباید روی clinical rule input/output یا دادهٔ ذخیره‌شده اثر بگذارند.
+
+
 ### سرویس تصمیم بالینی و موتور قوانین
 
 ورودی موتور یک snapshot حداقلی از داده‌های بیمار، زمینهٔ درمان و `rule_bundle_id` است. موتور قطعی و بدون وابستگی به متن نمایشی عمل می‌کند و خروجی زیر را می‌سازد:

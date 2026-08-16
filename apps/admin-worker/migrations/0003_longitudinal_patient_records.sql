@@ -29,6 +29,29 @@ CREATE TABLE IF NOT EXISTS patient_registry (
 CREATE INDEX IF NOT EXISTS patient_registry_practice_updated_idx
   ON patient_registry(practice_id, updated_at DESC);
 
+-- Practice-scoped monotonic file-number allocator.
+-- Legacy HMAC-only identifiers cannot reveal a trustworthy global maximum, so an existing
+-- practice starts uninitialized until an authorized user confirms the latest assigned number.
+-- The application must allocate/bump this high-water mark atomically with identifier creation.
+CREATE TABLE IF NOT EXISTS patient_file_number_allocators (
+  practice_id TEXT PRIMARY KEY REFERENCES practices(id) ON DELETE CASCADE,
+  allocation_status TEXT NOT NULL DEFAULT 'uninitialized'
+    CHECK (allocation_status IN ('uninitialized','ready')),
+  last_allocated_number INTEGER,
+  display_width INTEGER NOT NULL DEFAULT 1
+    CHECK (display_width >= 1 AND display_width <= 18),
+  initialized_by TEXT REFERENCES runtime_users(id) ON DELETE SET NULL,
+  initialized_at TEXT,
+  updated_by TEXT REFERENCES runtime_users(id) ON DELETE SET NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (
+    (allocation_status='uninitialized' AND last_allocated_number IS NULL)
+    OR
+    (allocation_status='ready' AND last_allocated_number IS NOT NULL AND last_allocated_number >= 0)
+  )
+);
+
+
 CREATE TABLE IF NOT EXISTS patient_identifiers (
   id TEXT PRIMARY KEY,
   patient_id TEXT NOT NULL REFERENCES patient_registry(id) ON DELETE CASCADE,
@@ -82,6 +105,50 @@ CREATE INDEX IF NOT EXISTS patient_encounters_patient_time_idx
   ON patient_encounters(patient_id, encounter_at DESC);
 CREATE INDEX IF NOT EXISTS patient_encounters_practice_time_idx
   ON patient_encounters(practice_id, encounter_at DESC);
+
+-- Physician notes use a stable thread plus append-only encrypted revisions.
+-- Patient-scoped threads persist across visits; encounter-scoped threads belong to one visit.
+CREATE TABLE IF NOT EXISTS patient_note_threads (
+  id TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL REFERENCES patient_registry(id) ON DELETE CASCADE,
+  practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
+  note_scope TEXT NOT NULL CHECK (note_scope IN ('patient','encounter')),
+  encounter_id TEXT REFERENCES patient_encounters(id) ON DELETE CASCADE,
+  visibility TEXT NOT NULL DEFAULT 'physician_only'
+    CHECK (visibility IN ('physician_only','care_team_visible')),
+  is_pinned INTEGER NOT NULL DEFAULT 0 CHECK (is_pinned IN (0,1)),
+  created_by TEXT NOT NULL REFERENCES runtime_users(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  archived_at TEXT,
+  CHECK (
+    (note_scope='patient' AND encounter_id IS NULL)
+    OR
+    (note_scope='encounter' AND encounter_id IS NOT NULL)
+  )
+);
+CREATE INDEX IF NOT EXISTS patient_note_threads_patient_idx
+  ON patient_note_threads(patient_id, note_scope, updated_at DESC);
+CREATE INDEX IF NOT EXISTS patient_note_threads_encounter_idx
+  ON patient_note_threads(encounter_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS patient_note_revisions (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES patient_note_threads(id) ON DELETE CASCADE,
+  patient_id TEXT NOT NULL REFERENCES patient_registry(id) ON DELETE CASCADE,
+  practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
+  revision INTEGER NOT NULL CHECK (revision >= 1),
+  payload_ciphertext TEXT NOT NULL,
+  payload_iv TEXT NOT NULL,
+  payload_auth_tag TEXT NOT NULL,
+  schema_version TEXT NOT NULL DEFAULT 'physician-note-v1',
+  authored_by TEXT NOT NULL REFERENCES runtime_users(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL,
+  UNIQUE(thread_id, revision)
+);
+CREATE INDEX IF NOT EXISTS patient_note_revisions_patient_time_idx
+  ON patient_note_revisions(patient_id, created_at DESC);
+
 
 -- Append-only snapshots. Application code must NEVER UPDATE a historical snapshot row.
 CREATE TABLE IF NOT EXISTS patient_encounter_snapshots (
