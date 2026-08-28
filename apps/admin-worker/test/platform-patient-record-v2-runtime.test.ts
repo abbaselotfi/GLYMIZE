@@ -31,6 +31,13 @@ const runtimeSecurity = fs.readFileSync(
   new URL("../src/runtime-security.ts", import.meta.url),
   "utf8",
 );
+const encounterRevisionMigration = fs.readFileSync(
+  new URL(
+    "../migrations/0004_encounter_snapshot_revisions.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const handoffClient = fs.readFileSync(
   new URL("../../web/lib/patient-handoff-client.ts", import.meta.url),
   "utf8",
@@ -193,6 +200,8 @@ describe("Patient Record v2 runtime vertical slice", () => {
       "createPatient",
       "attachPatientIdentifier",
       "createPatientEncounter",
+      "getPatientEncounter",
+      "revisePatientEncounter",
       "getPatientWorkspace",
     ]) {
       expect(client).toContain(marker);
@@ -241,6 +250,35 @@ describe("Patient Record v2 runtime vertical slice", () => {
     );
     expect(runtime).toContain('"patient.encounter_created"');
     expect(runtime).not.toContain("UPDATE patient_encounter_snapshots");
+  });
+
+  it("adds optimistic same-encounter revisions without overwriting history", () => {
+    expect(runtime).toContain("ENCOUNTER_REVISION_CONFLICT");
+    expect(runtime).toContain("expectedRevision");
+    expect(runtime).toContain('"patient.encounter_revised"');
+    expect(runtime).toContain('request.method === "PATCH"');
+    expect(runtime).toContain("nextRevision = currentRevision + 1");
+    expect(runtime).toContain("snapshotAad(");
+    expect(runtime).not.toContain("UPDATE patient_encounter_snapshots");
+  });
+
+  it("links indexed observations to the snapshot revision via additive migration 0004", () => {
+    expect(encounterRevisionMigration).toContain(
+      "ADD COLUMN snapshot_revision",
+    );
+    expect(encounterRevisionMigration).toContain(
+      "patient_observations_encounter_revision_idx",
+    );
+    expect(runtime).toContain("snapshot_revision");
+    expect(runtime).toContain("nextRevision");
+  });
+
+  it("locks completed and signed encounters from in-place clinical revision", () => {
+    expect(runtime).toContain("ENCOUNTER_COMPLETED_IMMUTABLE");
+    expect(runtime).toContain("ENCOUNTER_SIGNED_PLAN_LOCKED");
+    expect(runtime).toContain(
+      "physician_encounter_revision_forbidden",
+    );
   });
 
   it("encrypts observations and marks timestamp fallback instead of inventing a source date", () => {

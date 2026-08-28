@@ -5,6 +5,9 @@ import type {
   PatientCreateResult,
   PatientEncounterCreateInput,
   PatientEncounterCreateResult,
+  PatientEncounterDetail,
+  PatientEncounterRevisionInput,
+  PatientEncounterRevisionResult,
   PatientFileNumberAllocatorInitializeInput,
   PatientFileNumberAllocatorState,
   PatientIdentifierAttachInput,
@@ -148,6 +151,37 @@ export async function createPatientEncounter(
   return checkedJson<PatientEncounterCreateResult>(
     response,
     "PATIENT_ENCOUNTER_CREATE_FAILED",
+  );
+}
+
+export async function getPatientEncounter(
+  patientId: string,
+  encounterId: string,
+) {
+  const response = await runtimeFetch(
+    `/v1/patients/${encodeURIComponent(patientId)}/encounters/${encodeURIComponent(encounterId)}`,
+  );
+  return checkedJson<PatientEncounterDetail>(
+    response,
+    "PATIENT_ENCOUNTER_READ_FAILED",
+  );
+}
+
+export async function revisePatientEncounter(
+  patientId: string,
+  encounterId: string,
+  input: PatientEncounterRevisionInput,
+) {
+  const response = await runtimeFetch(
+    `/v1/patients/${encodeURIComponent(patientId)}/encounters/${encodeURIComponent(encounterId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+  return checkedJson<PatientEncounterRevisionResult>(
+    response,
+    "PATIENT_ENCOUNTER_REVISION_FAILED",
   );
 }
 

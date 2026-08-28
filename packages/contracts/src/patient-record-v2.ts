@@ -199,6 +199,44 @@ export interface PatientEncounterCreateResult {
   observationCount: number;
 }
 
+export type PatientEncounterSnapshotKind =
+  | "clinical"
+  | "care_team"
+  | "physician_review"
+  | "final";
+
+export interface PatientEncounterSnapshotRevision {
+  revision: number;
+  snapshotKind: PatientEncounterSnapshotKind;
+  snapshot: PatientEncounterClinicalSnapshot;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface PatientEncounterDetail {
+  encounter: PatientEncounterSummary;
+  latestSnapshot?: PatientEncounterSnapshotRevision;
+}
+
+export interface PatientEncounterRevisionInput {
+  /**
+   * Latest snapshot revision previously read by the editor. Use 0 only when
+   * the encounter has no snapshot yet. A stale value must fail with HTTP 409.
+   */
+  expectedRevision: number;
+  /** Full current encounter snapshot; historical revisions remain immutable. */
+  snapshot: PatientEncounterClinicalSnapshot;
+  /** Optional lifecycle transition; encounter date/kind are immutable here. */
+  status?: PatientEncounterStatus;
+}
+
+export interface PatientEncounterRevisionResult {
+  encounter: PatientEncounterSummary;
+  previousRevision: number;
+  revision: number;
+  observationCount: number;
+}
+
 export type PhysicianNoteScope = "patient" | "encounter";
 export type PhysicianNoteVisibility =
   | "physician_only"
