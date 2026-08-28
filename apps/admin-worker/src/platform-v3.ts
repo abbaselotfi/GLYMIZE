@@ -1,5 +1,6 @@
 import platformHandler from "./platform-index";
 import { adminRuntimeRoute } from "./platform-v3-admin";
+import { patientPortalRoute } from "./platform-patient-portal";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -53,9 +54,18 @@ export default {
           assistantPasswordLogin: true,
           passwordSetup: true,
           adminUsers: true,
+          patientPortal:
+            String(env.PATIENT_PORTAL_V1_ENABLED ?? "")
+              .trim()
+              .toLowerCase() === "true",
         },
       });
     }
+
+    // WS-2/WS-3: patient portal + clinician portal review namespace.
+    // Fails closed unless PATIENT_PORTAL_V1_ENABLED === "true".
+    const portal = await patientPortalRoute(request, env);
+    if (portal) return portal;
 
     const adminRuntime = await adminRuntimeRoute(request, env);
     if (adminRuntime) return adminRuntime;

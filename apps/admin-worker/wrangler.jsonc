@@ -10,7 +10,8 @@
 		"ALLOWED_GITHUB_LOGIN": "abbaselotfi",
 		"GITHUB_REPOSITORY": "abbaselotfi/GLYMIZE",
 		"GITHUB_BRANCH": "main",
-		"CATALOG_PATH": "apps/web/public/data/admin-catalog.json"
+		"CATALOG_PATH": "apps/web/public/data/admin-catalog.json",
+		"PATIENT_PORTAL_V1_ENABLED": "false"
 	},
 	"secrets": {
 		"required": [
@@ -35,6 +36,12 @@
 			"database_name": "glymize-runtime",
 			"database_id": "ba073c8d-4925-4dab-a39c-6fa0f592cf1f",
 			"migrations_dir": "migrations"
+		}
+	]
+	,"r2_buckets": [
+		{
+			"binding": "PORTAL_MEDIA",
+			"bucket_name": "glymize-portal-media"
 		}
 	]
 }

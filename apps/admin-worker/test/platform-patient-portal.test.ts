@@ -1,0 +1,174 @@
+import fs from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const runtime = fs.readFileSync(
+  new URL("../src/platform-patient-portal.ts", import.meta.url),
+  "utf8",
+);
+const entry = fs.readFileSync(
+  new URL("../src/platform-v3.ts", import.meta.url),
+  "utf8",
+);
+const v3base = fs.readFileSync(
+  new URL("../src/platform-v3-base.ts", import.meta.url),
+  "utf8",
+);
+const wrangler = fs.readFileSync(
+  new URL("../wrangler.jsonc", import.meta.url),
+  "utf8",
+);
+const migration = fs.readFileSync(
+  new URL("../migrations/0005_patient_portal_v1.sql", import.meta.url),
+  "utf8",
+);
+const contracts = fs.readFileSync(
+  new URL("../../../packages/contracts/src/patient-portal.ts", import.meta.url),
+  "utf8",
+);
+const contractsIndex = fs.readFileSync(
+  new URL("../../../packages/contracts/src/index.ts", import.meta.url),
+  "utf8",
+);
+const portalClient = fs.readFileSync(
+  new URL("../../web/lib/portal-client.ts", import.meta.url),
+  "utf8",
+);
+const portalUi = fs.readFileSync(
+  new URL("../../web/app/portal/portal-client.tsx", import.meta.url),
+  "utf8",
+);
+const reviewUi = fs.readFileSync(
+  new URL("../../web/app/portal-review/portal-review-client.tsx", import.meta.url),
+  "utf8",
+);
+const recordRuntime = fs.readFileSync(
+  new URL("../src/platform-patient-record-v2.ts", import.meta.url),
+  "utf8",
+);
+
+function prepareTemplatesUseStaticSql(source: string) {
+  const marker = ".prepare(";
+  let cursor = 0;
+  while (true) {
+    const start = source.indexOf(marker, cursor);
+    if (start < 0) return true;
+    let index = start + marker.length;
+    while (/\s/.test(source[index] ?? "")) index += 1;
+    if (source[index] !== "`") return false;
+    index += 1;
+    const sqlStart = index;
+    while (index < source.length) {
+      if (source[index] === "`" && source[index - 1] !== "\\") break;
+      index += 1;
+    }
+    const sql = source.slice(sqlStart, index);
+    if (sql.includes("${")) return false;
+    cursor = index;
+  }
+}
+
+describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
+  it("stores patient intake in additive tables with no plaintext login handle", () => {
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS portal_users");
+    expect(migration).toContain("login_hash TEXT NOT NULL UNIQUE");
+    expect(migration).not.toContain("login_plain");
+    expect(migration).not.toContain("login_norm TEXT");
+    expect(migration).toContain(
+      "must_change_password INTEGER NOT NULL DEFAULT 1",
+    );
+    expect(migration).toContain("UNIQUE(practice_id, patient_id)");
+    expect(migration).toContain("portal_submissions");
+    expect(migration).toContain("portal_threads");
+    expect(migration).toContain("portal_messages");
+    expect(migration).toContain("portal_message_attachments");
+    expect(migration).toContain(
+      "(sender_role='patient' AND sender_portal_user_id IS NOT NULL AND sender_runtime_user_id IS NULL)",
+    );
+  });
+
+  it("keeps patient submissions isolated until explicit physician review", () => {
+    expect(migration).toContain("status TEXT NOT NULL DEFAULT 'submitted'");
+    expect(migration).toContain(
+      "CHECK (status IN ('submitted','acknowledged','reviewed','archived'))",
+    );
+    expect(migration).toContain(
+      "encounter_id TEXT REFERENCES patient_encounters(id) ON DELETE SET NULL",
+    );
+    expect(contracts).toContain("portalSubmissionKinds");
+    expect(contracts).toContain("reportedBy");
+    expect(contractsIndex).toContain('from "./patient-portal.js"');
+  });
+
+  it("forces patient-reported verification to unverified at the runtime boundary", () => {
+    expect(runtime).toContain('verification: "unverified"');
+    expect(runtime).toContain('payload.reportedBy = "patient"');
+    expect(runtime).toContain("sanitizePatientMedications");
+    expect(runtime).toContain("sanitizePatientLabs");
+    expect(runtime).toContain("sanitizePatientVitals");
+  });
+
+  it("fails closed on a disabled feature flag", () => {
+    expect(runtime).toContain("portalEnabled");
+    expect(runtime).toContain('{ error: "portal_disabled" }');
+    expect(wrangler).toContain('"PATIENT_PORTAL_V1_ENABLED": "false"');
+    expect(entry).toContain(
+      'import { patientPortalRoute } from "./platform-patient-portal"',
+    );
+    expect(entry).toContain("patientPortalRoute(request, env)");
+    expect(v3base).toContain("PATIENT_PORTAL_V1_ENABLED?:string");
+  });
+
+  it("separates patient sessions from runtime physician/assistant sessions", () => {
+    expect(runtime).toContain('"PORTAL-ACCESS-V1"');
+    expect(runtime).not.toContain('"RUNTIME-ACCESS-V1"');
+    expect(runtime).toContain("portal_refresh_tokens");
+    expect(runtime).toContain("portalRate");
+    expect(runtime).toContain("`portal-login:${normalized}`");
+  });
+
+  it("keeps media private and fail-closed with no public or presigned URLs", () => {
+    expect(wrangler).toContain('"binding": "PORTAL_MEDIA"');
+    expect(runtime).toContain("PORTAL_MEDIA_NOT_CONFIGURED");
+    expect(runtime).toContain("25 * 1024 * 1024");
+    expect(runtime).toContain('"image/jpeg"');
+    expect(runtime).toContain('"video/mp4"');
+    expect(runtime).not.toMatch(/presign/i);
+    expect(runtime).not.toContain("publicBucket");
+    expect(runtime).toContain('"cache-control": "private, no-store"');
+    expect(runtime).toContain("MAX_ATTACHMENTS_PER_MESSAGE");
+  });
+
+  it("enforces physician authority over clinical review actions", () => {
+    expect(runtime).toContain("physician_authority_required");
+    expect(runtime).toContain("thread.physician_id !== clinician.id");
+    expect(runtime).toContain('clinicianCan(clinician, "handoff.read")');
+    expect(runtime).toContain('clinicianCan(clinician, "handoff.write")');
+  });
+
+  it("audits portal security-relevant actions", () => {
+    expect(runtime).toContain('"portal.login"');
+    expect(runtime).toContain('"portal.submission_created"');
+    expect(runtime).toContain('"portal.message_sent"');
+    expect(runtime).toContain('"portal.submission_status_changed"');
+    expect(runtime).toContain('"portal.account_created"');
+    expect(runtime).toContain('"portal.thread_created"');
+  });
+
+  it("keeps every portal query on a static SQL template", () => {
+    expect(prepareTemplatesUseStaticSql(runtime)).toBe(true);
+  });
+
+  it("ships bilingual patient and clinician surfaces wired to the portal API", () => {
+    expect(portalClient).toContain("/v1/portal/auth/login");
+    expect(portalClient).toContain("refreshPortalSession");
+    expect(portalClient).toContain("sendPortalMessage");
+    expect(portalUi).toContain("handleIntakeSubmit");
+    expect(portalUi).toContain("patient-reported");
+    expect(reviewUi).toContain("/v1/portal/admin/submissions");
+    expect(reviewUi).toContain("physician_authority_required");
+  });
+
+  it("preserves the WS-1 encounter authorization lock in the same release", () => {
+    expect(recordRuntime).toContain("ENCOUNTER_REVIEWED_ASSISTANT_LOCKED");
+  });
+});

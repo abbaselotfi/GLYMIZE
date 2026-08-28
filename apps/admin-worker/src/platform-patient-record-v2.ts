@@ -2090,7 +2090,14 @@ function allowedRevisionStatuses(
   currentStatus: EncounterStateRow["status"],
 ) {
   if (role === "assistant") {
-    return ["draft", "ready_for_physician"];
+    // WS-1 authorization fix (handoff section 15): an assistant may only act
+    // on encounters that have NOT yet reached physician review. Once an
+    // encounter is reviewed/locked, there are no assistant-reachable target
+    // statuses; the reviseEncounter gate rejects earlier with 403.
+    return currentStatus === "draft" ||
+      currentStatus === "ready_for_physician"
+      ? ["draft", "ready_for_physician"]
+      : [];
   }
   if (currentStatus === "reviewed") {
     return ["reviewed", "completed"];
@@ -2146,6 +2153,32 @@ async function reviseEncounter(
   ) {
     return context.respond(
       { error: "physician_encounter_revision_forbidden" },
+      403,
+    );
+  }
+  if (
+    context.user.role === "assistant" &&
+    encounter.source === "care_team" &&
+    encounter.status !== "draft" &&
+    encounter.status !== "ready_for_physician"
+  ) {
+    // WS-1 authorization fix (handoff section 15 edge case): once a
+    // care_team encounter has been reviewed/locked by physician policy, an
+    // assistant must not silently revise clinical content or return it to
+    // draft. A deliberate physician-driven amendment workflow with its own
+    // authorization and audit is required instead. Fail closed.
+    await context.audit(
+      "patient.encounter_assistant_revision_denied",
+      "patient_encounter",
+      encounterId,
+      {
+        patientId,
+        status: encounter.status,
+        source: encounter.source,
+      },
+    );
+    return context.respond(
+      { error: "ENCOUNTER_REVIEWED_ASSISTANT_LOCKED" },
       403,
     );
   }

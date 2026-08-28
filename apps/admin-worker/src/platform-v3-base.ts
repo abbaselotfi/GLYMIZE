@@ -1,6 +1,6 @@
 import { sanitizeRuntimePermissions, type LayoutPreset, type RuntimePermission, type RuntimeRole } from "./runtime-security";
 
-export interface V3Env { ADMIN_ORIGIN:string; SESSION_SECRET:string; GLYMIZE_DB?:D1Database; [key:string]:unknown }
+export interface V3Env { ADMIN_ORIGIN:string; SESSION_SECRET:string; GLYMIZE_DB?:D1Database; PATIENT_PORTAL_V1_ENABLED?:string; PORTAL_MEDIA?:R2Bucket; [key:string]:unknown }
 export type V3User={id:string;role:RuntimeRole;status:"active"|"disabled";firstName:string;lastName:string;email?:string;mobile?:string;medicalCouncilCode?:string;profilePhoto?:string;layoutPreset:LayoutPreset;practiceId:string;practiceName:string;permissions:RuntimePermission[]};
 export function v3db(env:V3Env){if(!env.GLYMIZE_DB)throw new Error("GLYMIZE_DB_NOT_CONFIGURED");return env.GLYMIZE_DB}
 export function v3now(){return new Date().toISOString()}

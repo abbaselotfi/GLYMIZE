@@ -745,4 +745,5 @@ export interface Type2AssessmentResult {
 export * from "./patient-identifier.js";
 export * from "./patient-handoff.js";
 export * from "./patient-record-v2.js";
+export * from "./patient-portal.js";
 export * from "./physician-orders.js";

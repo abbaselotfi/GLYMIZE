@@ -281,6 +281,29 @@ describe("Patient Record v2 runtime vertical slice", () => {
     );
   });
 
+  it("locks physician-reviewed care_team encounters from assistant revision (WS-1 authorization fix)", () => {
+    expect(runtime).toContain("ENCOUNTER_REVIEWED_ASSISTANT_LOCKED");
+    expect(runtime).toContain(
+      '"patient.encounter_assistant_revision_denied"',
+    );
+    const gate = runtime.slice(
+      runtime.indexOf("async function reviseEncounter"),
+      runtime.indexOf("async function workspace"),
+    );
+    expect(gate).toContain('encounter.source === "care_team"');
+    expect(gate).toContain('encounter.status !== "draft"');
+    expect(gate).toContain('encounter.status !== "ready_for_physician"');
+  });
+
+  it("gives assistants no reachable target statuses after physician review", () => {
+    const fn = runtime.slice(
+      runtime.indexOf("function allowedRevisionStatuses"),
+      runtime.indexOf("async function reviseEncounter"),
+    );
+    expect(fn).toContain('return currentStatus === "draft" ||');
+    expect(fn).toContain(": [];");
+  });
+
   it("encrypts observations and marks timestamp fallback instead of inventing a source date", () => {
     expect(runtime).toContain("INSERT INTO patient_observations");
     expect(runtime).toContain("encryptClinicalPayload(");
