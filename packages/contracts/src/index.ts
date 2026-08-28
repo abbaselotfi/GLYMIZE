@@ -711,3 +711,4 @@ export interface Type2AssessmentResult {
   recommendation: Type2PathwayRecommendation;
   medications: Type2MedicationConsideration[];
 }
+

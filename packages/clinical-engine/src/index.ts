@@ -529,3 +529,5 @@ export function buildType2MedicationConsiderations(
     }];
   }).sort((left, right) => right.priorityScore - left.priorityScore || left.persianName.localeCompare(right.persianName, "fa"));
 }
+
+export * from "./decision-graph-v2/index.js";
