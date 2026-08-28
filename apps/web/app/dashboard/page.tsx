@@ -9,6 +9,52 @@ import styles from "./dashboard.module.css";
 
 type Locale = "fa" | "en";
 type Status = "available" | "foundation" | "planned";
+type LocalQaLayoutPreset = "auto" | "command_center" | "focused_workflow" | "compact_cards" | "evidence_trace";
+const LOCAL_QA_LAYOUT_KEY = "glymize-local-layout-preset";
+const LOCAL_QA_LAYOUT_EVENT = "glymize-local-layout-preset-change";
+const LOCAL_QA_LAYOUTS: Array<{
+  key: LocalQaLayoutPreset;
+  fa: string;
+  en: string;
+  hintFa: string;
+  hintEn: string;
+}> = [
+  {
+    key: "auto",
+    fa: "Auto",
+    en: "Auto",
+    hintFa: "چیدمان پیشنهادی متناسب با دستگاه و ترجیح ذخیره‌شده.",
+    hintEn: "Recommended layout adapted to device and saved preference."
+  },
+  {
+    key: "command_center",
+    fa: "Command Center",
+    en: "Command Center",
+    hintFa: "دید پانورامیک؛ بیشترین context هم‌زمان برای اسکن سریع و کنترل.",
+    hintEn: "Panoramic view with maximum simultaneous context for rapid scanning and control."
+  },
+  {
+    key: "focused_workflow",
+    fa: "Guided Focus",
+    en: "Guided Focus",
+    hintFa: "فقط یک تصمیم در هر مرحله؛ حداقل حواس‌پرتی و بار شناختی.",
+    hintEn: "One decision at a time with minimal distraction and cognitive overhead."
+  },
+  {
+    key: "compact_cards",
+    fa: "Visual Flow",
+    en: "Visual Flow",
+    hintFa: "مسیر بصری، کارت‌محور و کم‌متن برای تشخیص سریع الگو و حرکت روان.",
+    hintEn: "Visual, card-led, low-text flow optimized for fast pattern recognition."
+  },
+  {
+    key: "evidence_trace",
+    fa: "Evidence Trace",
+    en: "Evidence Trace",
+    hintFa: "منطق، دلیل، trade-off و منبع جلوتر از جزئیات اجرایی.",
+    hintEn: "Rationale, trade-offs, and provenance before operational detail."
+  },
+];
 
 type MarketDashboardMeta = {
   sourceGeneratedAt?: string;
@@ -141,6 +187,8 @@ export default function DashboardPage() {
   const { locale, isRtl } = useGlymizeLocale();
   const copy = COPY[locale];
   const [marketMeta, setMarketMeta] = useState<MarketDashboardMeta | null>(null);
+  const [localQaPreset, setLocalQaPreset] = useState<LocalQaLayoutPreset>("auto");
+  const localUiBypass = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_LOCAL_UI_BYPASS === "1";
 
   useEffect(() => {
     void fetch(`${withBasePath("/data/glymize-clinician-market-v2.meta.json")}?t=${Date.now()}`, { cache: "no-store" })
@@ -148,6 +196,20 @@ export default function DashboardPage() {
       .then(setMarketMeta)
       .catch(() => setMarketMeta(null));
   }, []);
+
+  useEffect(() => {
+    if (!localUiBypass) return;
+    const value = window.localStorage.getItem(LOCAL_QA_LAYOUT_KEY);
+    if (value === "auto" || value === "command_center" || value === "focused_workflow" || value === "compact_cards" || value === "evidence_trace" || value === "evidence_trace" || value === "evidence_trace") {
+      setLocalQaPreset(value);
+    }
+  }, [localUiBypass]);
+
+  function applyLocalQaPreset(next: LocalQaLayoutPreset) {
+    setLocalQaPreset(next);
+    window.localStorage.setItem(LOCAL_QA_LAYOUT_KEY, next);
+    window.dispatchEvent(new Event(LOCAL_QA_LAYOUT_EVENT));
+  }
 
   const dataMetrics = marketMeta?.dashboardMetrics;
   const lastUpdated = marketMeta?.sourceGeneratedAt
@@ -160,6 +222,20 @@ export default function DashboardPage() {
         <div><span className={styles.eyebrow}>{copy.eyebrow}</span><h1>{copy.title}</h1><p>{copy.intro}</p></div>
         <Link className={styles.heroAction} href="/type-2">{copy.startType2}<span aria-hidden="true">←</span></Link>
       </header>
+
+      {localUiBypass && <section className={styles.localQaLayout} aria-label={locale === "fa" ? "حالت تست چیدمان" : "Layout QA mode"}>
+        <div><strong>{locale === "fa" ? "تست چیدمان پزشک" : "Clinician layout QA"}</strong><small>{locale === "fa" ? "فقط localhost · همان preset واقعی AppShell" : "localhost only · real AppShell preset"}</small></div>
+        <div className={styles.localQaLayoutButtons}>
+          {LOCAL_QA_LAYOUTS.map((option) => <button
+            type="button"
+            key={option.key}
+            data-active={localQaPreset === option.key}
+            onClick={() => applyLocalQaPreset(option.key)}
+            title={locale === "fa" ? option.hintFa : option.hintEn}
+          >{option[locale]}</button>)}
+        </div>
+        <p className={styles.localQaLayoutHint}>{locale === "fa" ? LOCAL_QA_LAYOUTS.find((option) => option.key === localQaPreset)?.hintFa : LOCAL_QA_LAYOUTS.find((option) => option.key === localQaPreset)?.hintEn}</p>
+      </section>}
 
       <div className={styles.commandGrid}>
         <section className={styles.primaryLane}>

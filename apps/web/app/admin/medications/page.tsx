@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { readSheet } from "read-excel-file/browser";
 import { apiFetch, beginCatalogPublishBatch, buildCatalogDiagnosticSnapshot, endCatalogPublishBatch } from "../../../lib/api-client";
 import { withBasePath } from "../../../lib/base-path";
+const MEDICATION_PAGE_SIZE = 15;
 const clinicalDomainLabels: Record<MedicationClinicalDomain, string> = {
   diabetes: "دیابت", cardiovascular: "قلب و عروق", kidney: "کلیه", liver: "کبد", obesity: "چاقی",
   hypertension: "فشارخون", lipids: "چربی خون", heart_failure: "نارسایی قلبی", ascvd: "ASCVD",
@@ -90,6 +91,7 @@ export default function MedicationSelectionPage() {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [brandInsuranceDrafts, setBrandInsuranceDrafts] = useState<Record<string, CoverageDraft>>({});
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importFileName, setImportFileName] = useState("");
   const [syncVisibility, setSyncVisibility] = useState(true);
@@ -123,11 +125,27 @@ export default function MedicationSelectionPage() {
   }
   useEffect(() => { void refresh().catch(() => setMessage("API در دسترس نیست؛ سرویس را اجرا و صفحه را بازخوانی کنید.")); }, []);
 
-  const grouped = useMemo(() => {
+  const filteredItems = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
-    const visible = term ? items.filter((item) => `${item.genericName} ${item.therapeuticClass} ${item.dosageForm} ${item.brands.map((brand) => brand.name).join(" ")}`.toLocaleLowerCase().includes(term)) : items;
-    return visible.reduce<Record<string, MedicationChecklistItem[]>>((groups, item) => ((groups[item.therapeuticClass] ??= []).push(item), groups), {});
+    return term
+      ? items.filter((item) => `${item.genericName} ${item.therapeuticClass} ${item.dosageForm} ${item.brands.map((brand) => brand.name).join(" ")}`.toLocaleLowerCase().includes(term))
+      : items;
   }, [items, query]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / MEDICATION_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * MEDICATION_PAGE_SIZE;
+  const pagedItems = useMemo(
+    () => filteredItems.slice(pageStart, pageStart + MEDICATION_PAGE_SIZE),
+    [filteredItems, pageStart]
+  );
+  const grouped = useMemo(
+    () => pagedItems.reduce<Record<string, MedicationChecklistItem[]>>(
+      (groups, item) => ((groups[item.therapeuticClass] ??= []).push(item), groups),
+      {}
+    ),
+    [pagedItems]
+  );
 
   function draftFor(item: MedicationChecklistItem): Draft {
     return drafts[item.referencePresentationId] ?? { enabled: item.insuranceCoverages.length > 0, provider: "social_security", percent: "", genericCode: "", brandCode: "", insurerShareToman: "", patientShareToman: "", referencePriceToman: "" };
@@ -380,7 +398,7 @@ export default function MedicationSelectionPage() {
         <button disabled={Boolean(importPreview.errors.length) || !importPreview.matchedPresentationIds.length} onClick={() => void applyImport()} type="button">تأیید و ثبت Import</button>
       </div>}
     </section>
-    <div className="catalog-toolbar"><label className="search-field"><span>جست‌وجوی دارو یا دسته</span><input onChange={(event) => setQuery(event.target.value)} placeholder="مثلاً metformin یا insulin" type="search" value={query} /></label><p className="muted" role="status">{message}</p></div>
+    <div className="catalog-toolbar"><label className="search-field"><span>جست‌وجوی دارو یا دسته</span><input onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="مثلاً metformin یا insulin" type="search" value={query} /></label><p className="muted" role="status">{message}</p><div className="catalog-pagination" aria-label="صفحه‌بندی فهرست داروها"><button className="secondary" disabled={currentPage === 1} onClick={() => setPage(1)} type="button">اول</button><button className="secondary" disabled={currentPage === 1} onClick={() => setPage(Math.max(1, currentPage - 1))} type="button">قبلی</button><span>صفحه {currentPage.toLocaleString("fa-IR")} از {pageCount.toLocaleString("fa-IR")} · نمایش {filteredItems.length ? (pageStart + 1).toLocaleString("fa-IR") : "۰"} تا {Math.min(pageStart + MEDICATION_PAGE_SIZE, filteredItems.length).toLocaleString("fa-IR")} از {filteredItems.length.toLocaleString("fa-IR")}</span><button className="secondary" disabled={currentPage === pageCount} onClick={() => setPage(Math.min(pageCount, currentPage + 1))} type="button">بعدی</button><button className="secondary" disabled={currentPage === pageCount} onClick={() => setPage(pageCount)} type="button">آخر</button></div></div>
     <div className="insurance-column-legend"><span>نمایش دارو</span><span>بیمه</span><span>ارگان پوشش‌دهنده</span><span>درصد پوشش</span><span>ثبت</span></div>
     <div className="medication-group-list">{Object.entries(grouped).map(([group, groupItems]) => <section className="medication-group" key={group}><header><div><h2>{group}</h2><span>{groupItems.filter((item) => item.showInApp).length} فعال از {groupItems.length}</span></div></header><div className="medication-checklist">{groupItems.map((item) => {
       const draft = draftFor(item);

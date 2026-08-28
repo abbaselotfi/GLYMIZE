@@ -54,7 +54,7 @@ export default function MedicationMarketDetails({
       {marketBadge?.confirmedByAdmin && <span className="market-new-badge">{marketBadge.labelFa}</span>}
     </div>
     <details className="medication-market-details">
-      <summary>{fa ? "قیمت، کدها و جزئیات بیمه" : "Price, codes and insurance details"}</summary>
+      <summary>{fa ? "جزئیات بیمه، کدها و هزینه" : "Insurance, codes and cost details"}</summary>
       <div className="market-details-body">
         <div className="registry-code-row">
           {genericRegistryCode && <span><b>{fa ? "کد ژنریک رجیستری:" : "Registry generic code:"}</b> <code>{genericRegistryCode}</code></span>}

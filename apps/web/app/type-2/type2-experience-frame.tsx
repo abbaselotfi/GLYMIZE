@@ -18,28 +18,78 @@ function findPrimarySections() {
   ));
 }
 
+function scrollToType2Target(target: HTMLElement | null | undefined) {
+  if (!target) return;
+
+  const shell = document.querySelector<HTMLElement>('.glymize-internal-shell[data-route="type-2"]');
+  const focused = shell?.dataset.layoutPreset === "focused_workflow";
+
+  if (!focused) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const topbar = document.querySelector<HTMLElement>(".global-topbar");
+  const stepper = document.querySelector<HTMLElement>(".type2-v3-stepper");
+
+  const topbarHeight = topbar?.getBoundingClientRect().height ?? 72;
+  const stepperHeight = stepper?.getBoundingClientRect().height ?? 64;
+  const visualGap = 22;
+
+  const targetTop = window.scrollY + target.getBoundingClientRect().top;
+  const destination = targetTop - topbarHeight - stepperHeight - visualGap;
+
+  window.scrollTo({
+    top: Math.max(0, destination),
+    behavior: "smooth",
+  });
+}
+
 export default function Type2ExperienceFrame() {
   const { locale } = useGlymizeLocale();
   const [activeStep, setActiveStep] = useState(1);
 
   function goToStep(step: number) {
-    setActiveStep(step);
-    window.requestAnimationFrame(() => {
-      if (step <= 3) {
-        findPrimarySections()[step - 1]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (step === 4) {
+      const results = document.querySelector<HTMLElement>(
+        '.glymize-internal-shell[data-route="type-2"] [class*="results"]',
+      );
+
+      if (!results) {
+        setActiveStep(3);
+        window.requestAnimationFrame(() => {
+          scrollToType2Target(document.querySelector<HTMLElement>(
+            '.glymize-internal-shell[data-route="type-2"] [class*="submitBar"]',
+          ));
+        });
         return;
       }
-      document.querySelector<HTMLElement>('.glymize-internal-shell[data-route="type-2"] [class*="results"]')
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    setActiveStep(step);
+
+    window.requestAnimationFrame(() => {
+      if (step <= 3) {
+        scrollToType2Target(findPrimarySections()[step - 1]);
+        return;
+      }
+
+      scrollToType2Target(document.querySelector<HTMLElement>(
+        '.glymize-internal-shell[data-route="type-2"] [class*="results"]',
+      ));
     });
   }
 
   return (
     <div className="type2-v3-frame" data-type2-step={activeStep}>
-      <nav className="type2-v3-stepper" aria-label={locale === "fa" ? "مراحل تصمیم‌یار دیابت نوع ۲" : "Type 2 decision-support steps"}>
+      <nav
+        className="type2-v3-stepper"
+        aria-label={locale === "fa" ? "مراحل تصمیم‌یار دیابت نوع ۲" : "Type 2 decision-support steps"}
+      >
         {STEPS.map((step, index) => {
           const number = index + 1;
           const active = activeStep === number;
+
           return (
             <button
               aria-current={active ? "step" : undefined}
@@ -54,6 +104,7 @@ export default function Type2ExperienceFrame() {
           );
         })}
       </nav>
+
       <Type2ScenariosClient />
     </div>
   );
