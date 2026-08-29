@@ -144,9 +144,12 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
   const requiredPermission = permissionForClinicalPath(pathname);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
   const isPublicRuntimePath = pathname === "/account" || pathname.startsWith("/account/");
+  // WS-2: the patient portal is a standalone guest surface. It must never be
+  // wrapped in the clinician shell nor blocked by the runtime sign-in gate.
+  const isPatientPortalPath = pathname === "/portal" || pathname.startsWith("/portal/");
   const permissionDenied = Boolean(user && requiredPermission && !user.permissions.includes(requiredPermission));
 
-  if (pathname === "/") return <>{children}</>;
+  if (pathname === "/" || isPatientPortalPath) return <>{children}</>;
 
   let renderedChildren = children;
   if (!localUiBypass && !isAdminPath && !isPublicRuntimePath && pathname !== "/profile") {

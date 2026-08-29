@@ -5,6 +5,7 @@
   align-items: center;
   gap: 12px;
   padding: 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   background: #f5f7fb;
   color: #152238;
 }
@@ -48,6 +49,7 @@
   border-radius: 10px;
   padding: 10px 12px;
   font: inherit;
+  font-size: 16px; /* prevents focus zoom on iOS Safari */
   background: #fbfcff;
   box-sizing: border-box;
 }
@@ -65,6 +67,8 @@
   border: 0;
   border-radius: 10px;
   padding: 10px 18px;
+  min-height: 44px;
+  touch-action: manipulation;
   background: #1257c4;
   color: #fff;
   font: inherit;
@@ -79,6 +83,8 @@
   background: #fff;
   border-radius: 10px;
   padding: 8px 14px;
+  min-height: 44px;
+  touch-action: manipulation;
   font: inherit;
   cursor: pointer;
 }
@@ -90,6 +96,8 @@
   flex: 1;
   border-radius: 10px;
   padding: 10px;
+  min-height: 44px;
+  touch-action: manipulation;
   font: inherit;
   cursor: pointer;
 }
@@ -171,8 +179,9 @@
   flex-direction: column;
   gap: 8px;
   min-height: 180px;
-  max-height: 420px;
-  overflow: auto;
+  max-height: min(420px, 55dvh);
+  overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid #e3e9f5;
   border-radius: 12px;
   padding: 12px;
@@ -180,13 +189,15 @@
 
 .bubbleMine,
 .bubbleOther {
-  max-width: 85%;
+  max-width: 92%;
   border-radius: 12px;
   padding: 8px 12px;
   font-size: 0.9rem;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .bubbleMine { align-self: flex-start; background: #e8f0ff; }
@@ -207,4 +218,28 @@
 
 @media (max-width: 720px) {
   .threadLayout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .card { padding: 14px; border-radius: 14px; }
+  .title { font-size: 1.05rem; }
+  .primary,
+  .ghost { width: 100%; }
+  .kindRow { flex-direction: column; }
+  .kindRow .tab,
+  .kindRow .tabActive { width: 100%; }
+}
+
+@media (pointer: coarse) {
+  .primary,
+  .ghost,
+  .tab,
+  .tabActive,
+  .attachment {
+    -webkit-tap-highlight-color: transparent;
+  }
 }

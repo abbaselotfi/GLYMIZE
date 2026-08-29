@@ -4,6 +4,7 @@
   flex-direction: column;
   gap: 16px;
   padding: 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   background: #f5f7fb;
   color: #152238;
   max-width: 1080px;
@@ -31,6 +32,8 @@
 .tabActive {
   border-radius: 10px;
   padding: 8px 14px;
+  min-height: 44px;
+  touch-action: manipulation;
   font: inherit;
   cursor: pointer;
 }
@@ -48,6 +51,8 @@
   border: 0;
   border-radius: 10px;
   padding: 10px 16px;
+  min-height: 44px;
+  touch-action: manipulation;
   background: #1257c4;
   color: #fff;
   font: inherit;
@@ -62,6 +67,8 @@
   background: #fff;
   border-radius: 10px;
   padding: 8px 14px;
+  min-height: 44px;
+  touch-action: manipulation;
   font: inherit;
   cursor: pointer;
 }
@@ -73,6 +80,7 @@
   border-radius: 10px;
   padding: 9px 12px;
   font: inherit;
+  font-size: 16px; /* prevents focus zoom on iOS Safari */
   background: #fbfcff;
   box-sizing: border-box;
 }
@@ -207,4 +215,27 @@
 
 @media (max-width: 800px) {
   .threadLayout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 14px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .card { padding: 14px; border-radius: 14px; }
+  .title { font-size: 1.05rem; }
+  .actionRow .input { max-width: none; }
+  .actionRow .primary,
+  .actionRow .ghost { flex: 1 1 100%; }
+  .payload { max-height: 140px; }
+}
+
+@media (pointer: coarse) {
+  .primary,
+  .ghost,
+  .tab,
+  .tabActive,
+  .attachment {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
