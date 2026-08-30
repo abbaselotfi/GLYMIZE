@@ -345,6 +345,123 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       expect(portalUi).toContain(marker);
     }
   });
+  it("limits direct conversations to the assigned physician and attributes clinician audit actors", () => {
+    const auditStart = runtime.indexOf(
+      "async function portalAudit(",
+    );
+    const auditEnd = runtime.indexOf(
+      "async function issuePortalSession(",
+      auditStart,
+    );
+
+    expect(auditStart).toBeGreaterThanOrEqual(0);
+    expect(auditEnd).toBeGreaterThan(auditStart);
+
+    const audit = runtime.slice(
+      auditStart,
+      auditEnd,
+    );
+
+    expect(audit).toContain(
+      "actorUserId: string | null = null",
+    );
+    expect(audit).toContain(
+      "VALUES(?,?,?,?,?,?,?,?)",
+    );
+    expect(audit).not.toContain(
+      "VALUES(?,NULL",
+    );
+
+    expect(runtime).toContain(
+      "sender.runtimeUserId ?? null",
+    );
+
+    const threadListStart = runtime.indexOf(
+      "async function adminThreadsList(",
+    );
+    const threadListEnd = runtime.indexOf(
+      "async function adminThreadCreate(",
+      threadListStart,
+    );
+    const threadList = runtime.slice(
+      threadListStart,
+      threadListEnd,
+    );
+
+    expect(threadList).toContain(
+      'clinician.role !== "physician"',
+    );
+    expect(threadList).toContain(
+      "WHERE practice_id=? AND physician_id=?",
+    );
+    expect(threadList).toContain(
+      "clinician.id",
+    );
+
+    const messageStart = runtime.indexOf(
+      "async function adminThreadMessages(",
+    );
+    const messageEnd = runtime.indexOf(
+      "type ThreadMessagesResult =",
+      messageStart,
+    );
+    const messageHandler = runtime.slice(
+      messageStart,
+      messageEnd,
+    );
+
+    expect(messageHandler).toContain(
+      'clinician.role !== "physician"',
+    );
+    expect(messageHandler).toContain(
+      "thread.physician_id !== clinician.id",
+    );
+    expect(messageHandler).toContain(
+      '"thread_not_assigned_to_physician"',
+    );
+
+    const attachmentStart = runtime.indexOf(
+      "async function adminDownloadAttachment(",
+    );
+    const attachmentEnd = runtime.indexOf(
+      "async function adminAccountCreate(",
+      attachmentStart,
+    );
+    const attachmentHandler = runtime.slice(
+      attachmentStart,
+      attachmentEnd,
+    );
+
+    expect(attachmentHandler).toContain(
+      "JOIN portal_threads",
+    );
+    expect(attachmentHandler).toContain(
+      "attachmentThread.physician_id !== clinician.id",
+    );
+
+    const accountStart = runtime.indexOf(
+      "async function adminAccountCreate(",
+    );
+    const accountEnd = runtime.indexOf(
+      "// --- Route dispatcher",
+      accountStart,
+    );
+    const accountHandler = runtime.slice(
+      accountStart,
+      accountEnd,
+    );
+
+    expect(accountHandler).toContain(
+      'clinicianCan(clinician, "handoff.write")',
+    );
+
+    expect(reviewUi).toContain(
+      "thread_not_assigned_to_physician",
+    );
+    expect(reviewUi).toContain(
+      "This conversation is assigned to another physician.",
+    );
+  });
   it("keeps media private and fail-closed with no public or presigned URLs", () => {
     expect(wrangler).toContain('"binding": "PORTAL_MEDIA"');
     expect(runtime).toContain("PORTAL_MEDIA_NOT_CONFIGURED");

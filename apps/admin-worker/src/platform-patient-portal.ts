@@ -174,15 +174,17 @@ async function portalAudit(
   targetType?: string,
   targetId?: string,
   meta?: unknown,
+  actorUserId: string | null = null,
 ) {
   await v3db(env)
     .prepare(
       `INSERT INTO audit_log
        (id,actor_user_id,practice_id,action,target_type,target_id,meta_json,created_at)
-       VALUES(?,NULL,?,?,?,?,?,?)`,
+       VALUES(?,?,?,?,?,?,?,?)`,
     )
     .bind(
       crypto.randomUUID(),
+      actorUserId,
       practiceId,
       action,
       targetType ?? null,
@@ -192,7 +194,6 @@ async function portalAudit(
     )
     .run();
 }
-
 async function issuePortalSession(
   env: V3Env,
   user: PortalUserRow,
@@ -1092,6 +1093,7 @@ async function persistThreadMessage(
       senderRole: sender.role,
       attachmentCount: attachments.length,
     },
+    sender.runtimeUserId ?? null,
   );
   return {
     ok: true,
@@ -1164,21 +1166,63 @@ async function adminThreadMessages(
   clinician: V3User,
   threadId: string,
 ) {
-  if (!clinicianCan(clinician, "handoff.read")) {
-    return reply(request, env, { error: "permission_denied" }, 403);
+  if (clinician.role !== "physician") {
+    return reply(
+      request,
+      env,
+      { error: "physician_authority_required" },
+      403,
+    );
   }
-  const thread = await loadThreadForClinic(env, threadId, clinician.practiceId);
-  if (!thread) return reply(request, env, { error: "thread_not_found" }, 404);
+
+  if (!clinicianCan(clinician, "handoff.read")) {
+    return reply(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
+  const thread = await loadThreadForClinic(
+    env,
+    threadId,
+    clinician.practiceId,
+  );
+
+  if (!thread) {
+    return reply(
+      request,
+      env,
+      { error: "thread_not_found" },
+      404,
+    );
+  }
+
+  if (thread.physician_id !== clinician.id) {
+    return reply(
+      request,
+      env,
+      { error: "thread_not_assigned_to_physician" },
+      403,
+    );
+  }
+
   const result = await threadMessagesPayload(
     env,
     thread,
     new URL(request.url),
   );
+
   return result.ok
     ? reply(request, env, result.body)
-    : reply(request, env, { error: result.error }, result.status);
+    : reply(
+        request,
+        env,
+        { error: result.error },
+        result.status,
+      );
 }
-
 type ThreadMessagesResult =
   | { ok: true; body: Record<string, unknown> }
   | { ok: false; status: number; error: string };
@@ -1551,22 +1595,46 @@ async function adminSubmissionStatus(
       encounterId,
       physicianId: clinician.id,
     },
+    clinician.id,
   );
   return reply(request, env, { ok: true, status: targetStatus });
 }
 
-async function adminThreadsList(request: Request, env: V3Env, clinician: V3User) {
-  if (!clinicianCan(clinician, "handoff.read")) {
-    return reply(request, env, { error: "permission_denied" }, 403);
+async function adminThreadsList(
+  request: Request,
+  env: V3Env,
+  clinician: V3User,
+) {
+  if (clinician.role !== "physician") {
+    return reply(
+      request,
+      env,
+      { error: "physician_authority_required" },
+      403,
+    );
   }
+
+  if (!clinicianCan(clinician, "handoff.read")) {
+    return reply(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
   const rows = await v3db(env)
     .prepare(
       `SELECT id,patient_id,portal_user_id,physician_id,encounter_id,status,
               last_message_at,created_at
-       FROM portal_threads WHERE practice_id=?
+       FROM portal_threads
+       WHERE practice_id=? AND physician_id=?
        ORDER BY last_message_at DESC LIMIT 100`,
     )
-    .bind(clinician.practiceId)
+    .bind(
+      clinician.practiceId,
+      clinician.id,
+    )
     .all<{
       id: string;
       patient_id: string;
@@ -1577,6 +1645,7 @@ async function adminThreadsList(request: Request, env: V3Env, clinician: V3User)
       last_message_at: string;
       created_at: string;
     }>();
+
   return reply(request, env, {
     threads: rows.results.map((row) => ({
       id: row.id,
@@ -1586,11 +1655,12 @@ async function adminThreadsList(request: Request, env: V3Env, clinician: V3User)
       status: row.status,
       lastMessageAt: row.last_message_at,
       createdAt: row.created_at,
-      ...(row.encounter_id ? { encounterId: row.encounter_id } : {}),
+      ...(row.encounter_id
+        ? { encounterId: row.encounter_id }
+        : {}),
     })),
   });
 }
-
 async function adminThreadCreate(request: Request, env: V3Env, clinician: V3User) {
   if (clinician.role !== "physician") {
     return reply(request, env, { error: "physician_authority_required" }, 403);
@@ -1675,6 +1745,7 @@ async function adminThreadCreate(request: Request, env: V3Env, clinician: V3User
     "portal_thread",
     id,
     { patientId, physicianId },
+    clinician.id,
   );
   return reply(request, env, {
     thread: { id, patientId, physicianId, status: "open", lastMessageAt: now, createdAt: now },
@@ -1737,18 +1808,82 @@ async function adminDownloadAttachment(
   clinician: V3User,
   attachmentId: string,
 ) {
-  if (!clinicianCan(clinician, "handoff.read")) {
-    return reply(request, env, { error: "permission_denied" }, 403);
+  if (clinician.role !== "physician") {
+    return reply(
+      request,
+      env,
+      { error: "physician_authority_required" },
+      403,
+    );
   }
-  return serveAttachment(request, env, attachmentId, clinician.practiceId, null);
-}
 
+  if (!clinicianCan(clinician, "handoff.read")) {
+    return reply(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
+  const attachmentThread = await v3db(env)
+    .prepare(
+      `SELECT t.physician_id
+       FROM portal_message_attachments a
+       JOIN portal_threads t ON t.id=a.thread_id
+       WHERE a.id=? AND a.practice_id=? AND t.practice_id=?`,
+    )
+    .bind(
+      attachmentId,
+      clinician.practiceId,
+      clinician.practiceId,
+    )
+    .first<{
+      physician_id: string;
+    }>();
+
+  if (!attachmentThread) {
+    return reply(
+      request,
+      env,
+      { error: "attachment_not_found" },
+      404,
+    );
+  }
+
+  if (attachmentThread.physician_id !== clinician.id) {
+    return reply(
+      request,
+      env,
+      { error: "thread_not_assigned_to_physician" },
+      403,
+    );
+  }
+
+  return serveAttachment(
+    request,
+    env,
+    attachmentId,
+    clinician.practiceId,
+    null,
+  );
+}
 async function adminAccountCreate(request: Request, env: V3Env, clinician: V3User) {
   // Physician authority only: creating a patient's portal identity is a
   // clinical-registry action with PHI implications.
   if (clinician.role !== "physician") {
     return reply(request, env, { error: "physician_authority_required" }, 403);
   }
+
+  if (!clinicianCan(clinician, "handoff.write")) {
+    return reply(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json() as Record<string, unknown>;
@@ -1848,6 +1983,7 @@ async function adminAccountCreate(request: Request, env: V3Env, clinician: V3Use
     "portal_user",
     id,
     { patientId, loginKind: login.kind },
+    clinician.id,
   );
   return reply(request, env, { portalUserId: id, mustChangePassword: true });
 }

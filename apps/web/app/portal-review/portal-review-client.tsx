@@ -31,21 +31,31 @@ async function adminJson<T>(path: string, init?: RequestInit): Promise<T> {
 
 function adminError(reason: unknown, fa: boolean) {
   const code = reason instanceof Error ? reason.message : "";
+
   if (code === "physician_authority_required") {
     return fa
       ? "این عمل فقط با اختیار پزشک مجاز است."
       : "This action requires physician authority.";
   }
+
+  if (code === "thread_not_assigned_to_physician") {
+    return fa
+      ? "این گفتگو به پزشک دیگری اختصاص دارد."
+      : "This conversation is assigned to another physician.";
+  }
+
   if (code === "PORTAL_MEDIA_NOT_CONFIGURED") {
     return fa
       ? "ارسال رسانه در این محیط فعال نیست."
       : "Media upload is not available in this environment.";
   }
+
   if (code === "auth_required" || code === "permission_denied") {
     return fa
       ? "دسترسی لازم را ندارید."
       : "You do not have the required access.";
   }
+
   return fa ? "عملیات ناموفق بود." : "The operation failed.";
 }
 
@@ -181,16 +191,28 @@ export default function PortalReviewClient() {
       const response = await runtimeFetch(
         `/v1/portal/admin/attachments/${encodeURIComponent(attachmentId)}`,
       );
-      if (!response.ok) throw new Error("download_failed");
+
+      if (!response.ok) {
+        const body = await response
+          .json()
+          .catch(() => null) as Record<string, unknown> | null;
+
+        throw new Error(
+          String(body?.error ?? "download_failed"),
+        );
+      }
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
+
       anchor.href = url;
       anchor.download = `attachment-${attachmentId.slice(0, 8)}`;
       anchor.click();
+
       URL.revokeObjectURL(url);
-    } catch {
-      setStatus(fa ? "دانلود ناموفق بود." : "Download failed.");
+    } catch (reason) {
+      setStatus(adminError(reason, fa));
     }
   }
 
