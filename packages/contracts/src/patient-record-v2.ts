@@ -127,6 +127,23 @@ export interface PatientResolveResult {
   legacyHandoff?: PatientLegacyHandoffReference;
 }
 
+export interface PatientLegacyHandoffPromotionInput {
+  /** Existing legacy handoff selected after an explicit identifier lookup. */
+  legacyHandoffId: string;
+  /** Optimistic-concurrency guard for the legacy current-row revision. */
+  expectedLegacyRevision: number;
+  /** Raw identifier is re-entered so the server can verify the legacy HMAC exactly. */
+  identifier: PatientIdentifierInput;
+}
+export interface PatientLegacyHandoffPromotionResult {
+  legacyHandoffId: string;
+  legacyRevision: number;
+  patientId: string;
+  encounterId: string;
+  /** True when this legacy handoff had already been promoted earlier. */
+  alreadyPromoted: boolean;
+}
+
 export interface PatientCreateInput {
   identifiers?: PatientIdentifierInput[];
   /**

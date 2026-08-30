@@ -182,6 +182,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
       '"/v1/patients/file-number-allocator"',
       '"/v1/patients/file-number-allocator/initialize"',
       '"/v1/patients/resolve"',
+      '"/v1/patients/promote-legacy-handoff"',
       '"/v1/patients"',
       "/identifiers",
       "/encounters",
@@ -189,7 +190,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
     ]) {
       expect(runtime).toContain(marker);
     }
-    expect(runtime).not.toContain("patient_handoff_legacy_links");
+    expect(runtime).toContain("patient_handoff_legacy_links");
   });
 
   it("keeps one typed web client aligned with the new runtime endpoints", () => {
@@ -197,6 +198,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
       "getPatientFileNumberAllocator",
       "initializePatientFileNumberAllocator",
       "resolvePatient",
+      "promoteLegacyHandoff",
       "createPatient",
       "attachPatientIdentifier",
       "createPatientEncounter",
@@ -207,6 +209,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
       expect(client).toContain(marker);
     }
     expect(client).toContain('"/v1/patients/resolve"');
+    expect(client).toContain('"/v1/patients/promote-legacy-handoff"');
     expect(client).toContain('"/v1/patients"');
   });
 
@@ -218,6 +221,31 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(runtime).not.toContain("autoMigrateLegacy");
   });
 
+  it("promotes a legacy handoff only through explicit, practice-scoped, idempotent v2 migration", () => {
+    const start = runtime.indexOf("async function promoteLegacyHandoff");
+    const end = runtime.indexOf("function conflictResponse", start);
+    const promotion = runtime.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(promotion).toContain('!can(context, "handoff.read")');
+    expect(promotion).toContain('!can(context, "handoff.write")');
+    expect(promotion).toContain("expectedLegacyRevision");
+    expect(promotion).toContain("LEGACY_HANDOFF_REVISION_CONFLICT");
+    expect(promotion).toContain("LEGACY_HANDOFF_IDENTIFIER_MISMATCH");
+    expect(promotion).toContain("LEGACY_HANDOFF_REVIEWED_LOCKED");
+    expect(promotion).toContain("PATIENT_IDENTIFIER_EXISTS");
+    expect(promotion).toContain("INSERT INTO patient_handoff_legacy_links");
+    expect(promotion).toContain("context.database.batch(statements)");
+    expect(promotion).toContain('"patient.legacy_handoff_promoted"');
+    expect(promotion).toContain('"care_team"');
+    expect(promotion).toContain("migrationProvenance");
+    expect(promotion).toContain("...payload");
+    expect(promotion).toContain("legacyRevision: legacy.revision");
+    expect(promotion).toContain("legacyCreatedAt: legacy.created_at");
+    expect(promotion).toContain("legacyUpdatedAt: legacy.updated_at");
+    expect(promotion).not.toContain("UPDATE patient_handoffs");
+    expect(promotion).not.toContain("DELETE FROM patient_handoffs");
+  });
   it("uses a monotonic allocator with server-side conflict and concurrency guards", () => {
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_UNINITIALIZED");
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_OUT_OF_SYNC");

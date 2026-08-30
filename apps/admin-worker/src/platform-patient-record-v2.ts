@@ -74,6 +74,26 @@ type LegacyReference = {
   updated_at: string;
 };
 
+type LegacyPromotionRow = {
+  id: string;
+  patient_code_hash: string;
+  patient_code_kind: PatientIdentifierKind;
+  patient_code_display: string;
+  ciphertext: string;
+  iv: string;
+  auth_tag: string;
+  status: "draft" | "ready_for_physician" | "reviewed";
+  revision: number;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+};
+type LegacyLinkRow = {
+  patient_id: string;
+  encounter_id: string;
+};
+
 const MAX_PAYLOAD_CHARS = 250_000;
 const MAX_LABS = 500;
 
@@ -718,6 +738,475 @@ async function resolvePatient(
         }
       : {}),
   }, legacy ? 200 : 404);
+}
+
+async function promoteLegacyHandoff(
+  request: Request,
+  context: PatientRecordV2RouteContext,
+) {
+  if (
+    !can(context, "handoff.read") ||
+    !can(context, "handoff.write")
+  ) {
+    return context.respond({ error: "permission_denied" }, 403);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return context.respond({ error: "invalid_json" }, 400);
+  }
+  if (JSON.stringify(body).length > MAX_PAYLOAD_CHARS) {
+    return context.respond(
+      { error: "promotion_payload_too_large" },
+      413,
+    );
+  }
+
+  const legacyHandoffId = String(
+    body.legacyHandoffId ?? "",
+  ).trim();
+  const expectedLegacyRevision = Number(
+    body.expectedLegacyRevision,
+  );
+  if (
+    !/^[A-Za-z0-9-]{8,80}$/.test(legacyHandoffId) ||
+    !Number.isSafeInteger(expectedLegacyRevision) ||
+    expectedLegacyRevision < 1
+  ) {
+    return context.respond(
+      { error: "invalid_legacy_handoff_target" },
+      422,
+    );
+  }
+
+  const identifier = await normalizeIdentifier(
+    context,
+    body.identifier,
+  );
+  if (!identifier) {
+    return context.respond(
+      { error: "invalid_patient_identifier" },
+      422,
+    );
+  }
+
+  const legacy = await context.database.prepare(
+    `SELECT id,patient_code_hash,patient_code_kind,patient_code_display,
+            ciphertext,iv,auth_tag,status,revision,created_by,updated_by,
+            created_at,updated_at
+     FROM patient_handoffs
+     WHERE practice_id=? AND id=?`,
+  ).bind(
+    context.user.practiceId,
+    legacyHandoffId,
+  ).first<LegacyPromotionRow>();
+  if (!legacy) {
+    return context.respond(
+      { error: "legacy_handoff_not_found" },
+      404,
+    );
+  }
+  if (
+    identifier.kind !== legacy.patient_code_kind ||
+    identifier.hash !== legacy.patient_code_hash
+  ) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_IDENTIFIER_MISMATCH" },
+      409,
+    );
+  }
+
+  const existingLink = await context.database.prepare(
+    `SELECT l.patient_id,l.encounter_id
+     FROM patient_handoff_legacy_links l
+     JOIN patient_registry p ON p.id=l.patient_id
+     JOIN patient_encounters e ON e.id=l.encounter_id
+     WHERE l.legacy_handoff_id=?
+       AND p.practice_id=?
+       AND e.practice_id=?`,
+  ).bind(
+    legacyHandoffId,
+    context.user.practiceId,
+    context.user.practiceId,
+  ).first<LegacyLinkRow>();
+  if (existingLink) {
+    return context.respond({
+      legacyHandoffId,
+      legacyRevision: legacy.revision,
+      patientId: existingLink.patient_id,
+      encounterId: existingLink.encounter_id,
+      alreadyPromoted: true,
+    });
+  }
+
+  if (legacy.revision !== expectedLegacyRevision) {
+    return context.respond(
+      {
+        error: "LEGACY_HANDOFF_REVISION_CONFLICT",
+        currentRevision: legacy.revision,
+      },
+      409,
+    );
+  }
+  if (legacy.status === "reviewed") {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_REVIEWED_LOCKED" },
+      409,
+    );
+  }
+  if (
+    legacy.status !== "draft" &&
+    legacy.status !== "ready_for_physician"
+  ) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_STATUS_UNSUPPORTED" },
+      409,
+    );
+  }
+
+  const existingIdentifier = await context.database.prepare(
+    `SELECT patient_id
+     FROM patient_identifiers
+     WHERE practice_id=? AND identifier_kind=? AND identifier_hash=?`,
+  ).bind(
+    context.user.practiceId,
+    identifier.kind,
+    identifier.hash,
+  ).first<{ patient_id: string }>();
+  if (existingIdentifier) {
+    return context.respond(
+      { error: "PATIENT_IDENTIFIER_EXISTS" },
+      409,
+    );
+  }
+
+  const payload = await decryptClinicalPayload<Record<string, unknown>>(
+    {
+      ciphertext: legacy.ciphertext,
+      iv: legacy.iv,
+      authTag: legacy.auth_tag,
+    },
+    context.clinicalSecret,
+    `${context.user.practiceId}:${legacy.patient_code_hash}`,
+  );
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return context.respond(
+      { error: "legacy_handoff_decryption_failed" },
+      500,
+    );
+  }
+
+  const labs = payload.labs === undefined
+    ? []
+    : Array.isArray(payload.labs)
+      ? payload.labs
+      : null;
+  const medications = payload.medications === undefined
+    ? []
+    : Array.isArray(payload.medications)
+      ? payload.medications
+      : null;
+  if (!labs || !medications || labs.length > MAX_LABS) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_PAYLOAD_INVALID" },
+      500,
+    );
+  }
+  for (const rawLab of labs) {
+    if (
+      !rawLab ||
+      typeof rawLab !== "object" ||
+      Array.isArray(rawLab)
+    ) {
+      return context.respond(
+        { error: "LEGACY_HANDOFF_PAYLOAD_INVALID" },
+        500,
+      );
+    }
+  }
+
+  const snapshotObject: Record<string, unknown> = {
+    ...payload,
+    labs,
+    medications,
+    migrationProvenance: {
+      source: "legacy_patient_handoff",
+      legacyHandoffId,
+      legacyRevision: legacy.revision,
+      legacyStatus: legacy.status,
+      legacyCreatedAt: legacy.created_at,
+      legacyUpdatedAt: legacy.updated_at,
+    },
+  };
+  if (JSON.stringify(snapshotObject).length > MAX_PAYLOAD_CHARS) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_PAYLOAD_INVALID" },
+      500,
+    );
+  }
+
+  const patientId = crypto.randomUUID();
+  const encounterId = crypto.randomUUID();
+  const migratedAt = nowIso();
+  const encounterAt = normalizeEncounterTimestamp(
+    legacy.updated_at,
+    migratedAt,
+  );
+  if (!encounterAt) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_TIMESTAMP_INVALID" },
+      500,
+    );
+  }
+  const encryptedSnapshot = await encryptClinicalPayload(
+    snapshotObject,
+    context.clinicalSecret,
+    snapshotAad(
+      context.user.practiceId,
+      encounterId,
+      1,
+    ),
+  );
+
+  const statements: D1PreparedStatement[] = [
+    context.database.prepare(
+      `INSERT INTO patient_registry
+       (id,practice_id,status,created_at,updated_at,archived_at)
+       VALUES (?,?,'active',?,?,NULL)`,
+    ).bind(
+      patientId,
+      context.user.practiceId,
+      migratedAt,
+      migratedAt,
+    ),
+    ...(await identifierInsertStatements(
+      context,
+      patientId,
+      [identifier],
+      identifier.kind,
+      migratedAt,
+    )),
+  ];
+
+  const demographicsStatement = await demographicsInsertStatement(
+    context,
+    patientId,
+    {
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+    },
+    migratedAt,
+  );
+  if (demographicsStatement) {
+    statements.push(demographicsStatement);
+  }
+
+  statements.push(
+    context.database.prepare(
+      `INSERT INTO patient_encounters
+       (id,patient_id,practice_id,encounter_at,encounter_kind,source,status,
+        created_by,updated_by,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    ).bind(
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encounterAt,
+      "outpatient",
+      "care_team",
+      legacy.status,
+      context.user.id,
+      context.user.id,
+      migratedAt,
+      migratedAt,
+    ),
+    context.database.prepare(
+      `INSERT INTO patient_encounter_snapshots
+       (id,encounter_id,patient_id,practice_id,revision,snapshot_kind,
+        payload_ciphertext,payload_iv,payload_auth_tag,schema_version,
+        created_by,created_at)
+       VALUES (?,?,?,?,1,'care_team',?,?,?,?,?,?)`,
+    ).bind(
+      crypto.randomUUID(),
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encryptedSnapshot.ciphertext,
+      encryptedSnapshot.iv,
+      encryptedSnapshot.authTag,
+      "patient-record-v2",
+      context.user.id,
+      migratedAt,
+    ),
+  );
+
+  let observationCount = 0;
+  for (const rawLab of labs) {
+    const lab = rawLab as Record<string, unknown>;
+    const observationId = crypto.randomUUID();
+    const time = canonicalObservationTime(
+      lab.observedAt,
+      encounterAt,
+    );
+    const verification = String(
+      lab.verification ?? "unverified",
+    );
+    const safeVerification =
+      verification === "confirmed" ||
+      verification === "rejected"
+        ? verification
+        : "unverified";
+    const encrypted = await encryptClinicalPayload(
+      {
+        ...lab,
+        sourceObservedAt:
+          String(lab.observedAt ?? "").trim() || undefined,
+        observedAtBasis: time.basis,
+      },
+      context.clinicalSecret,
+      observationAad(
+        context.user.practiceId,
+        observationId,
+      ),
+    );
+    statements.push(
+      context.database.prepare(
+        `INSERT INTO patient_observations
+         (id,encounter_id,patient_id,practice_id,snapshot_revision,
+          canonical_key,observed_at,verification,payload_ciphertext,payload_iv,
+          payload_auth_tag,schema_version,created_by,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ).bind(
+        observationId,
+        encounterId,
+        patientId,
+        context.user.practiceId,
+        1,
+        observationIndexKey(
+          lab.canonicalKey,
+          lab.rawName,
+        ),
+        time.observedAt,
+        safeVerification,
+        encrypted.ciphertext,
+        encrypted.iv,
+        encrypted.authTag,
+        "observation-v1",
+        context.user.id,
+        migratedAt,
+      ),
+    );
+    observationCount += 1;
+  }
+
+  if (identifier.kind === "file_number") {
+    const numericFile = parseNumericFileNumber(
+      identifier.normalized,
+    );
+    if (numericFile) {
+      const numericValue = numericFile.number.toString();
+      statements.push(
+        context.database.prepare(
+          `UPDATE patient_file_number_allocators
+           SET last_allocated_number=CAST(? AS INTEGER),
+               display_width=CASE WHEN display_width < ? THEN ? ELSE display_width END,
+               updated_by=?,updated_at=?
+           WHERE practice_id=?
+             AND allocation_status='ready'
+             AND CAST(last_allocated_number AS INTEGER) < CAST(? AS INTEGER)`,
+        ).bind(
+          numericValue,
+          numericFile.width,
+          numericFile.width,
+          context.user.id,
+          migratedAt,
+          context.user.practiceId,
+          numericValue,
+        ),
+      );
+    }
+  }
+
+  statements.push(
+    context.database.prepare(
+      `INSERT INTO patient_handoff_legacy_links
+       (legacy_handoff_id,patient_id,encounter_id,migrated_at)
+       VALUES (?,?,?,?)`,
+    ).bind(
+      legacyHandoffId,
+      patientId,
+      encounterId,
+      migratedAt,
+    ),
+  );
+
+  try {
+    await context.database.batch(statements);
+  } catch (error) {
+    const racedLink = await context.database.prepare(
+      `SELECT l.patient_id,l.encounter_id
+       FROM patient_handoff_legacy_links l
+       JOIN patient_registry p ON p.id=l.patient_id
+       JOIN patient_encounters e ON e.id=l.encounter_id
+       WHERE l.legacy_handoff_id=?
+         AND p.practice_id=?
+         AND e.practice_id=?`,
+    ).bind(
+      legacyHandoffId,
+      context.user.practiceId,
+      context.user.practiceId,
+    ).first<LegacyLinkRow>();
+    if (racedLink) {
+      return context.respond({
+        legacyHandoffId,
+        legacyRevision: legacy.revision,
+        patientId: racedLink.patient_id,
+        encounterId: racedLink.encounter_id,
+        alreadyPromoted: true,
+      });
+    }
+    const racedIdentifier = await context.database.prepare(
+      `SELECT patient_id
+       FROM patient_identifiers
+       WHERE practice_id=? AND identifier_kind=? AND identifier_hash=?`,
+    ).bind(
+      context.user.practiceId,
+      identifier.kind,
+      identifier.hash,
+    ).first<{ patient_id: string }>();
+    if (racedIdentifier) {
+      return context.respond(
+        { error: "PATIENT_IDENTIFIER_EXISTS" },
+        409,
+      );
+    }
+    throw error;
+  }
+
+  await context.audit(
+    "patient.legacy_handoff_promoted",
+    "patient_handoff",
+    legacyHandoffId,
+    {
+      patientId,
+      encounterId,
+      legacyRevision: legacy.revision,
+      observationCount,
+    },
+  );
+  return context.respond({
+    legacyHandoffId,
+    legacyRevision: legacy.revision,
+    patientId,
+    encounterId,
+    alreadyPromoted: false,
+  }, 201);
 }
 
 function conflictResponse(
@@ -2549,6 +3038,12 @@ export async function patientRecordV2Route(
     request.method === "POST"
   ) {
     return resolvePatient(request, context);
+  }
+  if (
+    url.pathname === "/v1/patients/promote-legacy-handoff" &&
+    request.method === "POST"
+  ) {
+    return promoteLegacyHandoff(request, context);
   }
   if (
     url.pathname === "/v1/patients" &&

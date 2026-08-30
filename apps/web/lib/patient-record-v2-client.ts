@@ -12,6 +12,8 @@ import type {
   PatientFileNumberAllocatorState,
   PatientIdentifierAttachInput,
   PatientIdentifierAttachResult,
+  PatientLegacyHandoffPromotionInput,
+  PatientLegacyHandoffPromotionResult,
   PatientResolveInput,
   PatientResolveResult,
   PatientWorkspaceSnapshot,
@@ -101,6 +103,22 @@ export async function resolvePatient(
   return checkedJson<PatientResolveResult>(
     response,
     "PATIENT_RESOLVE_FAILED",
+  );
+}
+
+export async function promoteLegacyHandoff(
+  input: PatientLegacyHandoffPromotionInput,
+) {
+  const response = await runtimeFetch(
+    "/v1/patients/promote-legacy-handoff",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return checkedJson<PatientLegacyHandoffPromotionResult>(
+    response,
+    "PATIENT_LEGACY_HANDOFF_PROMOTION_FAILED",
   );
 }
 
