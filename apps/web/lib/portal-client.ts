@@ -56,27 +56,78 @@ export function clearPortalSession() {
   window.sessionStorage.removeItem(refreshSessionKey);
 }
 
-export async function refreshPortalSession(): Promise<boolean> {
+let portalRefreshInFlight: Promise<boolean> | null = null;
+
+async function performPortalRefresh(): Promise<boolean> {
   const refreshToken = getRefreshToken();
-  if (!refreshToken || !runtimeApiUrl) return false;
+
+  if (!refreshToken || !runtimeApiUrl) {
+    return false;
+  }
+
+  const rememberMe =
+    browser() &&
+    window.localStorage.getItem(refreshLocalKey) === refreshToken;
+
   try {
-    const response = await fetch(`${runtimeApiUrl}/v1/portal/auth/refresh`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
-    });
-    if (!response.ok) return false;
-    const session = await response.json() as PortalLoginResponse;
+    const response = await fetch(
+      `${runtimeApiUrl}/v1/portal/auth/refresh`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          refreshToken,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      // Never let a stale cross-tab refresh failure erase a token
+      // that another tab has already rotated successfully.
+      if (
+        (response.status === 401 ||
+          response.status === 403) &&
+        getRefreshToken() === refreshToken
+      ) {
+        clearPortalSession();
+      }
+
+      return false;
+    }
+
+    const session =
+      await response.json() as PortalLoginResponse;
+
     storeSession(
       session,
-      Boolean(window.localStorage.getItem(refreshLocalKey)),
+      rememberMe,
     );
+
     return true;
   } catch {
+    // Network failure does not prove the server-side session is invalid.
     return false;
   }
 }
 
+export function refreshPortalSession(): Promise<boolean> {
+  if (portalRefreshInFlight) {
+    return portalRefreshInFlight;
+  }
+
+  const operation = performPortalRefresh();
+  portalRefreshInFlight = operation;
+
+  void operation.finally(() => {
+    if (portalRefreshInFlight === operation) {
+      portalRefreshInFlight = null;
+    }
+  });
+
+  return operation;
+}
 async function portalFetch(
   path: string,
   init: RequestInit = {},
@@ -101,6 +152,23 @@ async function portalFetch(
   return response;
 }
 
+export async function logoutPortal(): Promise<void> {
+  try {
+    if (!runtimeApiUrl) {
+      return;
+    }
+
+    await portalFetch(
+      "/v1/portal/auth/logout",
+      {
+        method: "POST",
+      },
+    );
+  } finally {
+    // Local logout must always complete even if the network is unavailable.
+    clearPortalSession();
+  }
+}
 async function errorOf(response: Response, fallback: string) {
   const body = await response
     .json()

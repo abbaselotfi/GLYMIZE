@@ -8,7 +8,7 @@ import type {
 } from "@glymize/contracts";
 import {
   changePortalPassword,
-  clearPortalSession,
+  logoutPortal,
   createPortalSubmission,
   downloadPortalAttachment,
   getPortalSession,
@@ -74,12 +74,38 @@ export default function PortalClient() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const resetPortalPatientState = useCallback(() => {
+    setSubmissions([]);
+    setThreads([]);
+    setMessages([]);
+    setActiveThreadId(null);
+
+    setMedicationRows([EMPTY_MEDICATION_ROW]);
+    setLabRows([EMPTY_LAB_ROW]);
+    setVitalsForm(EMPTY_VITALS);
+    setIntakeNote("");
+
+    setComposeText("");
+    setComposeFiles([]);
+
+    setCurrentPassword("");
+    setNewPassword("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
 
   const loadSession = useCallback(async () => {
     const user = await getPortalSession();
+
+    if (!user) {
+      resetPortalPatientState();
+    }
+
     setSession(user);
     setReady(true);
-  }, []);
+  }, [resetPortalPatientState]);
 
   useEffect(() => {
     void (async () => {
@@ -141,11 +167,16 @@ export default function PortalClient() {
   }
 
   async function handleLogout() {
-    clearPortalSession();
-    setSession(null);
-    setMessages([]);
-    setActiveThreadId(null);
-    setTab("intake");
+    setBusy(true);
+
+    try {
+      await logoutPortal();
+    } finally {
+      resetPortalPatientState();
+      setSession(null);
+      setTab("intake");
+      setBusy(false);
+    }
   }
 
   async function handleChangePassword() {

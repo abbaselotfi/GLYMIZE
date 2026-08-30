@@ -279,6 +279,72 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       "if (!session || session.mustChangePassword) return;",
     );
   });
+  it("revokes logout server-side, single-flights refresh, and purges prior patient state", () => {
+    const logoutStart = runtime.indexOf(
+      "async function portalLogout(",
+    );
+    const logoutEnd = runtime.indexOf(
+      "async function portalSession(",
+      logoutStart,
+    );
+
+    expect(logoutStart).toBeGreaterThanOrEqual(0);
+    expect(logoutEnd).toBeGreaterThan(logoutStart);
+
+    const logoutHandler = runtime.slice(
+      logoutStart,
+      logoutEnd,
+    );
+
+    expect(logoutHandler).toContain(
+      "UPDATE portal_refresh_tokens SET revoked_at=?",
+    );
+    expect(logoutHandler).toContain(
+      "access.sessionId",
+    );
+    expect(logoutHandler).toContain(
+      "access.portalUserId",
+    );
+
+    for (const marker of [
+      "let portalRefreshInFlight: Promise<boolean> | null = null",
+      "async function performPortalRefresh()",
+      "if (portalRefreshInFlight)",
+      "portalRefreshInFlight = operation",
+      "getRefreshToken() === refreshToken",
+      "export async function logoutPortal()",
+      '"/v1/portal/auth/logout"',
+      "finally {",
+      "clearPortalSession();",
+    ]) {
+      expect(portalClient).toContain(marker);
+    }
+
+    expect(portalUi).toContain(
+      "logoutPortal,",
+    );
+    expect(portalUi).not.toContain(
+      "  clearPortalSession,",
+    );
+    expect(portalUi).toContain(
+      "await logoutPortal();",
+    );
+    expect(portalUi).toContain(
+      "resetPortalPatientState",
+    );
+
+    for (const marker of [
+      "setSubmissions([]);",
+      "setThreads([]);",
+      "setMessages([]);",
+      "setMedicationRows([EMPTY_MEDICATION_ROW]);",
+      "setLabRows([EMPTY_LAB_ROW]);",
+      "setVitalsForm(EMPTY_VITALS);",
+      "setComposeFiles([]);",
+    ]) {
+      expect(portalUi).toContain(marker);
+    }
+  });
   it("keeps media private and fail-closed with no public or presigned URLs", () => {
     expect(wrangler).toContain('"binding": "PORTAL_MEDIA"');
     expect(runtime).toContain("PORTAL_MEDIA_NOT_CONFIGURED");
