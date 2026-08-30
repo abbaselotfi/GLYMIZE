@@ -110,6 +110,14 @@ function portalEnabled(env: V3Env) {
   );
 }
 
+function portalPatientDataPath(pathname: string) {
+  return (
+    pathname === "/v1/portal/submissions" ||
+    pathname === "/v1/portal/threads" ||
+    /^\/v1\/portal\/threads\/[^/]+\/messages$/.test(pathname) ||
+    /^\/v1\/portal\/attachments\/[^/]+$/.test(pathname)
+  );
+}
 function mediaBucket(env: V3Env): R2Bucket | null {
   return (env.PORTAL_MEDIA as R2Bucket | undefined) ?? null;
 }
@@ -585,25 +593,56 @@ async function portalSession(request: Request, env: V3Env) {
 
 async function portalChangePassword(request: Request, env: V3Env) {
   const user = await requirePortalUser(request, env);
-  if (!user) return reply(request, env, { error: "auth_required" }, 401);
+
+  if (!user) {
+    return reply(request, env, { error: "auth_required" }, 401);
+  }
+
+  const access = await portalAccessPayload(request, env);
+
+  if (
+    !access ||
+    access.kind !== "portal_access" ||
+    access.portalUserId !== user.id ||
+    access.practiceId !== user.practice_id ||
+    access.patientId !== user.patient_id
+  ) {
+    return reply(request, env, { error: "auth_required" }, 401);
+  }
+
   let body: Record<string, unknown>;
+
   try {
     body = await request.json() as Record<string, unknown>;
   } catch {
     return reply(request, env, { error: "invalid_json" }, 400);
   }
+
   const currentPassword = String(body.currentPassword ?? "");
   const newPassword = String(body.newPassword ?? "");
+
   if (!validCredentialValue(newPassword)) {
-    return reply(request, env, { error: "password_policy_failed" }, 422);
+    return reply(
+      request,
+      env,
+      { error: "password_policy_failed" },
+      422,
+    );
   }
+
   if (
     !user.password_hash ||
     !user.password_salt ||
     !user.password_iterations
   ) {
-    return reply(request, env, { error: "password_not_set" }, 409);
+    return reply(
+      request,
+      env,
+      { error: "password_not_set" },
+      409,
+    );
   }
+
   if (
     !(await credentialMatches(currentPassword, {
       hash: user.password_hash,
@@ -611,35 +650,116 @@ async function portalChangePassword(request: Request, env: V3Env) {
       iterations: user.password_iterations,
     }))
   ) {
-    return reply(request, env, { error: "invalid_credentials" }, 401);
+    return reply(
+      request,
+      env,
+      { error: "invalid_credentials" },
+      401,
+    );
   }
-  const credential = await createCredential(newPassword);
-  await v3db(env)
+
+  const currentSession = await v3db(env)
     .prepare(
-      `UPDATE portal_users
-       SET password_hash=?,password_salt=?,password_iterations=?,
-           password_updated_at=?,must_change_password=0,updated_at=?
-       WHERE id=?`,
+      `SELECT persistent,device_label
+       FROM portal_refresh_tokens
+       WHERE id=? AND portal_user_id=? AND revoked_at IS NULL`,
     )
     .bind(
-      credential.hash,
-      credential.salt,
-      credential.iterations,
-      v3now(),
-      v3now(),
+      access.sessionId,
       user.id,
     )
-    .run();
+    .first<{
+      persistent: 0 | 1;
+      device_label: string | null;
+    }>();
+
+  if (!currentSession) {
+    return reply(
+      request,
+      env,
+      { error: "auth_required" },
+      401,
+    );
+  }
+
+  const credential = await createCredential(newPassword);
+  const now = v3now();
+
+  try {
+    await v3db(env).batch([
+      v3db(env)
+        .prepare(
+          `UPDATE portal_users
+           SET password_hash=?,password_salt=?,password_iterations=?,
+               password_updated_at=?,must_change_password=0,updated_at=?
+           WHERE id=?`,
+        )
+        .bind(
+          credential.hash,
+          credential.salt,
+          credential.iterations,
+          now,
+          now,
+          user.id,
+        ),
+
+      v3db(env)
+        .prepare(
+          `UPDATE portal_refresh_tokens
+           SET revoked_at=?,last_used_at=?
+           WHERE portal_user_id=? AND revoked_at IS NULL`,
+        )
+        .bind(
+          now,
+          now,
+          user.id,
+        ),
+    ]);
+  } catch {
+    return reply(
+      request,
+      env,
+      { error: "password_change_persist_failed" },
+      500,
+    );
+  }
+
+  const updatedUser: PortalUserRow = {
+    ...user,
+    password_hash: credential.hash,
+    password_salt: credential.salt,
+    password_iterations: credential.iterations,
+    must_change_password: 0,
+  };
+
   await portalAudit(
     env,
     user.practice_id,
     "portal.password_changed",
     "portal_user",
     user.id,
+    {
+      sessionsRevoked: true,
+      replacementSessionIssued: true,
+    },
   );
-  return reply(request, env, { ok: true, mustChangePassword: false });
-}
 
+  const replacementSession = await issuePortalSession(
+    env,
+    updatedUser,
+    currentSession.persistent === 1,
+    currentSession.device_label ?? "portal-password-change",
+  );
+
+  return reply(
+    request,
+    env,
+    {
+      ok: true,
+      ...replacementSession,
+    },
+  );
+}
 // --- Patient intake submissions (patient-reported, physician-reviewed) ------
 
 async function portalCreateSubmission(request: Request, env: V3Env) {
@@ -1777,6 +1897,27 @@ export async function patientPortalRoute(
   }
   if (url.pathname === "/v1/portal/session" && request.method === "GET") {
     return portalSession(request, env);
+  }
+  if (portalPatientDataPath(url.pathname)) {
+    const patient = await requirePortalUser(request, env);
+
+    if (!patient) {
+      return reply(
+        request,
+        env,
+        { error: "auth_required" },
+        401,
+      );
+    }
+
+    if (patient.must_change_password === 1) {
+      return reply(
+        request,
+        env,
+        { error: "password_change_required" },
+        403,
+      );
+    }
   }
   if (url.pathname === "/v1/portal/submissions" && request.method === "GET") {
     return portalListSubmissions(request, env);

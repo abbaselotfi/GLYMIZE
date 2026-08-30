@@ -142,16 +142,44 @@ export async function changePortalPassword(
   currentPassword: string,
   newPassword: string,
 ) {
-  const response = await portalFetch("/v1/portal/auth/password", {
-    method: "POST",
-    body: JSON.stringify({ currentPassword, newPassword }),
-  });
-  if (!response.ok) {
-    throw new Error(await errorOf(response, "PORTAL_PASSWORD_CHANGE_FAILED"));
-  }
-  return response.json() as Promise<{ ok: boolean; mustChangePassword: boolean }>;
-}
+  const rememberMe =
+    browser() &&
+    Boolean(
+      window.localStorage.getItem(refreshLocalKey),
+    );
 
+  const response = await portalFetch(
+    "/v1/portal/auth/password",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await errorOf(
+        response,
+        "PORTAL_PASSWORD_CHANGE_FAILED",
+      ),
+    );
+  }
+
+  const result =
+    await response.json() as PortalLoginResponse & {
+      ok: boolean;
+    };
+
+  storeSession(
+    result,
+    rememberMe,
+  );
+
+  return result;
+}
 export async function createPortalSubmission(input: Record<string, unknown>) {
   const response = await portalFetch("/v1/portal/submissions", {
     method: "POST",

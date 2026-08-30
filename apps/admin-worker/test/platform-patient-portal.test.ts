@@ -204,6 +204,81 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       ),
     );
   });
+  it("requires temporary-password rotation before patient PHI and replaces prior sessions", () => {
+    expect(runtime).toContain(
+      "function portalPatientDataPath",
+    );
+
+    expect(runtime).toContain(
+      'pathname === "/v1/portal/submissions"',
+    );
+    expect(runtime).toContain(
+      'pathname === "/v1/portal/threads"',
+    );
+    expect(runtime).toContain(
+      "^\\/v1\\/portal\\/threads\\/[^/]+\\/messages$",
+    );
+    expect(runtime).toContain(
+      "^\\/v1\\/portal\\/attachments\\/[^/]+$",
+    );
+
+    expect(runtime).toContain(
+      "portalPatientDataPath(url.pathname)",
+    );
+    expect(runtime).toContain(
+      "patient.must_change_password === 1",
+    );
+    expect(runtime).toContain(
+      '"password_change_required"',
+    );
+
+    const passwordStart = runtime.indexOf(
+      "async function portalChangePassword(",
+    );
+
+    const passwordEnd = runtime.indexOf(
+      "// --- Patient intake submissions",
+      passwordStart,
+    );
+
+    expect(passwordStart).toBeGreaterThanOrEqual(0);
+    expect(passwordEnd).toBeGreaterThan(passwordStart);
+
+    const passwordHandler = runtime.slice(
+      passwordStart,
+      passwordEnd,
+    );
+
+    for (const marker of [
+      "portalAccessPayload(request, env)",
+      "access.sessionId",
+      "SELECT persistent,device_label",
+      "v3db(env).batch([",
+      "must_change_password=0",
+      "WHERE portal_user_id=? AND revoked_at IS NULL",
+      "currentSession.persistent === 1",
+      "sessionsRevoked: true",
+      "replacementSessionIssued: true",
+      "const replacementSession",
+      "must_change_password: 0",
+    ]) {
+      expect(passwordHandler).toContain(marker);
+    }
+
+    expect(portalClient).toContain(
+      "PortalLoginResponse &",
+    );
+    expect(portalClient).toContain(
+      "storeSession(",
+    );
+    expect(portalClient).toContain(
+      "rememberMe",
+    );
+
+    expect(portalUi).toContain(
+      "if (!session || session.mustChangePassword) return;",
+    );
+  });
   it("keeps media private and fail-closed with no public or presigned URLs", () => {
     expect(wrangler).toContain('"binding": "PORTAL_MEDIA"');
     expect(runtime).toContain("PORTAL_MEDIA_NOT_CONFIGURED");

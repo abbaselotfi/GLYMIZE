@@ -111,7 +111,7 @@ export default function PortalClient() {
   }, [fa]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || session.mustChangePassword) return;
     void loadSubmissions();
     void loadThreads();
   }, [session, loadSubmissions, loadThreads]);
