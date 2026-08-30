@@ -11,6 +11,7 @@ import type {
   PatientHandoffFieldProvenanceMap,
   PatientHandoffLab,
   PatientHandoffMedication,
+  PatientHandoffStatus,
   PatientHandoffVitals,
 } from "./patient-handoff.js";
 
@@ -73,6 +74,30 @@ export interface PatientLongitudinalSummary {
   latestEncounterAt?: string;
 }
 
+export type PatientRecordArchiveSource =
+  | "patient_record_v2"
+  | "legacy_handoff";
+
+export interface PatientRecordArchiveItem {
+  /** Opaque key used only by the archive read model. */
+  id: string;
+  source: PatientRecordArchiveSource;
+  patientId?: string;
+  encounterId?: string;
+  legacyHandoffId?: string;
+  patientCodeKind: PatientIdentifierKind;
+  /** Masked identifier only. Raw identifiers are never returned by archive list. */
+  patientCodeDisplay: string;
+  status: PatientHandoffStatus;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PatientRecordArchivePage {
+  items: PatientRecordArchiveItem[];
+  nextCursor: string | null;
+}
 export interface PatientFileNumberAllocatorState {
   status: "uninitialized" | "ready";
   /** Serialized decimal string to avoid JavaScript integer precision loss. */

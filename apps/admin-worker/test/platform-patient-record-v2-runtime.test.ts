@@ -58,6 +58,21 @@ const physicianHandoffLookup = fs.readFileSync(
   ),
   "utf8",
 );
+const recordsPage = fs.readFileSync(
+  new URL(
+    "../../web/app/records/records-client.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+
+const patientRecordArchiveClient = fs.readFileSync(
+  new URL(
+    "../../web/lib/patient-record-archive-client.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
 type PrepareBind = {
   sql: string;
   bindCount: number;
@@ -518,6 +533,80 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(reviewLookup).not.toContain(
       "revisePatientEncounter(",
     );
+  });
+  it("cuts Patient Archive over to v2 encounters plus only unpromoted legacy rows", () => {
+    expect(runtime).toContain(
+      'url.pathname === "/v1/patients/archive"',
+    );
+
+    const start = runtime.indexOf(
+      "async function listPatientArchive",
+    );
+    const end = runtime.indexOf(
+      "async function workspace",
+      start,
+    );
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+
+    const archiveRuntime = runtime.slice(
+      start,
+      end,
+    );
+
+    for (const marker of [
+      "patient_encounters",
+      "patient_identifiers",
+      "patient_handoffs",
+      "patient_handoff_legacy_links",
+      "NOT EXISTS",
+      "UNION ALL",
+      "record_key",
+      "ORDER BY updated_at DESC,record_key DESC",
+      '"handoff.read"',
+    ]) {
+      expect(archiveRuntime).toContain(marker);
+    }
+
+    expect(recordsPage).toContain(
+      'from "../../lib/patient-record-archive-client";',
+    );
+    expect(recordsPage).not.toContain(
+      "../../lib/patient-handoff-client",
+    );
+    expect(recordsPage).not.toContain(
+      "listPatientHandoffs",
+    );
+    expect(recordsPage).not.toContain(
+      "getPatientHandoffById",
+    );
+
+    for (const marker of [
+      "/v1/patients/archive",
+      "getPatientWorkspace",
+      "getPatientEncounter",
+      "resolvePatient",
+      "getLegacyPatientHandoffById",
+      "lookupLegacyPatientHandoff",
+      "AMBIGUOUS_PATIENT_CODE",
+    ]) {
+      expect(
+        patientRecordArchiveClient,
+      ).toContain(marker);
+    }
+
+    for (const forbidden of [
+      "promoteLegacyHandoff",
+      "createCareTeamPatientIntake",
+      "createPatientEncounter",
+      "revisePatientEncounter",
+      "savePatientHandoff",
+    ]) {
+      expect(
+        patientRecordArchiveClient,
+      ).not.toContain(forbidden);
+    }
   });
   it("keeps every static D1 prepare placeholder aligned with bind arity", () => {
     const calls = scanPrepareBindCalls(runtime);
