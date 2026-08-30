@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -14,7 +13,6 @@ import { timingSafeEqual } from "node:crypto";
 import type {
   PatientHandoffLookupInput,
   PatientHandoffLookupResult,
-  PatientHandoffUpsertInput,
 } from "@glymize/contracts";
 import { PatientHandoffService } from "./patient-handoff.service.js";
 
@@ -29,18 +27,6 @@ export class PatientHandoffController {
     const left = Buffer.from(token);
     const right = Buffer.from(expected);
     if (left.length !== right.length || !timingSafeEqual(left, right)) throw new UnauthorizedException();
-  }
-
-  @Post("upsert")
-  async upsert(@Headers("x-glymize-handoff-token") token: string | undefined, @Body() input: PatientHandoffUpsertInput) {
-    this.authorize(token);
-    try {
-      return await this.handoffs.upsert(input);
-    } catch (error) {
-      if (error instanceof Error && error.message === "INVALID_PATIENT_CODE") throw new BadRequestException("Invalid patient code");
-      if (error instanceof Error && error.message === "INVALID_NATIONAL_ID") throw new BadRequestException("Invalid Iranian national ID checksum");
-      throw error;
-    }
   }
 
   @Post("lookup")

@@ -24,10 +24,10 @@ import {
   type OcrProgress,
 } from "../../lib/client-ocr";
 import {
-  checkPatientHandoffCode,
+  checkCareTeamPatientCode,
   lookupPatientHandoff,
   PatientHandoffCodeConflictError,
-  savePatientHandoff,
+  saveCareTeamPatientRecord,
   validateIranianNationalId,
 } from "../../lib/care-team-record-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
@@ -955,7 +955,7 @@ async function checkPatientCodeAvailability() {
   setPatientCodeCheckBusy(true);
 
   try {
-    const result = await checkPatientHandoffCode(
+    const result = await checkCareTeamPatientCode(
       codeAtCheck,
       kindAtCheck,
     );
@@ -1160,7 +1160,7 @@ async function save(): Promise<boolean> {
         ? "create" as const
         : "update" as const;
 
-    const record = await savePatientHandoff({
+    const record = await saveCareTeamPatientRecord({
       patientCode,
       patientCodeKind,
       writeMode,

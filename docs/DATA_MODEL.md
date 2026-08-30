@@ -104,6 +104,7 @@ AuditEvent --> any versioned aggregate
 در مدل موقت پیش از Patient Record v2، `patient_handoffs` هنوز یک رکورد جاری برای هر hash شناسه دارد؛ بنابراین intent نوشتن باید صریح باشد. `create` فقط در صورت آزاد بودن `(practice_id, patient_code_hash)` مجاز است و conflict نباید به update تبدیل شود. `update` باید به `record_id` بارگذاری‌شده و `expectedRevision` همان رکورد مقید باشد. پیشنهاد شماره پرونده عددی صرفاً first-free در یک دنباله بررسی‌شده و advisory است؛ چون plaintext شناسه عمداً در جدول نگهداری نمی‌شود، نباید از آن به‌عنوان «بزرگ‌ترین شماره پرونده کل مطب» تعبیر شود. پیشنهاد در زمان ذخیره دوباره کنترل می‌شود و برای کد ملی تولید نمی‌شود.
 
 
+> **وضعیت پس از P2-C2C:** توضیح `create/update` روی `patient_handoffs` در پاراگراف‌های بالا فقط رفتار تاریخی bridge پیش از cutover را مستند می‌کند و دیگر write contract فعال نیست. جدول legacy برای migration/read-only fallback حفظ می‌شود؛ تمام ایجاد/ویرایش جدید بیمار و encounter از Patient Record v2 عبور می‌کند.
 ### Patient Record v2 longitudinal workspace contract
 
 در Patient Record v2، `Patient` و `Encounter` دو aggregate مستقل هستند. `patient_id` شناسهٔ داخلی پایدار است و کد ملی/شماره پرونده فقط identifierهای قابل resolve همان بیمارند. هر مراجعه `encounter_id` مستقل و `encounter_at` مستقل دارد؛ ذخیرهٔ مراجعهٔ جدید نباید snapshot یا تصمیم مراجعهٔ قبلی را بازنویسی کند.

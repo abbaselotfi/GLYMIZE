@@ -428,7 +428,7 @@ async function codeStatusFromResolved(
   };
 }
 
-export async function checkPatientHandoffCode(
+export async function checkCareTeamPatientCode(
   patientCode: string,
   patientCodeKind: PatientCodeKind,
 ): Promise<PatientHandoffCodeStatus> {
@@ -465,7 +465,7 @@ function translatePatientRecordError(error: unknown): never {
   throw error instanceof Error ? error : new Error(code);
 }
 
-export async function savePatientHandoff(
+export async function saveCareTeamPatientRecord(
   input: PatientHandoffUpsertInput,
 ): Promise<PatientHandoffRecord> {
   const normalized = normalizePatientCode(input.patientCode);

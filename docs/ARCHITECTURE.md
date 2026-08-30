@@ -58,6 +58,7 @@ Patient Workspace یک read model ترکیبی است:
 پس از اجرای migration `0003` روی D1 ایزولهٔ RC، فایل `0003` immutable/frozen است و هر تغییر schema بعدی باید migration جدید `0004+` باشد. Production تا عبور runtime/browser gate نباید Patient Record v2 را دریافت کند. در rollout تدریجی، legacy `patient_handoffs` و مسیر v2 هم‌زمان باقی می‌مانند؛ تا وقتی optimistic snapshot revision برای draft encounter کامل نشده، Care Team UI نباید repeated save را به create encounter جدید نگاشت کند.
 
 
+> **وضعیت P2-C2C:** پس از cutover، `patient_handoffs` فقط یک منبع legacy read-only برای رکوردهای هنوز promote‌نشده است. Care Team، collision checking، ایجاد بیمار/ویزیت و revision همگی از Patient Record v2 استفاده می‌کنند. مسیرهای legacy `upsert` و `code-status` retired هستند؛ `lookup/list/records/:id` فقط تا پایان promotion داده‌های قدیمی باقی می‌مانند.
 ### سرویس تصمیم بالینی و موتور قوانین
 
 ورودی موتور یک snapshot حداقلی از داده‌های بیمار، زمینهٔ درمان و `rule_bundle_id` است. موتور قطعی و بدون وابستگی به متن نمایشی عمل می‌کند و خروجی زیر را می‌سازد:

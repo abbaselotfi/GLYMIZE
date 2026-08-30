@@ -244,28 +244,54 @@ expect(contracts).toContain(
     expect(labParser).toContain("stripInterpretationLegend");
   });
 
-it("prevents new-patient file-code collisions and keeps updates optimistic", () => {
-  expect(platform).toContain("codeStatusHandoff");
-  expect(platform).toContain('"/v1/patient-handoff/code-status"');
-  expect(platform).toContain("PATIENT_CODE_EXISTS");
-  expect(platform).toContain("HANDOFF_REVISION_CONFLICT");
-  expect(platform).toContain("HANDOFF_UPDATE_TARGET_MISMATCH");
-  expect(platform).toContain("expectedRecordId");
-  expect(platform).toContain("expectedRevision");
-  expect(platform).toContain("DO NOTHING");
-  expect(platform).not.toContain(
-    "ON CONFLICT(practice_id,patient_code_hash) DO UPDATE SET",
-  );
-  expect(handoffClient).toContain("checkPatientHandoffCode");
-  expect(handoffClient).toContain("PatientHandoffCodeConflictError");
-  expect(careTeam).toContain("patientCodeCollision");
-  expect(careTeam).toContain("useSuggestedPatientCode");
-  expect(careTeam).toContain("openExistingFromCollision");
-  expect(careTeam).toContain('writeMode === "update"');
-  expect(careTeam).toContain("loadedRecordId");
-  expect(careTeamStyles).toContain(".duplicateCodeDialog");
-  expect(contracts).toContain("PatientHandoffWriteMode");
-  expect(contracts).toContain("PatientHandoffCodeStatus");
-});
+  it("keeps Care Team collision protection on Patient Record v2 while legacy transport is read-only", () => {
+    expect(platform).toContain(
+      "LEGACY_HANDOFF_WRITE_RETIRED",
+    );
+    expect(platform).not.toContain(
+      "codeStatusHandoff",
+    );
+    expect(platform).not.toContain(
+      "upsertHandoff",
+    );
 
+    expect(handoffClient).not.toContain(
+      "checkPatientHandoffCode",
+    );
+    expect(handoffClient).not.toContain(
+      "savePatientHandoff",
+    );
+
+    expect(careTeam).toContain(
+      "checkCareTeamPatientCode",
+    );
+    expect(careTeam).toContain(
+      "saveCareTeamPatientRecord",
+    );
+    expect(careTeam).toContain(
+      "patientCodeCollision",
+    );
+    expect(careTeam).toContain(
+      "useSuggestedPatientCode",
+    );
+    expect(careTeam).toContain(
+      "openExistingFromCollision",
+    );
+    expect(careTeam).toContain(
+      'writeMode === "update"',
+    );
+    expect(careTeam).toContain(
+      "loadedRecordId",
+    );
+    expect(careTeamStyles).toContain(
+      ".duplicateCodeDialog",
+    );
+
+    expect(contracts).toContain(
+      "PatientHandoffWriteMode",
+    );
+    expect(contracts).toContain(
+      "PatientHandoffCodeStatus",
+    );
+  });
 });

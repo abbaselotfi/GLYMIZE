@@ -73,6 +73,21 @@ const patientRecordArchiveClient = fs.readFileSync(
   ),
   "utf8",
 );
+const legacyPatientHandoffApiController = fs.readFileSync(
+  new URL(
+    "../../api/src/patient-handoff/patient-handoff.controller.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
+
+const legacyPatientHandoffApiService = fs.readFileSync(
+  new URL(
+    "../../api/src/patient-handoff/patient-handoff.service.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
 type PrepareBind = {
   sql: string;
   bindCount: number;
@@ -197,16 +212,35 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(handoffClient).not.toContain("const PERSIAN_DIGITS");
   });
 
-  it("wires one authenticated v2 route without replacing the legacy handoff path", () => {
+  it("keeps legacy handoff transport read-only after Patient Record v2 cutover", () => {
     expect(platform).toContain(
       'import { patientRecordV2Route } from "./platform-patient-record-v2"',
     );
-    expect(platform).toContain('url.pathname.startsWith("/v1/patients")');
-    expect(platform).toContain("patientRecordV2Route(request");
-    expect(platform).toContain('"/v1/patient-handoff/upsert"');
-    expect(platform).toContain('"/v1/patient-handoff/lookup"');
+    expect(platform).toContain(
+      'url.pathname.startsWith("/v1/patients")',
+    );
+    expect(platform).toContain(
+      "patientRecordV2Route(request",
+    );
+    expect(platform).toContain(
+      "LEGACY_HANDOFF_WRITE_RETIRED",
+    );
+    expect(platform).toContain(
+      "/v1/patient-handoff/lookup",
+    );
+    expect(platform).toContain(
+      "/v1/patient-handoff/list",
+    );
+    expect(platform).toContain(
+      "handoffRecordMatch",
+    );
+    expect(platform).not.toContain(
+      "async function upsertHandoff",
+    );
+    expect(platform).not.toContain(
+      "async function codeStatusHandoff",
+    );
   });
-
   it("exposes the bounded Patient Record v2 foundation endpoints", () => {
     for (const marker of [
       '"/v1/patients/file-number-allocator"',
@@ -278,29 +312,80 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(promotion).not.toContain("UPDATE patient_handoffs");
     expect(promotion).not.toContain("DELETE FROM patient_handoffs");
   });
-  it("locks legacy handoff writes after explicit v2 promotion", () => {
-    const start = platform.indexOf("async function upsertHandoff");
-    const end = platform.indexOf("async function lookupHandoff", start);
-    const upsert = platform.slice(start, end);
-
-    expect(start).toBeGreaterThanOrEqual(0);
-    expect(upsert).toContain("patient_handoff_legacy_links");
-    expect(upsert).toContain("LEGACY_HANDOFF_PROMOTED_READ_ONLY");
-    expect(upsert).toContain('"handoff.legacy_write_denied"');
-    expect(upsert).toContain("expectedRecordId");
-    expect(upsert).toContain('reason: "promoted_to_patient_record_v2"');
-
-    const lockQuery = upsert.match(
-      /SELECT l\.patient_id,l\.encounter_id[\s\S]*?LIMIT 1\x60,\s*\)\.bind\(([\s\S]*?)\)\.first/,
+  it("retires legacy handoff writes across Worker, web transport, and local API while preserving reads", () => {
+    expect(platform).toContain(
+      "LEGACY_HANDOFF_WRITE_RETIRED",
     );
-    expect(lockQuery).not.toBeNull();
-    const sqlSegment = lockQuery?.[0] ?? "";
-    const placeholders = (sqlSegment.match(/\?/g) ?? []).length;
-    const bindCount = topLevelArgumentCount(lockQuery?.[1] ?? "");
-    expect(placeholders).toBe(3);
-    expect(bindCount).toBe(3);
-  });
+    expect(platform).toContain("410");
 
+    for (const forbidden of [
+      "async function upsertHandoff",
+      "async function codeStatusHandoff",
+      "INSERT INTO patient_handoffs",
+      "UPDATE patient_handoffs",
+    ]) {
+      expect(platform).not.toContain(forbidden);
+    }
+
+    expect(platform).toContain(
+      "/v1/patient-handoff/lookup",
+    );
+    expect(platform).toContain(
+      "/v1/patient-handoff/list",
+    );
+    expect(platform).toContain(
+      "handoffRecordMatch",
+    );
+
+    expect(handoffClient).not.toContain(
+      "savePatientHandoff",
+    );
+    expect(handoffClient).not.toContain(
+      "checkPatientHandoffCode",
+    );
+    expect(handoffClient).not.toContain(
+      "/v1/patient-handoff/upsert",
+    );
+    expect(handoffClient).not.toContain(
+      "/v1/patient-handoff/code-status",
+    );
+    expect(handoffClient).toContain(
+      "lookupPatientHandoff",
+    );
+    expect(handoffClient).toContain(
+      "getPatientHandoffById",
+    );
+
+    expect(careTeamRecordClient).toContain(
+      "checkCareTeamPatientCode",
+    );
+    expect(careTeamRecordClient).toContain(
+      "saveCareTeamPatientRecord",
+    );
+    expect(careTeamPage).toContain(
+      "checkCareTeamPatientCode",
+    );
+    expect(careTeamPage).toContain(
+      "saveCareTeamPatientRecord",
+    );
+
+    expect(
+      legacyPatientHandoffApiController,
+    ).not.toContain('@Post("upsert")');
+    expect(
+      legacyPatientHandoffApiController,
+    ).toContain('@Post("lookup")');
+
+    expect(
+      legacyPatientHandoffApiService,
+    ).not.toContain("async upsert(");
+    expect(
+      legacyPatientHandoffApiService,
+    ).not.toContain("writeFile(");
+    expect(
+      legacyPatientHandoffApiService,
+    ).toContain("async lookup(");
+  });
   it("uses a monotonic allocator with server-side conflict and concurrency guards", () => {
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_UNINITIALIZED");
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_OUT_OF_SYNC");
