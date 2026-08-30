@@ -1545,6 +1545,378 @@ async function createPatientAllocated(
   );
 }
 
+
+async function createCareTeamPatientIntake(
+  request: Request,
+  context: PatientRecordV2RouteContext,
+) {
+  if (
+    context.user.role !== "assistant" ||
+    !can(context, "handoff.write")
+  ) {
+    return context.respond({ error: "assistant_required" }, 403);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return context.respond({ error: "invalid_json" }, 400);
+  }
+
+  if (JSON.stringify(body).length > MAX_PAYLOAD_CHARS) {
+    return context.respond(
+      { error: "care_team_intake_payload_too_large" },
+      413,
+    );
+  }
+
+  const identifier = await normalizeIdentifier(
+    context,
+    body.identifier,
+  );
+  if (!identifier) {
+    return context.respond(
+      { error: "invalid_patient_identifier" },
+      422,
+    );
+  }
+
+  const numericFile =
+    identifier.kind === "file_number"
+      ? parseNumericFileNumber(identifier.normalized)
+      : null;
+  if (numericFile) {
+    const allocator = await readAllocator(context);
+    if (
+      !allocator ||
+      allocator.allocation_status !== "ready"
+    ) {
+      return context.respond(
+        {
+          error: "FILE_NUMBER_ALLOCATOR_UNINITIALIZED",
+          allocator: allocatorPublicState(allocator),
+        },
+        409,
+      );
+    }
+  }
+
+  const conflict = await findConflict(context, identifier);
+  if (conflict) {
+    return conflictResponse(context, {
+      identifier,
+      conflict,
+    })!;
+  }
+
+  const snapshot = body.snapshot;
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    Array.isArray(snapshot)
+  ) {
+    return context.respond(
+      { error: "invalid_encounter_snapshot" },
+      422,
+    );
+  }
+  const snapshotObject =
+    snapshot as Record<string, unknown>;
+  const labs = snapshotObject.labs === undefined
+    ? []
+    : Array.isArray(snapshotObject.labs)
+      ? snapshotObject.labs
+      : null;
+  if (!labs || labs.length > MAX_LABS) {
+    return context.respond(
+      { error: "too_many_laboratory_observations" },
+      422,
+    );
+  }
+  for (const rawLab of labs) {
+    if (
+      !rawLab ||
+      typeof rawLab !== "object" ||
+      Array.isArray(rawLab)
+    ) {
+      return context.respond(
+        { error: "invalid_laboratory_observation" },
+        422,
+      );
+    }
+  }
+
+  const currentTime = nowIso();
+  const encounterAt = normalizeEncounterTimestamp(
+    body.encounterAt,
+    currentTime,
+  );
+  if (!encounterAt) {
+    return context.respond(
+      { error: "invalid_encounter_at" },
+      422,
+    );
+  }
+
+  const encounterKind = String(
+    body.encounterKind ?? "outpatient",
+  );
+  if (
+    !["outpatient", "telehealth", "other"].includes(
+      encounterKind,
+    )
+  ) {
+    return context.respond(
+      { error: "invalid_encounter_kind" },
+      422,
+    );
+  }
+
+  const patientId = crypto.randomUUID();
+  const encounterId = crypto.randomUUID();
+  const encryptedSnapshot = await encryptClinicalPayload(
+    snapshotObject,
+    context.clinicalSecret,
+    snapshotAad(
+      context.user.practiceId,
+      encounterId,
+      1,
+    ),
+  );
+
+  const statements: D1PreparedStatement[] = [
+    context.database.prepare(
+      `INSERT INTO patient_registry
+       (id,practice_id,status,created_at,updated_at,archived_at)
+       VALUES (?,?,'active',?,?,NULL)`,
+    ).bind(
+      patientId,
+      context.user.practiceId,
+      currentTime,
+      currentTime,
+    ),
+    ...(await identifierInsertStatements(
+      context,
+      patientId,
+      [identifier],
+      identifier.kind,
+      currentTime,
+    )),
+  ];
+
+  let demographicsStatement: D1PreparedStatement | null;
+  try {
+    demographicsStatement =
+      await demographicsInsertStatement(
+        context,
+        patientId,
+        body.demographics,
+        currentTime,
+      );
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "INVALID_DATE_OF_BIRTH"
+    ) {
+      return context.respond(
+        { error: "invalid_date_of_birth" },
+        422,
+      );
+    }
+    throw error;
+  }
+  if (demographicsStatement) {
+    statements.push(demographicsStatement);
+  }
+
+  if (numericFile) {
+    const numericValue = numericFile.number.toString();
+    statements.push(
+      context.database.prepare(
+        `UPDATE patient_file_number_allocators
+         SET last_allocated_number=
+           CASE
+             WHEN last_allocated_number < CAST(? AS INTEGER)
+             THEN CAST(? AS INTEGER)
+             ELSE last_allocated_number
+           END,
+           display_width=
+           CASE WHEN display_width < ? THEN ? ELSE display_width END,
+           updated_by=?,updated_at=?
+         WHERE practice_id=? AND allocation_status='ready'`,
+      ).bind(
+        numericValue,
+        numericValue,
+        numericFile.width,
+        numericFile.width,
+        context.user.id,
+        currentTime,
+        context.user.practiceId,
+      ),
+    );
+  }
+
+  statements.push(
+    context.database.prepare(
+      `INSERT INTO patient_encounters
+       (id,patient_id,practice_id,encounter_at,encounter_kind,source,status,
+        created_by,updated_by,created_at,updated_at)
+       VALUES (?,?,?,?,?,'care_team','ready_for_physician',?,?,?,?)`,
+    ).bind(
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encounterAt,
+      encounterKind,
+      context.user.id,
+      context.user.id,
+      currentTime,
+      currentTime,
+    ),
+    context.database.prepare(
+      `INSERT INTO patient_encounter_snapshots
+       (id,encounter_id,patient_id,practice_id,revision,snapshot_kind,
+        payload_ciphertext,payload_iv,payload_auth_tag,schema_version,
+        created_by,created_at)
+       VALUES (?,?,?,?,1,'care_team',?,?,?,?,?,?)`,
+    ).bind(
+      crypto.randomUUID(),
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encryptedSnapshot.ciphertext,
+      encryptedSnapshot.iv,
+      encryptedSnapshot.authTag,
+      "patient-record-v2",
+      context.user.id,
+      currentTime,
+    ),
+  );
+
+  let observationCount = 0;
+  for (const rawLab of labs) {
+    const lab = rawLab as Record<string, unknown>;
+    const observationId = crypto.randomUUID();
+    const time = canonicalObservationTime(
+      lab.observedAt,
+      encounterAt,
+    );
+    const verification = String(
+      lab.verification ?? "unverified",
+    );
+    const safeVerification =
+      verification === "confirmed" ||
+      verification === "rejected"
+        ? verification
+        : "unverified";
+    const encrypted = await encryptClinicalPayload(
+      {
+        ...lab,
+        sourceObservedAt:
+          String(lab.observedAt ?? "").trim() ||
+          undefined,
+        observedAtBasis: time.basis,
+      },
+      context.clinicalSecret,
+      observationAad(
+        context.user.practiceId,
+        observationId,
+      ),
+    );
+    statements.push(
+      context.database.prepare(
+        `INSERT INTO patient_observations
+         (id,encounter_id,patient_id,practice_id,snapshot_revision,
+          canonical_key,observed_at,verification,payload_ciphertext,payload_iv,
+          payload_auth_tag,schema_version,created_by,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ).bind(
+        observationId,
+        encounterId,
+        patientId,
+        context.user.practiceId,
+        1,
+        observationIndexKey(
+          lab.canonicalKey,
+          lab.rawName,
+        ),
+        time.observedAt,
+        safeVerification,
+        encrypted.ciphertext,
+        encrypted.iv,
+        encrypted.authTag,
+        "observation-v1",
+        context.user.id,
+        currentTime,
+      ),
+    );
+    observationCount += 1;
+  }
+
+  try {
+    await context.database.batch(statements);
+  } catch (error) {
+    const raced = await findConflict(context, identifier);
+    if (raced) {
+      return conflictResponse(context, {
+        identifier,
+        conflict: raced,
+      })!;
+    }
+    throw error;
+  }
+
+  await context.audit(
+    "patient.created",
+    "patient",
+    patientId,
+    {
+      identifierKinds: [identifier.kind],
+      allocatedFileNumber: false,
+      careTeamAtomicIntake: true,
+    },
+  );
+  await context.audit(
+    "patient.encounter_created",
+    "patient_encounter",
+    encounterId,
+    {
+      patientId,
+      source: "care_team",
+      status: "ready_for_physician",
+      observationCount,
+      careTeamAtomicIntake: true,
+    },
+  );
+
+  const patient = await readPatientSummary(
+    context,
+    patientId,
+  );
+  if (!patient) {
+    throw new Error(
+      "CARE_TEAM_INTAKE_PATIENT_READBACK_FAILED",
+    );
+  }
+
+  return context.respond({
+    patient,
+    encounter: {
+      encounterId,
+      patientId,
+      encounterAt,
+      encounterKind,
+      source: "care_team",
+      status: "ready_for_physician",
+      latestSnapshotRevision: 1,
+    },
+    observationCount,
+    allocator:
+      allocatorPublicState(await readAllocator(context)),
+  }, 201);
+}
+
 async function createPatient(
   request: Request,
   context: PatientRecordV2RouteContext,
@@ -3044,6 +3416,12 @@ export async function patientRecordV2Route(
     request.method === "POST"
   ) {
     return promoteLegacyHandoff(request, context);
+  }
+  if (
+    url.pathname === "/v1/patients/care-team-intake" &&
+    request.method === "POST"
+  ) {
+    return createCareTeamPatientIntake(request, context);
   }
   if (
     url.pathname === "/v1/patients" &&

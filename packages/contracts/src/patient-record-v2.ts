@@ -163,6 +163,24 @@ export interface PatientCreateResult {
   allocator: PatientFileNumberAllocatorState;
 }
 
+export interface PatientCareTeamIntakeInput {
+  identifier: PatientIdentifierInput;
+  demographics?: Pick<
+    PatientLongitudinalDemographics,
+    "firstName" | "lastName" | "dateOfBirth"
+  >;
+  encounterAt?: string;
+  encounterKind?: PatientEncounterKind;
+  /** Full first encounter snapshot; creation is atomic with the Patient row. */
+  snapshot: PatientEncounterClinicalSnapshot;
+}
+export interface PatientCareTeamIntakeResult {
+  patient: PatientLongitudinalSummary;
+  encounter: PatientEncounterSummary;
+  observationCount: number;
+  allocator: PatientFileNumberAllocatorState;
+}
+
 export interface PatientIdentifierAttachInput {
   /**
    * Attach one explicit identifier to an existing patient. Omit this only

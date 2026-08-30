@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  PatientCareTeamIntakeInput,
+  PatientCareTeamIntakeResult,
   PatientCreateInput,
   PatientCreateResult,
   PatientEncounterCreateInput,
@@ -119,6 +121,22 @@ export async function promoteLegacyHandoff(
   return checkedJson<PatientLegacyHandoffPromotionResult>(
     response,
     "PATIENT_LEGACY_HANDOFF_PROMOTION_FAILED",
+  );
+}
+
+export async function createCareTeamPatientIntake(
+  input: PatientCareTeamIntakeInput,
+) {
+  const response = await runtimeFetch(
+    "/v1/patients/care-team-intake",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return checkedJson<PatientCareTeamIntakeResult>(
+    response,
+    "PATIENT_CARE_TEAM_INTAKE_FAILED",
   );
 }
 

@@ -199,6 +199,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
       "initializePatientFileNumberAllocator",
       "resolvePatient",
       "promoteLegacyHandoff",
+      "createCareTeamPatientIntake",
       "createPatient",
       "attachPatientIdentifier",
       "createPatientEncounter",
@@ -210,6 +211,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
     }
     expect(client).toContain('"/v1/patients/resolve"');
     expect(client).toContain('"/v1/patients/promote-legacy-handoff"');
+    expect(client).toContain('"/v1/patients/care-team-intake"');
     expect(client).toContain('"/v1/patients"');
   });
 
@@ -293,6 +295,42 @@ describe("Patient Record v2 runtime vertical slice", () => {
     );
   });
 
+  it("creates a new Care Team patient and first encounter atomically in Patient Record v2", () => {
+    const start = runtime.indexOf(
+      "async function createCareTeamPatientIntake",
+    );
+    const end = runtime.indexOf(
+      "async function createPatient(",
+      start,
+    );
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const intake = runtime.slice(start, end);
+    expect(intake).toContain(
+      'context.user.role !== "assistant"',
+    );
+    expect(intake).toContain(
+      "FILE_NUMBER_ALLOCATOR_UNINITIALIZED",
+    );
+    expect(intake).toContain(
+      "INSERT INTO patient_registry",
+    );
+    expect(intake).toContain(
+      "INSERT INTO patient_encounters",
+    );
+    expect(intake).toContain(
+      "INSERT INTO patient_encounter_snapshots",
+    );
+    expect(intake).toContain(
+      "await context.database.batch(statements)",
+    );
+    expect(intake).toContain(
+      "'care_team','ready_for_physician'",
+    );
+    expect(runtime).toContain(
+      'url.pathname === "/v1/patients/care-team-intake"',
+    );
+  });
   it("creates a separate encounter and append-only revision-1 snapshot", () => {
     expect(runtime).toContain("INSERT INTO patient_encounters");
     expect(runtime).toContain("INSERT INTO patient_encounter_snapshots");
