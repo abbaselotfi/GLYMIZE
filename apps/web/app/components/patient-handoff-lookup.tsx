@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import type { PatientHandoffRecord } from "@glymize/contracts";
-import { lookupPatientHandoff } from "../../lib/patient-handoff-client";
+import {
+  lookupPatientHandoff as lookupLegacyPatientHandoff,
+} from "../../lib/patient-handoff-client";
+import {
+  lookupPatientHandoffForReview,
+} from "../../lib/care-team-record-client";
 import { useGlymizeLocale } from "./use-glymize-locale";
 import styles from "./patient-handoff-lookup.module.css";
 
@@ -22,7 +27,15 @@ export default function PatientHandoffLookup({ onApply }: { onApply: (record: Pa
     setBusy(true);
     setRecord(null);
     try {
-      const result = await lookupPatientHandoff(code);
+      const v2Result =
+        await lookupPatientHandoffForReview(code);
+      const result =
+        v2Result.resolution === "legacy"
+          ? await lookupLegacyPatientHandoff(
+              code,
+              v2Result.patientCodeKind,
+            )
+          : v2Result;
       if (!result.found || !result.record) {
         setStatus(fa ? "پرونده آماده‌ای با این کد پیدا نشد." : "No prepared handoff was found for this code.");
         return;

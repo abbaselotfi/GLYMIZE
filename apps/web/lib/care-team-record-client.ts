@@ -11,6 +11,7 @@ import type {
 } from "@glymize/contracts";
 import {
   normalizePatientCode,
+  validateIranianNationalId,
 } from "@glymize/contracts";
 export {
   normalizePatientCode,
@@ -243,6 +244,126 @@ export async function lookupPatientHandoff(
   };
 }
 
+export async function lookupPatientHandoffForReview(
+  patientCode: string,
+) {
+  const normalized = normalizePatientCode(patientCode);
+  if (!normalized) {
+    return {
+      found: false,
+      resolution: "none" as const,
+    };
+  }
+
+  try {
+    const kinds: PatientCodeKind[] = [
+      "file_number",
+      "other",
+    ];
+    if (validateIranianNationalId(normalized)) {
+      kinds.unshift("national_id");
+    }
+
+    const matches: Array<{
+      kind: PatientCodeKind;
+      resolved: Awaited<ReturnType<typeof resolvePatient>>;
+    }> = [];
+
+    for (const kind of kinds) {
+      const resolved = await resolvePatient({
+        identifier: normalized,
+        kind,
+      });
+
+      if (resolved.patient || resolved.legacyHandoff) {
+        matches.push({
+          kind,
+          resolved,
+        });
+      }
+    }
+
+    const patientIds = new Set<string>();
+    const legacyIds = new Set<string>();
+
+    for (const match of matches) {
+      if (match.resolved.patient) {
+        patientIds.add(match.resolved.patient.patientId);
+      }
+      if (match.resolved.legacyHandoff) {
+        legacyIds.add(match.resolved.legacyHandoff.id);
+      }
+    }
+
+    if (patientIds.size + legacyIds.size > 1) {
+      throw new Error("AMBIGUOUS_PATIENT_CODE");
+    }
+
+    const patientMatch = matches.find(
+      (item) => Boolean(item.resolved.patient),
+    );
+
+    if (patientMatch?.resolved.patient) {
+      const patient = patientMatch.resolved.patient;
+      const workspace = await getPatientWorkspace(
+        patient.patientId,
+      );
+
+      const encounter = workspace.encounters.find(
+        (item) =>
+          item.source === "care_team" &&
+          item.status === "ready_for_physician",
+      );
+
+      if (!encounter) {
+        return {
+          found: false,
+          resolution: "patient_record_v2" as const,
+          patientCodeKind: patientMatch.kind,
+        };
+      }
+
+      const detail = await getPatientEncounter(
+        patient.patientId,
+        encounter.encounterId,
+      );
+
+      return {
+        found: true,
+        resolution: "patient_record_v2" as const,
+        patientCodeKind: patientMatch.kind,
+        record: recordFromSnapshot({
+          patient,
+          encounter: detail.encounter,
+          snapshot: detail.latestSnapshot?.snapshot ?? {},
+          revision: detail.latestSnapshot?.revision ?? 0,
+          patientCode: normalized,
+          patientCodeKind: patientMatch.kind,
+          updatedAt: detail.latestSnapshot?.createdAt,
+        }),
+      };
+    }
+
+    const legacyMatch = matches.find(
+      (item) => Boolean(item.resolved.legacyHandoff),
+    );
+
+    if (legacyMatch?.resolved.legacyHandoff) {
+      return {
+        found: false,
+        resolution: "legacy" as const,
+        patientCodeKind: legacyMatch.kind,
+      };
+    }
+
+    return {
+      found: false,
+      resolution: "none" as const,
+    };
+  } catch (error) {
+    translatePatientRecordError(error);
+  }
+}
 async function codeStatusFromResolved(
   patientCode: string,
   patientCodeKind: PatientCodeKind,

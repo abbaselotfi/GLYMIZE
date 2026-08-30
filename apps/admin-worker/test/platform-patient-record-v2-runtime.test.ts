@@ -51,6 +51,13 @@ const careTeamPage = fs.readFileSync(
   "utf8",
 );
 
+const physicianHandoffLookup = fs.readFileSync(
+  new URL(
+    "../../web/app/components/patient-handoff-lookup.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 type PrepareBind = {
   sql: string;
   bindCount: number;
@@ -459,6 +466,59 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(careTeamPage).toContain("ENCOUNTER_REVIEWED_ASSISTANT_LOCKED");
   });
 
+  it("loads physician pre-visit handoff from Patient Record v2 first without implicit promotion", () => {
+    expect(physicianHandoffLookup).toContain(
+      "lookupPatientHandoffForReview",
+    );
+    expect(physicianHandoffLookup).toContain(
+      "lookupPatientHandoff as lookupLegacyPatientHandoff",
+    );
+    expect(physicianHandoffLookup).toContain(
+      'v2Result.resolution === "legacy"',
+    );
+
+    const start = careTeamRecordClient.indexOf(
+      "export async function lookupPatientHandoffForReview",
+    );
+    const end = careTeamRecordClient.indexOf(
+      "async function codeStatusFromResolved",
+      start,
+    );
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+
+    const reviewLookup = careTeamRecordClient.slice(
+      start,
+      end,
+    );
+
+    for (const marker of [
+      "resolvePatient",
+      "getPatientWorkspace",
+      "getPatientEncounter",
+      'item.status === "ready_for_physician"',
+      'kinds.unshift("national_id")',
+      "patientIds.size + legacyIds.size > 1",
+      "AMBIGUOUS_PATIENT_CODE",
+      'resolution: "legacy"',
+    ]) {
+      expect(reviewLookup).toContain(marker);
+    }
+
+    expect(reviewLookup).not.toContain(
+      "promoteLegacyHandoff(",
+    );
+    expect(reviewLookup).not.toContain(
+      "createCareTeamPatientIntake(",
+    );
+    expect(reviewLookup).not.toContain(
+      "createPatientEncounter(",
+    );
+    expect(reviewLookup).not.toContain(
+      "revisePatientEncounter(",
+    );
+  });
   it("keeps every static D1 prepare placeholder aligned with bind arity", () => {
     const calls = scanPrepareBindCalls(runtime);
     expect(calls.length).toBeGreaterThanOrEqual(20);
