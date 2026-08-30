@@ -42,6 +42,14 @@ const handoffClient = fs.readFileSync(
   new URL("../../web/lib/patient-handoff-client.ts", import.meta.url),
   "utf8",
 );
+const careTeamRecordClient = fs.readFileSync(
+  new URL("../../web/lib/care-team-record-client.ts", import.meta.url),
+  "utf8",
+);
+const careTeamPage = fs.readFileSync(
+  new URL("../../web/app/care-team/care-team-client.tsx", import.meta.url),
+  "utf8",
+);
 
 type PrepareBind = {
   sql: string;
@@ -421,6 +429,34 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(roadmap).toContain("Migration `0003` is now frozen");
     expect(queue).toContain("applied migration `0003` is frozen");
     expect(queue).toContain("Production is unchanged");
+  });
+
+  it("cuts Care Team persistence over to Patient Record v2 without legacy writes", () => {
+    expect(careTeamPage).toContain(
+      'from "../../lib/care-team-record-client";',
+    );
+    expect(careTeamPage).not.toContain(
+      'from "../../lib/patient-handoff-client";',
+    );
+    for (const marker of [
+      "resolvePatient",
+      "promoteLegacyHandoff",
+      "createCareTeamPatientIntake",
+      "createPatientEncounter",
+      "getPatientEncounter",
+      "getPatientWorkspace",
+      "revisePatientEncounter",
+      "expectedRevision",
+      "displayMask",
+      "input.expectedRevision !== 0",
+      'status: "ready_for_physician"',
+    ]) {
+      expect(careTeamRecordClient).toContain(marker);
+    }
+    expect(careTeamRecordClient).not.toContain("/v1/patient-handoff/");
+    expect(careTeamRecordClient).not.toContain("patient-handoff-client");
+    expect(careTeamPage).toContain("FILE_NUMBER_ALLOCATOR_UNINITIALIZED");
+    expect(careTeamPage).toContain("ENCOUNTER_REVIEWED_ASSISTANT_LOCKED");
   });
 
   it("keeps every static D1 prepare placeholder aligned with bind arity", () => {
