@@ -18,6 +18,7 @@ export interface PortalLoginResponse {
   accessExpiresAt: string;
   refreshToken: string;
   refreshExpiresAt: string;
+  persistent: boolean;
   mustChangePassword: boolean;
 }
 
@@ -37,18 +38,36 @@ function getRefreshToken() {
   );
 }
 
-function storeSession(session: PortalLoginResponse, rememberMe: boolean) {
+function storeSession(
+  session: PortalLoginResponse,
+) {
   if (!browser()) return;
-  window.sessionStorage.setItem(accessKey, session.accessToken);
-  window.localStorage.removeItem(refreshLocalKey);
-  window.sessionStorage.removeItem(refreshSessionKey);
-  if (rememberMe) {
-    window.localStorage.setItem(refreshLocalKey, session.refreshToken);
+
+  window.sessionStorage.setItem(
+    accessKey,
+    session.accessToken,
+  );
+
+  window.localStorage.removeItem(
+    refreshLocalKey,
+  );
+
+  window.sessionStorage.removeItem(
+    refreshSessionKey,
+  );
+
+  if (session.persistent === true) {
+    window.localStorage.setItem(
+      refreshLocalKey,
+      session.refreshToken,
+    );
   } else {
-    window.sessionStorage.setItem(refreshSessionKey, session.refreshToken);
+    window.sessionStorage.setItem(
+      refreshSessionKey,
+      session.refreshToken,
+    );
   }
 }
-
 export function clearPortalSession() {
   if (!browser()) return;
   window.sessionStorage.removeItem(accessKey);
@@ -64,10 +83,6 @@ async function performPortalRefresh(): Promise<boolean> {
   if (!refreshToken || !runtimeApiUrl) {
     return false;
   }
-
-  const rememberMe =
-    browser() &&
-    window.localStorage.getItem(refreshLocalKey) === refreshToken;
 
   try {
     const response = await fetch(
@@ -100,11 +115,7 @@ async function performPortalRefresh(): Promise<boolean> {
     const session =
       await response.json() as PortalLoginResponse;
 
-    storeSession(
-      session,
-      rememberMe,
-    );
-
+    storeSession(session);
     return true;
   } catch {
     // Network failure does not prove the server-side session is invalid.
@@ -195,7 +206,7 @@ export async function portalLogin(
     throw new Error(await errorOf(response, "PORTAL_LOGIN_FAILED"));
   }
   const session = await response.json() as PortalLoginResponse;
-  storeSession(session, rememberMe);
+  storeSession(session);
   return session;
 }
 
@@ -210,12 +221,6 @@ export async function changePortalPassword(
   currentPassword: string,
   newPassword: string,
 ) {
-  const rememberMe =
-    browser() &&
-    Boolean(
-      window.localStorage.getItem(refreshLocalKey),
-    );
-
   const response = await portalFetch(
     "/v1/portal/auth/password",
     {
@@ -241,11 +246,7 @@ export async function changePortalPassword(
       ok: boolean;
     };
 
-  storeSession(
-    result,
-    rememberMe,
-  );
-
+  storeSession(result);
   return result;
 }
 export async function createPortalSubmission(input: Record<string, unknown>) {

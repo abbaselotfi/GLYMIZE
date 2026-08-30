@@ -55,7 +55,7 @@ export default function PortalClient() {
   const [session, setSession] = useState<SessionUser | null>(null);
   const [loginHandle, setLoginHandle] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [busy, setBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -313,7 +313,11 @@ export default function PortalClient() {
             ? fa
               ? "نوع فایل مجاز نیست (فقط تصویر یا ویدیو)."
               : "Only images or videos are allowed."
-            : code === "media_size_rejected"
+            : code === "media_signature_rejected"
+              ? fa
+                ? "محتوای فایل با نوع اعلام‌شده آن مطابقت ندارد."
+                : "The file content does not match its declared media type."
+              : code === "media_size_rejected"
               ? fa
                 ? "حجم هر فایل حداکثر ۲۵ مگابایت است."
                 : "Each file may be at most 25 MB."

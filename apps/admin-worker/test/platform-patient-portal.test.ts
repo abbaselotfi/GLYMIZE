@@ -258,7 +258,7 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       "WHERE portal_user_id=? AND revoked_at IS NULL",
       "currentSession.persistent === 1",
       "sessionsRevoked: true",
-      "replacementSessionIssued: true",
+      "INSERT INTO audit_log",
       "const replacementSession",
       "must_change_password: 0",
     ]) {
@@ -574,6 +574,146 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       'code === "rate_limited"',
     );
   });
+  it("hardens portal media lifecycle and keeps persistence explicit", () => {
+    expect(runtime).toContain(
+      "function portalMediaSignatureMatches(",
+    );
+    expect(runtime).toContain(
+      "async function cleanupPortalMedia(",
+    );
+    expect(runtime).toContain(
+      "await bucket.delete(mediaKey)",
+    );
+    expect(runtime).toContain(
+      '"media_signature_rejected"',
+    );
+
+    const persistStart = runtime.indexOf(
+      "async function persistThreadMessage(",
+    );
+    const persistEnd = runtime.indexOf(
+      "// --- Patient-side thread handlers",
+      persistStart,
+    );
+    const persist = runtime.slice(
+      persistStart,
+      persistEnd,
+    );
+
+    expect(persist).toContain(
+      "uploadedMediaKeys.push(mediaKey)",
+    );
+    expect(persist).toContain(
+      "cleanupPortalMedia(",
+    );
+    expect(persist).toContain(
+      "INSERT INTO audit_log",
+    );
+    expect(persist).toContain(
+      "v3db(env).batch(",
+    );
+    expect(persist).not.toContain(
+      "await portalAudit(",
+    );
+
+    const serveStart = runtime.indexOf(
+      "async function serveAttachment(",
+    );
+    const serveEnd = runtime.indexOf(
+      "async function portalDownloadAttachment(",
+      serveStart,
+    );
+    const serve = runtime.slice(
+      serveStart,
+      serveEnd,
+    );
+
+    expect(serve).toContain(
+      "a.sha256",
+    );
+    expect(serve).toContain(
+      "await sha256BytesHex(bytes)",
+    );
+    expect(serve).toContain(
+      '"attachment_integrity_mismatch"',
+    );
+    expect(serve).toContain(
+      'origin === env.ADMIN_ORIGIN',
+    );
+    expect(serve).toContain(
+      '"x-content-type-options":',
+    );
+    expect(serve).toContain(
+      '"nosniff"',
+    );
+    expect(serve).toContain(
+      "attachment; filename=",
+    );
+    expect(serve).not.toContain(
+      '"content-disposition": "inline"',
+    );
+
+    const passwordStart = runtime.indexOf(
+      "async function portalChangePassword(",
+    );
+    const passwordEnd = runtime.indexOf(
+      "// --- Patient intake submissions",
+      passwordStart,
+    );
+    const passwordHandler = runtime.slice(
+      passwordStart,
+      passwordEnd,
+    );
+
+    expect(passwordHandler).toContain(
+      "INSERT INTO audit_log",
+    );
+    expect(passwordHandler).toContain(
+      '"portal.password_changed"',
+    );
+    expect(passwordHandler).toContain(
+      "sessionsRevoked: true",
+    );
+    expect(passwordHandler).not.toContain(
+      "replacementSessionIssued: true",
+    );
+    expect(passwordHandler).not.toContain(
+      "await portalAudit(",
+    );
+
+    expect(runtime).toContain(
+      "persistent: rememberMe",
+    );
+    expect(runtime).toContain(
+      "body.rememberMe === true",
+    );
+    expect(runtime).not.toContain(
+      "body.rememberMe !== false",
+    );
+
+    expect(portalClient).toContain(
+      "persistent: boolean;",
+    );
+    expect(portalClient).toContain(
+      "session.persistent === true",
+    );
+    expect(portalClient).toContain(
+      "storeSession(session);",
+    );
+    expect(portalClient).toContain(
+      "storeSession(result);",
+    );
+    expect(portalClient).not.toContain(
+      "storeSession(session, rememberMe)",
+    );
+
+    expect(portalUi).toContain(
+      "const [rememberMe, setRememberMe] = useState(false);",
+    );
+    expect(portalUi).toContain(
+      '"media_signature_rejected"',
+    );
+  });
   it("keeps media private and fail-closed with no public or presigned URLs", () => {
     expect(wrangler).toContain('"binding": "PORTAL_MEDIA"');
     expect(runtime).toContain("PORTAL_MEDIA_NOT_CONFIGURED");
@@ -582,7 +722,9 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
     expect(runtime).toContain('"video/mp4"');
     expect(runtime).not.toMatch(/presign/i);
     expect(runtime).not.toContain("publicBucket");
-    expect(runtime).toContain('"cache-control": "private, no-store"');
+    expect(runtime).toMatch(
+      /"cache-control"\s*:\s*"private, no-store"/,
+    );
     expect(runtime).toContain("MAX_ATTACHMENTS_PER_MESSAGE");
   });
 

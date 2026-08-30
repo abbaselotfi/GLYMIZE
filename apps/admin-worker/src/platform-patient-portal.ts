@@ -270,6 +270,7 @@ async function issuePortalSession(
     accessExpiresAt: new Date(expiresAt).toISOString(),
     refreshToken,
     refreshExpiresAt,
+    persistent: rememberMe,
     mustChangePassword: user.must_change_password === 1,
   };
 }
@@ -337,6 +338,214 @@ async function sha256BytesHex(bytes: ArrayBuffer) {
     .join("");
 }
 
+function bytesStartWith(
+  bytes: Uint8Array,
+  expected: number[],
+  offset = 0,
+) {
+  if (bytes.length < offset + expected.length) {
+    return false;
+  }
+
+  return expected.every(
+    (value, index) =>
+      bytes[offset + index] === value,
+  );
+}
+
+function asciiAt(
+  bytes: Uint8Array,
+  offset: number,
+  length: number,
+) {
+  let result = "";
+
+  for (
+    let index = offset;
+    index < offset + length &&
+    index < bytes.length;
+    index += 1
+  ) {
+    result += String.fromCharCode(
+      bytes[index]!,
+    );
+  }
+
+  return result;
+}
+
+function isoBmffBrands(
+  bytes: Uint8Array,
+) {
+  if (
+    bytes.length < 12 ||
+    asciiAt(bytes, 4, 4) !== "ftyp"
+  ) {
+    return [];
+  }
+
+  const brands = [
+    asciiAt(bytes, 8, 4),
+  ];
+
+  const end = Math.min(
+    bytes.length,
+    128,
+  );
+
+  for (
+    let offset = 16;
+    offset + 4 <= end;
+    offset += 4
+  ) {
+    brands.push(
+      asciiAt(bytes, offset, 4),
+    );
+  }
+
+  return brands;
+}
+
+function portalMediaSignatureMatches(
+  mime: string,
+  value: ArrayBuffer,
+) {
+  const bytes = new Uint8Array(value);
+
+  if (mime === "image/jpeg") {
+    return bytesStartWith(
+      bytes,
+      [0xff, 0xd8, 0xff],
+    );
+  }
+
+  if (mime === "image/png") {
+    return bytesStartWith(
+      bytes,
+      [
+        0x89,
+        0x50,
+        0x4e,
+        0x47,
+        0x0d,
+        0x0a,
+        0x1a,
+        0x0a,
+      ],
+    );
+  }
+
+  if (mime === "image/webp") {
+    return (
+      asciiAt(bytes, 0, 4) === "RIFF" &&
+      asciiAt(bytes, 8, 4) === "WEBP"
+    );
+  }
+
+  if (mime === "video/webm") {
+    return bytesStartWith(
+      bytes,
+      [0x1a, 0x45, 0xdf, 0xa3],
+    );
+  }
+
+  const brands = isoBmffBrands(bytes);
+
+  if (brands.length === 0) {
+    return false;
+  }
+
+  const normalizedBrands =
+    brands.map(
+      (brand) => brand.toLowerCase(),
+    );
+
+  if (mime === "image/heic") {
+    return normalizedBrands.some(
+      (brand) =>
+        [
+          "heic",
+          "heix",
+          "hevc",
+          "hevx",
+          "heim",
+          "heis",
+          "hevm",
+          "hevs",
+        ].includes(brand),
+    );
+  }
+
+  if (mime === "video/quicktime") {
+    return brands.includes("qt  ");
+  }
+
+  if (mime === "video/mp4") {
+    const mp4Brands = new Set([
+      "isom",
+      "iso2",
+      "iso3",
+      "iso4",
+      "iso5",
+      "iso6",
+      "mp41",
+      "mp42",
+      "avc1",
+      "dash",
+      "m4v ",
+      "f4v ",
+      "3gp4",
+      "3gp5",
+    ]);
+
+    return normalizedBrands.some(
+      (brand) => mp4Brands.has(brand),
+    );
+  }
+
+  return false;
+}
+
+function portalMediaExtension(
+  mime: string,
+) {
+  switch (mime) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/heic":
+      return "heic";
+    case "video/mp4":
+      return "mp4";
+    case "video/webm":
+      return "webm";
+    case "video/quicktime":
+      return "mov";
+    default:
+      return "bin";
+  }
+}
+
+async function cleanupPortalMedia(
+  bucket: R2Bucket | null,
+  keys: string[],
+) {
+  if (!bucket || keys.length === 0) {
+    return;
+  }
+
+  for (const mediaKey of keys) {
+    try {
+      await bucket.delete(mediaKey);
+    } catch {
+      // Best-effort compensation for an R2 write that has no
+      // corresponding committed D1 attachment row.
+    }
+  }
+}
 // --- Patient-reported intake sanitization ----------------------------------
 // Patient entries are stored exactly as REPORTED. verification is never
 // accepted from the patient; it is forced to "unverified". Only a physician
@@ -518,6 +727,11 @@ async function portalLogin(request: Request, env: V3Env) {
   ) {
     return reply(request, env, { error: "invalid_credentials" }, 401);
   }
+  const rememberMe =
+    user.must_change_password === 1
+      ? false
+      : body.rememberMe === true;
+
   await portalAudit(
     env,
     user.practice_id,
@@ -531,7 +745,7 @@ async function portalLogin(request: Request, env: V3Env) {
     await issuePortalSession(
       env,
       user,
-      body.rememberMe !== false,
+      rememberMe,
       String(body.deviceLabel ?? "portal-web"),
     ),
   );
@@ -804,7 +1018,6 @@ async function portalChangePassword(request: Request, env: V3Env) {
           now,
           user.id,
         ),
-
       v3db(env)
         .prepare(
           `UPDATE portal_refresh_tokens
@@ -816,6 +1029,24 @@ async function portalChangePassword(request: Request, env: V3Env) {
           now,
           user.id,
         ),
+      v3db(env)
+        .prepare(
+          `INSERT INTO audit_log
+           (id,actor_user_id,practice_id,action,target_type,target_id,meta_json,created_at)
+           VALUES(?,?,?,?,?,?,?,?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          null,
+          user.practice_id,
+          "portal.password_changed",
+          "portal_user",
+          user.id,
+          JSON.stringify({
+            sessionsRevoked: true,
+          }),
+          now,
+        ),
     ]);
   } catch {
     return reply(
@@ -825,7 +1056,6 @@ async function portalChangePassword(request: Request, env: V3Env) {
       500,
     );
   }
-
   const updatedUser: PortalUserRow = {
     ...user,
     password_hash: credential.hash,
@@ -833,18 +1063,6 @@ async function portalChangePassword(request: Request, env: V3Env) {
     password_iterations: credential.iterations,
     must_change_password: 0,
   };
-
-  await portalAudit(
-    env,
-    user.practice_id,
-    "portal.password_changed",
-    "portal_user",
-    user.id,
-    {
-      sessionsRevoked: true,
-      replacementSessionIssued: true,
-    },
-  );
 
   const replacementSession = await issuePortalSession(
     env,
@@ -1104,26 +1322,53 @@ async function persistThreadMessage(
   key: string,
 ): Promise<MessagePersistResult> {
   const bucket = mediaBucket(env);
-  const files: { file: File; mediaKind: "image" | "video" }[] = [];
+
+  const files: {
+    file: File;
+    mediaKind: "image" | "video";
+    mime: string;
+  }[] = [];
+
   let totalMediaBytes = 0;
 
   for (const file of content.files) {
-    const mime = String(file.type ?? "").toLowerCase();
-    const mediaKind = IMAGE_MIME_TYPES.has(mime)
-      ? "image" as const
-      : VIDEO_MIME_TYPES.has(mime)
-        ? "video" as const
-        : null;
+    const mime =
+      String(file.type ?? "")
+        .trim()
+        .toLowerCase();
+
+    const mediaKind =
+      IMAGE_MIME_TYPES.has(mime)
+        ? "image" as const
+        : VIDEO_MIME_TYPES.has(mime)
+          ? "video" as const
+          : null;
+
     if (!mediaKind) {
-      return { ok: false, error: "unsupported_media_type", status: 415 };
+      return {
+        ok: false,
+        error: "unsupported_media_type",
+        status: 415,
+      };
     }
-    if (file.size <= 0 || file.size > MAX_MEDIA_BYTES) {
-      return { ok: false, error: "media_size_rejected", status: 413 };
+
+    if (
+      file.size <= 0 ||
+      file.size > MAX_MEDIA_BYTES
+    ) {
+      return {
+        ok: false,
+        error: "media_size_rejected",
+        status: 413,
+      };
     }
 
     totalMediaBytes += file.size;
 
-    if (totalMediaBytes > MAX_TOTAL_MEDIA_BYTES) {
+    if (
+      totalMediaBytes >
+      MAX_TOTAL_MEDIA_BYTES
+    ) {
       return {
         ok: false,
         error: "media_total_size_rejected",
@@ -1131,22 +1376,45 @@ async function persistThreadMessage(
       };
     }
 
-    files.push({ file, mediaKind });
+    files.push({
+      file,
+      mediaKind,
+      mime,
+    });
   }
-  // Fail closed: media requires the private R2 binding. No binding => no upload.
-  if (files.length > 0 && !bucket) {
-    return { ok: false, error: "PORTAL_MEDIA_NOT_CONFIGURED", status: 503 };
+
+  if (
+    files.length > 0 &&
+    !bucket
+  ) {
+    return {
+      ok: false,
+      error: "PORTAL_MEDIA_NOT_CONFIGURED",
+      status: 503,
+    };
   }
-  if (!content.body && files.length === 0) {
-    return { ok: false, error: "empty_message", status: 422 };
+
+  if (
+    !content.body &&
+    files.length === 0
+  ) {
+    return {
+      ok: false,
+      error: "empty_message",
+      status: 422,
+    };
   }
+
   const now = v3now();
   const messageId = crypto.randomUUID();
-  const encryptedBody = await encryptClinicalPayload(
-    { text: content.body },
-    key,
-    `portal-message:${thread.practice_id}:${thread.id}`,
-  );
+
+  const encryptedBody =
+    await encryptClinicalPayload(
+      { text: content.body },
+      key,
+      `portal-message:${thread.practice_id}:${thread.id}`,
+    );
+
   const statements = [
     v3db(env)
       .prepare(
@@ -1168,21 +1436,126 @@ async function persistThreadMessage(
         now,
       ),
     v3db(env)
-      .prepare(`UPDATE portal_threads SET last_message_at=?,updated_at=? WHERE id=?`)
-      .bind(now, now, thread.id),
+      .prepare(
+        `UPDATE portal_threads
+         SET last_message_at=?,updated_at=?
+         WHERE id=?`,
+      )
+      .bind(
+        now,
+        now,
+        thread.id,
+      ),
   ];
-  const attachments: Record<string, unknown>[] = [];
+
+  const attachments:
+    Record<string, unknown>[] = [];
+
+  const uploadedMediaKeys:
+    string[] = [];
+
   for (const item of files) {
-    const attachmentId = crypto.randomUUID();
-    const mediaKey = `portal/${thread.practice_id}/${thread.id}/${attachmentId}`;
-    const bytes = await item.file.arrayBuffer();
-    const digest = await sha256BytesHex(bytes);
-    const upload = await bucket!.put(mediaKey, bytes, {
-      httpMetadata: { contentType: String(item.file.type).toLowerCase() },
-    });
-    if (!upload) {
-      return { ok: false, error: "media_upload_failed", status: 502 };
+    const attachmentId =
+      crypto.randomUUID();
+
+    const mediaKey =
+      `portal/${thread.practice_id}/${thread.id}/${attachmentId}`;
+
+    let bytes: ArrayBuffer;
+
+    try {
+      bytes =
+        await item.file.arrayBuffer();
+    } catch {
+      await cleanupPortalMedia(
+        bucket,
+        uploadedMediaKeys,
+      );
+
+      return {
+        ok: false,
+        error: "media_upload_failed",
+        status: 502,
+      };
     }
+
+    if (
+      !portalMediaSignatureMatches(
+        item.mime,
+        bytes,
+      )
+    ) {
+      await cleanupPortalMedia(
+        bucket,
+        uploadedMediaKeys,
+      );
+
+      return {
+        ok: false,
+        error: "media_signature_rejected",
+        status: 415,
+      };
+    }
+
+    let digest: string;
+
+    try {
+      digest =
+        await sha256BytesHex(bytes);
+    } catch {
+      await cleanupPortalMedia(
+        bucket,
+        uploadedMediaKeys,
+      );
+
+      return {
+        ok: false,
+        error: "media_upload_failed",
+        status: 502,
+      };
+    }
+
+    // Track before PUT so ambiguous remote failures are also
+    // eligible for compensating deletion.
+    uploadedMediaKeys.push(mediaKey);
+
+    try {
+      const upload =
+        await bucket!.put(
+          mediaKey,
+          bytes,
+          {
+            httpMetadata: {
+              contentType: item.mime,
+            },
+          },
+        );
+
+      if (!upload) {
+        await cleanupPortalMedia(
+          bucket,
+          uploadedMediaKeys,
+        );
+
+        return {
+          ok: false,
+          error: "media_upload_failed",
+          status: 502,
+        };
+      }
+    } catch {
+      await cleanupPortalMedia(
+        bucket,
+        uploadedMediaKeys,
+      );
+
+      return {
+        ok: false,
+        error: "media_upload_failed",
+        status: 502,
+      };
+    }
+
     statements.push(
       v3db(env)
         .prepare(
@@ -1197,37 +1570,62 @@ async function persistThreadMessage(
           thread.practice_id,
           mediaKey,
           item.mediaKind,
-          String(item.file.type).toLowerCase(),
+          item.mime,
           item.file.size,
           digest,
           now,
         ),
     );
+
     attachments.push({
       id: attachmentId,
       mediaKind: item.mediaKind,
-      mimeType: String(item.file.type).toLowerCase(),
+      mimeType: item.mime,
       sizeBytes: item.file.size,
     });
   }
-  try {
-    await v3db(env).batch(statements);
-  } catch {
-    return { ok: false, error: "message_persist_failed", status: 500 };
-  }
-  await portalAudit(
-    env,
-    thread.practice_id,
-    "portal.message_sent",
-    "portal_thread",
-    thread.id,
-    {
-      messageId,
-      senderRole: sender.role,
-      attachmentCount: attachments.length,
-    },
-    sender.runtimeUserId ?? null,
+
+  statements.push(
+    v3db(env)
+      .prepare(
+        `INSERT INTO audit_log
+         (id,actor_user_id,practice_id,action,target_type,target_id,meta_json,created_at)
+         VALUES(?,?,?,?,?,?,?,?)`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        sender.runtimeUserId ?? null,
+        thread.practice_id,
+        "portal.message_sent",
+        "portal_thread",
+        thread.id,
+        JSON.stringify({
+          messageId,
+          senderRole: sender.role,
+          attachmentCount:
+            attachments.length,
+        }),
+        now,
+      ),
   );
+
+  try {
+    await v3db(env).batch(
+      statements,
+    );
+  } catch {
+    await cleanupPortalMedia(
+      bucket,
+      uploadedMediaKeys,
+    );
+
+    return {
+      ok: false,
+      error: "message_persist_failed",
+      status: 500,
+    };
+  }
+
   return {
     ok: true,
     message: {
@@ -1240,7 +1638,6 @@ async function persistThreadMessage(
     },
   };
 }
-
 // --- Patient-side thread handlers --------------------------------------------
 
 async function portalListThreads(request: Request, env: V3Env) {
@@ -1525,45 +1922,153 @@ async function serveAttachment(
   portalUserId: string | null,
 ) {
   const bucket = mediaBucket(env);
-  if (!bucket) {
-    return reply(request, env, { error: "PORTAL_MEDIA_NOT_CONFIGURED" }, 503);
-  }
-  const row = await (portalUserId
-    ? v3db(env)
-        .prepare(
-          `SELECT a.media_key,a.mime_type,a.size_bytes
-           FROM portal_message_attachments a
-           JOIN portal_threads t ON t.id=a.thread_id
-           WHERE a.id=? AND a.practice_id=? AND t.portal_user_id=?`,
-        )
-        .bind(attachmentId, practiceId, portalUserId)
-    : v3db(env)
-        .prepare(
-          `SELECT a.media_key,a.mime_type,a.size_bytes
-           FROM portal_message_attachments a
-           JOIN portal_threads t ON t.id=a.thread_id
-           WHERE a.id=? AND a.practice_id=?`,
-        )
-        .bind(attachmentId, practiceId)
-  ).first<{ media_key: string; mime_type: string; size_bytes: number }>();
-  if (!row) {
-    return reply(request, env, { error: "attachment_not_found" }, 404);
-  }
-  const object = await bucket.get(row.media_key);
-  if (!object) {
-    return reply(request, env, { error: "attachment_not_found" }, 404);
-  }
-  // Bytes stream from the private bucket; there is no public URL of any kind.
-  return new Response(object.body, {
-    headers: {
-      "content-type": row.mime_type,
-      "content-length": String(row.size_bytes),
-      "cache-control": "private, no-store",
-      "content-disposition": "inline",
-    },
-  });
-}
 
+  if (!bucket) {
+    return reply(
+      request,
+      env,
+      {
+        error:
+          "PORTAL_MEDIA_NOT_CONFIGURED",
+      },
+      503,
+    );
+  }
+
+  const row = await (
+    portalUserId
+      ? v3db(env)
+          .prepare(
+            `SELECT a.media_key,a.mime_type,a.size_bytes,a.sha256
+             FROM portal_message_attachments a
+             JOIN portal_threads t ON t.id=a.thread_id
+             WHERE a.id=? AND a.practice_id=? AND t.portal_user_id=?`,
+          )
+          .bind(
+            attachmentId,
+            practiceId,
+            portalUserId,
+          )
+      : v3db(env)
+          .prepare(
+            `SELECT a.media_key,a.mime_type,a.size_bytes,a.sha256
+             FROM portal_message_attachments a
+             JOIN portal_threads t ON t.id=a.thread_id
+             WHERE a.id=? AND a.practice_id=?`,
+          )
+          .bind(
+            attachmentId,
+            practiceId,
+          )
+  ).first<{
+    media_key: string;
+    mime_type: string;
+    size_bytes: number;
+    sha256: string;
+  }>();
+
+  if (!row) {
+    return reply(
+      request,
+      env,
+      { error: "attachment_not_found" },
+      404,
+    );
+  }
+
+  const object =
+    await bucket.get(row.media_key);
+
+  if (!object) {
+    return reply(
+      request,
+      env,
+      { error: "attachment_not_found" },
+      404,
+    );
+  }
+
+  let bytes: ArrayBuffer;
+  let digest: string;
+
+  try {
+    bytes = await object.arrayBuffer();
+    digest =
+      await sha256BytesHex(bytes);
+  } catch {
+    return reply(
+      request,
+      env,
+      { error: "attachment_read_failed" },
+      502,
+    );
+  }
+
+  if (
+    bytes.byteLength !==
+      row.size_bytes ||
+    digest !== row.sha256
+  ) {
+    return reply(
+      request,
+      env,
+      {
+        error:
+          "attachment_integrity_mismatch",
+      },
+      409,
+    );
+  }
+
+  const normalizedMime =
+    String(row.mime_type ?? "")
+      .trim()
+      .toLowerCase();
+
+  const safeMime =
+    IMAGE_MIME_TYPES.has(
+      normalizedMime,
+    ) ||
+    VIDEO_MIME_TYPES.has(
+      normalizedMime,
+    )
+      ? normalizedMime
+      : "application/octet-stream";
+
+  const extension =
+    portalMediaExtension(safeMime);
+
+  const origin =
+    request.headers.get("origin");
+
+  return new Response(
+    bytes,
+    {
+      headers: {
+        ...(origin === env.ADMIN_ORIGIN
+          ? {
+              "access-control-allow-origin":
+                origin,
+              vary: "Origin",
+            }
+          : {}),
+        "content-type": safeMime,
+        "content-length":
+          String(bytes.byteLength),
+        "cache-control":
+          "private, no-store",
+        "content-disposition":
+          `attachment; filename="glymize-attachment.${extension}"`,
+        "x-content-type-options":
+          "nosniff",
+        "content-security-policy":
+          "default-src 'none'; sandbox",
+        "referrer-policy":
+          "no-referrer",
+      },
+    },
+  );
+}
 async function portalDownloadAttachment(
   request: Request,
   env: V3Env,
