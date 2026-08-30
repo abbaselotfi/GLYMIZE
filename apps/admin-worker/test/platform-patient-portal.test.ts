@@ -126,6 +126,84 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
     expect(runtime).toContain("`portal-login:${normalized}`");
   });
 
+  it("fails closed on refresh replay and cross-patient encounter binding", () => {
+    const refreshStart = runtime.indexOf(
+      "async function portalRefresh(",
+    );
+    const refreshEnd = runtime.indexOf(
+      "async function portalLogout(",
+      refreshStart,
+    );
+
+    expect(refreshStart).toBeGreaterThanOrEqual(0);
+    expect(refreshEnd).toBeGreaterThan(refreshStart);
+
+    const refresh = runtime.slice(
+      refreshStart,
+      refreshEnd,
+    );
+
+    expect(refresh).toContain(
+      "persistent,expires_at,revoked_at",
+    );
+    expect(refresh).toContain(
+      "refreshToken.length < 32",
+    );
+    expect(refresh).toContain(
+      "refreshToken.length > 200",
+    );
+    expect(refresh).toContain(
+      "(revoked.meta.changes ?? 0) !== 1",
+    );
+    expect(refresh).toContain(
+      '"refresh_token_replayed"',
+    );
+    expect(refresh).toContain(
+      "token.persistent === 1",
+    );
+    expect(refresh).not.toContain(
+      'issuePortalSession(env, user, true, "portal-refresh")',
+    );
+
+    expect(runtime).toContain(
+      "user.practice_id !== access.practiceId",
+    );
+    expect(runtime).toContain(
+      "user.patient_id !== access.patientId",
+    );
+
+    const statusStart = runtime.indexOf(
+      "async function adminSubmissionStatus(",
+    );
+    const statusEnd = runtime.indexOf(
+      "async function adminThreadsList(",
+      statusStart,
+    );
+
+    expect(statusStart).toBeGreaterThanOrEqual(0);
+    expect(statusEnd).toBeGreaterThan(statusStart);
+
+    const statusHandler = runtime.slice(
+      statusStart,
+      statusEnd,
+    );
+
+    expect(statusHandler).toContain(
+      "WHERE id=? AND practice_id=? AND patient_id=?",
+    );
+    expect(statusHandler).toContain(
+      "submission.patient_id",
+    );
+    expect(
+      statusHandler.indexOf(
+        "SELECT id,patient_id FROM portal_submissions",
+      ),
+    ).toBeLessThan(
+      statusHandler.indexOf(
+        "SELECT id FROM patient_encounters",
+      ),
+    );
+  });
   it("keeps media private and fail-closed with no public or presigned URLs", () => {
     expect(wrangler).toContain('"binding": "PORTAL_MEDIA"');
     expect(runtime).toContain("PORTAL_MEDIA_NOT_CONFIGURED");

@@ -280,6 +280,12 @@ async function requirePortalUser(
     .bind(access.portalUserId)
     .first<PortalUserRow>();
   if (!user || user.status !== "active") return null;
+  if (
+    user.practice_id !== access.practiceId ||
+    user.patient_id !== access.patientId
+  ) {
+    return null;
+  }
   return user;
 }
 
@@ -466,23 +472,30 @@ async function portalRefresh(request: Request, env: V3Env) {
   } catch {
     return reply(request, env, { error: "invalid_json" }, 400);
   }
-  const refreshToken = String(body.refreshToken ?? "");
-  if (!refreshToken) {
+
+  const refreshToken = String(body.refreshToken ?? "").trim();
+  if (
+    refreshToken.length < 32 ||
+    refreshToken.length > 200
+  ) {
     return reply(request, env, { error: "auth_required" }, 401);
   }
+
   const refreshHash = await sha256Hex(refreshToken);
   const token = await v3db(env)
     .prepare(
-      `SELECT id,portal_user_id,expires_at,revoked_at
+      `SELECT id,portal_user_id,persistent,expires_at,revoked_at
        FROM portal_refresh_tokens WHERE token_hash=?`,
     )
     .bind(refreshHash)
     .first<{
       id: string;
       portal_user_id: string;
+      persistent: 0 | 1;
       expires_at: string;
       revoked_at: string | null;
     }>();
+
   if (
     !token ||
     token.revoked_at ||
@@ -490,6 +503,7 @@ async function portalRefresh(request: Request, env: V3Env) {
   ) {
     return reply(request, env, { error: "auth_required" }, 401);
   }
+
   const user = await v3db(env)
     .prepare(
       `SELECT id,practice_id,patient_id,status,password_hash,password_salt,
@@ -498,21 +512,39 @@ async function portalRefresh(request: Request, env: V3Env) {
     )
     .bind(token.portal_user_id)
     .first<PortalUserRow>();
+
   if (!user || user.status !== "active") {
     return reply(request, env, { error: "auth_required" }, 401);
   }
-  // Rotate: the presented refresh token is consumed; a new one is issued.
-  await v3db(env)
+
+  // Exactly-once refresh rotation. If another request already consumed
+  // this token, this request loses the race and must fail closed.
+  const revoked = await v3db(env)
     .prepare(
-      `UPDATE portal_refresh_tokens SET revoked_at=?
+      `UPDATE portal_refresh_tokens SET revoked_at=?,last_used_at=?
        WHERE id=? AND revoked_at IS NULL`,
     )
-    .bind(v3now(), token.id)
+    .bind(v3now(), v3now(), token.id)
     .run();
+
+  if ((revoked.meta.changes ?? 0) !== 1) {
+    return reply(
+      request,
+      env,
+      { error: "refresh_token_replayed" },
+      401,
+    );
+  }
+
   return reply(
     request,
     env,
-    await issuePortalSession(env, user, true, "portal-refresh"),
+    await issuePortalSession(
+      env,
+      user,
+      token.persistent === 1,
+      "portal-refresh",
+    ),
   );
 }
 
@@ -1331,16 +1363,34 @@ async function adminSubmissionStatus(
   if (!["acknowledged", "reviewed", "archived"].includes(targetStatus)) {
     return reply(request, env, { error: "invalid_submission_status" }, 422);
   }
+  const submission = await v3db(env)
+    .prepare(
+      `SELECT id,patient_id FROM portal_submissions
+       WHERE id=? AND practice_id=?`,
+    )
+    .bind(submissionId, clinician.practiceId)
+    .first<{ id: string; patient_id: string }>();
+
+  if (!submission) {
+    return reply(request, env, { error: "submission_not_found" }, 404);
+  }
+
   const encounterIdRaw = stringOrNull(body.encounterId, 64);
   let encounterId: string | null = null;
+
   if (encounterIdRaw) {
     const encounter = await v3db(env)
       .prepare(
-        `SELECT id,patient_id FROM patient_encounters
-         WHERE id=? AND practice_id=?`,
+        `SELECT id FROM patient_encounters
+         WHERE id=? AND practice_id=? AND patient_id=?`,
       )
-      .bind(encounterIdRaw, clinician.practiceId)
-      .first<{ id: string; patient_id: string }>();
+      .bind(
+        encounterIdRaw,
+        clinician.practiceId,
+        submission.patient_id,
+      )
+      .first<{ id: string }>();
+
     if (!encounter) {
       return reply(
         request,
@@ -1349,17 +1399,8 @@ async function adminSubmissionStatus(
         422,
       );
     }
+
     encounterId = encounter.id;
-  }
-  const submission = await v3db(env)
-    .prepare(
-      `SELECT id,patient_id FROM portal_submissions
-       WHERE id=? AND practice_id=?`,
-    )
-    .bind(submissionId, clinician.practiceId)
-    .first<{ id: string; patient_id: string }>();
-  if (!submission) {
-    return reply(request, env, { error: "submission_not_found" }, 404);
   }
   const now = v3now();
   await v3db(env)
