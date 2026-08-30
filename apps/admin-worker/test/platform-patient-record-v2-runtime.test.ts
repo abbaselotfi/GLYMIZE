@@ -246,6 +246,29 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(promotion).not.toContain("UPDATE patient_handoffs");
     expect(promotion).not.toContain("DELETE FROM patient_handoffs");
   });
+  it("locks legacy handoff writes after explicit v2 promotion", () => {
+    const start = platform.indexOf("async function upsertHandoff");
+    const end = platform.indexOf("async function lookupHandoff", start);
+    const upsert = platform.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(upsert).toContain("patient_handoff_legacy_links");
+    expect(upsert).toContain("LEGACY_HANDOFF_PROMOTED_READ_ONLY");
+    expect(upsert).toContain('"handoff.legacy_write_denied"');
+    expect(upsert).toContain("expectedRecordId");
+    expect(upsert).toContain('reason: "promoted_to_patient_record_v2"');
+
+    const lockQuery = upsert.match(
+      /SELECT l\.patient_id,l\.encounter_id[\s\S]*?LIMIT 1\x60,\s*\)\.bind\(([\s\S]*?)\)\.first/,
+    );
+    expect(lockQuery).not.toBeNull();
+    const sqlSegment = lockQuery?.[0] ?? "";
+    const placeholders = (sqlSegment.match(/\?/g) ?? []).length;
+    const bindCount = topLevelArgumentCount(lockQuery?.[1] ?? "");
+    expect(placeholders).toBe(3);
+    expect(bindCount).toBe(3);
+  });
+
   it("uses a monotonic allocator with server-side conflict and concurrency guards", () => {
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_UNINITIALIZED");
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_OUT_OF_SYNC");

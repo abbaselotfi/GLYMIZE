@@ -1627,6 +1627,40 @@ async function upsertHandoff(
     );
   }
 
+  const promotedLegacy = await db(env).prepare(
+    `SELECT l.patient_id,l.encounter_id
+     FROM patient_handoff_legacy_links l
+     JOIN patient_registry p ON p.id=l.patient_id
+     JOIN patient_encounters e ON e.id=l.encounter_id
+     WHERE l.legacy_handoff_id=?
+       AND p.practice_id=?
+       AND e.practice_id=?
+     LIMIT 1`,
+  ).bind(
+    expectedRecordId,
+    auth.user.practiceId,
+    auth.user.practiceId,
+  ).first<{
+    patient_id: string;
+    encounter_id: string;
+  }>();
+  if (promotedLegacy) {
+    await audit(
+      env,
+      auth.user.id,
+      auth.user.practiceId,
+      "handoff.legacy_write_denied",
+      "patient_handoff",
+      expectedRecordId,
+      { reason: "promoted_to_patient_record_v2" },
+    );
+    return json(
+      request,
+      env,
+      { error: "LEGACY_HANDOFF_PROMOTED_READ_ONLY" },
+      409,
+    );
+  }
   const result = await db(env).prepare(
     `UPDATE patient_handoffs
      SET ciphertext=?,
