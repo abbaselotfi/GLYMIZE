@@ -154,6 +154,23 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
     expect(runtime).toContain('"portal.thread_created"');
   });
 
+  it("keeps portal account INSERT placeholder arity aligned with bind values", () => {
+    const match = runtime.match(
+      /INSERT INTO portal_users[\s\S]*?VALUES\(([^`]+)\)`\s*,\s*\)\s*\.bind\(([\s\S]*?)\)\s*\.run\(\);/,
+    );
+
+    expect(match).not.toBeNull();
+
+    const placeholders = (match?.[1].match(/\?/g) ?? []).length;
+    const bindValues = (match?.[2] ?? "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.endsWith(",")).length;
+
+    expect(placeholders).toBe(15);
+    expect(bindValues).toBe(15);
+    expect(placeholders).toBe(bindValues);
+  });
   it("keeps every portal query on a static SQL template", () => {
     expect(prepareTemplatesUseStaticSql(runtime)).toBe(true);
   });

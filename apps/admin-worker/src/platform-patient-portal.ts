@@ -1657,7 +1657,7 @@ async function adminAccountCreate(request: Request, env: V3Env, clinician: V3Use
           login_ciphertext,login_iv,login_auth_tag,password_hash,password_salt,
           password_iterations,password_updated_at,must_change_password,
           created_by,created_at,updated_at)
-         VALUES(?,?,?,'active',?,?,?,?,?,?,?,?,?,?,1,?,?,?)`,
+         VALUES(?,?,?,'active',?,?,?,?,?,?,?,?,?,1,?,?,?)`,
       )
       .bind(
         id,
