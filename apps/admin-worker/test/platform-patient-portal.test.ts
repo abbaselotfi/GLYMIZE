@@ -462,6 +462,118 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       "This conversation is assigned to another physician.",
     );
   });
+  it("enforces monotonic submission transitions and bounds portal write abuse", () => {
+    expect(runtime).toContain(
+      "MAX_TOTAL_MEDIA_BYTES = 50 * 1024 * 1024",
+    );
+    expect(runtime).toContain(
+      "PORTAL_RATE_WINDOW_MS = 15 * 60 * 1000",
+    );
+    expect(runtime).toContain(
+      "async function portalRateKey(",
+    );
+
+    for (const scope of [
+      '"login-account"',
+      '"login-ip"',
+      '"refresh-ip"',
+      '"password-change"',
+      '"submission"',
+      '"patient-message"',
+    ]) {
+      expect(runtime).toContain(scope);
+    }
+
+    expect(runtime).not.toContain(
+      '`portal-login:${loginHash}:${request.headers.get("cf-connecting-ip")',
+    );
+
+    const refreshStart = runtime.indexOf(
+      "async function portalRefresh(",
+    );
+    const refreshEnd = runtime.indexOf(
+      "async function portalLogout(",
+      refreshStart,
+    );
+    const refreshHandler = runtime.slice(
+      refreshStart,
+      refreshEnd,
+    );
+
+    expect(refreshHandler).toContain(
+      '"refresh-ip"',
+    );
+    expect(refreshHandler).toContain(
+      "const refreshHash = await sha256Hex(refreshToken);",
+    );
+    expect(refreshHandler).toContain(
+      "(revoked.meta.changes ?? 0) !== 1",
+    );
+
+    expect(runtime).toContain(
+      '"media_total_size_rejected"',
+    );
+    expect(runtime).toContain(
+      "function portalSubmissionTransitionAllowed(",
+    );
+    expect(runtime).toContain(
+      '"invalid_submission_transition"',
+    );
+    expect(runtime).toContain(
+      '"submission_status_conflict"',
+    );
+    expect(runtime).toContain(
+      '"encounter_reference_requires_review"',
+    );
+    expect(runtime).toContain(
+      '"reviewed_submission_locked"',
+    );
+
+    const statusStart = runtime.indexOf(
+      "async function adminSubmissionStatus(",
+    );
+    const statusEnd = runtime.indexOf(
+      "async function adminThreadsList(",
+      statusStart,
+    );
+    const statusHandler = runtime.slice(
+      statusStart,
+      statusEnd,
+    );
+
+    expect(statusHandler).toContain(
+      "WHERE id=? AND practice_id=? AND status=?",
+    );
+    expect(statusHandler).toContain(
+      "reviewed_by=CASE WHEN ?='reviewed'",
+    );
+    expect(statusHandler).toContain(
+      "reviewed_at=CASE WHEN ?='reviewed'",
+    );
+    expect(statusHandler).toContain(
+      "fromStatus: submission.status",
+    );
+    expect(statusHandler).not.toContain(
+      "SET status=?,reviewed_by=?,reviewed_at=?",
+    );
+
+    expect(reviewUi).toContain(
+      'target === "reviewed" && encounterId',
+    );
+    expect(reviewUi).toContain(
+      'item.status === "archived"',
+    );
+    expect(reviewUi).toContain(
+      "encounter_reference_requires_review",
+    );
+
+    expect(portalUi).toContain(
+      '"media_total_size_rejected"',
+    );
+    expect(portalUi).toContain(
+      'code === "rate_limited"',
+    );
+  });
   it("keeps media private and fail-closed with no public or presigned URLs", () => {
     expect(wrangler).toContain('"binding": "PORTAL_MEDIA"');
     expect(runtime).toContain("PORTAL_MEDIA_NOT_CONFIGURED");

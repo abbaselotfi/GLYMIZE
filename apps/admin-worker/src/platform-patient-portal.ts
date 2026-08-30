@@ -61,8 +61,10 @@ type PortalThreadRow = {
 };
 
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
+const MAX_TOTAL_MEDIA_BYTES = 50 * 1024 * 1024;
 const MAX_ATTACHMENTS_PER_MESSAGE = 4;
 const MAX_MESSAGE_BODY_CHARS = 4000;
+const PORTAL_RATE_WINDOW_MS = 15 * 60 * 1000;
 const MAX_NOTE_CHARS = 5000;
 const MAX_SUBMISSION_ITEMS = 200;
 const PORTAL_ACCESS_CONTEXT = "PORTAL-ACCESS-V1";
@@ -146,9 +148,17 @@ function stringOrNull(value: unknown, max: number) {
   return text ? text.slice(0, max) : undefined;
 }
 
-async function portalRate(env: V3Env, key: string) {
+async function portalRate(
+  env: V3Env,
+  key: string,
+  limit = 6,
+  windowMs = PORTAL_RATE_WINDOW_MS,
+) {
   const now = v3now();
-  const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const cutoff = new Date(
+    Date.now() - windowMs,
+  ).toISOString();
+
   const row = await v3db(env)
     .prepare(
       `INSERT INTO auth_rate_limits(key,window_started_at,count)
@@ -158,9 +168,29 @@ async function portalRate(env: V3Env, key: string) {
          window_started_at=CASE WHEN auth_rate_limits.window_started_at<? THEN excluded.window_started_at ELSE auth_rate_limits.window_started_at END
        RETURNING count`,
     )
-    .bind(key, now, cutoff, cutoff)
+    .bind(
+      key,
+      now,
+      cutoff,
+      cutoff,
+    )
     .first<{ count: number }>();
-  return Boolean(row && row.count <= 6);
+
+  return Boolean(
+    row &&
+    row.count <= limit
+  );
+}
+
+async function portalRateKey(
+  env: V3Env,
+  scope: string,
+  subject: string,
+) {
+  return hmacHex(
+    env.SESSION_SECRET,
+    `portal-rate:${scope}:${subject}`,
+  );
 }
 
 async function portalLoginHash(env: V3Env, normalized: string) {
@@ -421,12 +451,45 @@ async function portalLogin(request: Request, env: V3Env) {
   if (!login || !validCredentialValue(password)) {
     return reply(request, env, { error: "invalid_credentials" }, 401);
   }
-  const loginHash = await portalLoginHash(env, login.normalized);
-  const key = await sha256Hex(
-    `portal-login:${loginHash}:${request.headers.get("cf-connecting-ip") ?? "unknown"}`,
+  const loginHash = await portalLoginHash(
+    env,
+    login.normalized,
   );
-  if (!(await portalRate(env, key))) {
-    return reply(request, env, { error: "rate_limited" }, 429);
+
+  const clientIp =
+    request.headers.get("cf-connecting-ip") ?? "unknown";
+
+  const loginAccountRateKey = await portalRateKey(
+    env,
+    "login-account",
+    loginHash,
+  );
+
+  const loginIpRateKey = await portalRateKey(
+    env,
+    "login-ip",
+    clientIp,
+  );
+
+  const accountAllowed = await portalRate(
+    env,
+    loginAccountRateKey,
+    6,
+  );
+
+  const ipAllowed = await portalRate(
+    env,
+    loginIpRateKey,
+    30,
+  );
+
+  if (!accountAllowed || !ipAllowed) {
+    return reply(
+      request,
+      env,
+      { error: "rate_limited" },
+      429,
+    );
   }
   const user = await v3db(env)
     .prepare(
@@ -488,6 +551,25 @@ async function portalRefresh(request: Request, env: V3Env) {
     refreshToken.length > 200
   ) {
     return reply(request, env, { error: "auth_required" }, 401);
+  }
+
+  const refreshRateKey = await portalRateKey(
+    env,
+    "refresh-ip",
+    request.headers.get("cf-connecting-ip") ?? "unknown",
+  );
+
+  if (!(await portalRate(
+    env,
+    refreshRateKey,
+    120,
+  ))) {
+    return reply(
+      request,
+      env,
+      { error: "rate_limited" },
+      429,
+    );
   }
 
   const refreshHash = await sha256Hex(refreshToken);
@@ -597,6 +679,25 @@ async function portalChangePassword(request: Request, env: V3Env) {
 
   if (!user) {
     return reply(request, env, { error: "auth_required" }, 401);
+  }
+
+  const passwordRateKey = await portalRateKey(
+    env,
+    "password-change",
+    user.id,
+  );
+
+  if (!(await portalRate(
+    env,
+    passwordRateKey,
+    6,
+  ))) {
+    return reply(
+      request,
+      env,
+      { error: "rate_limited" },
+      429,
+    );
   }
 
   const access = await portalAccessPayload(request, env);
@@ -766,6 +867,25 @@ async function portalChangePassword(request: Request, env: V3Env) {
 async function portalCreateSubmission(request: Request, env: V3Env) {
   const user = await requirePortalUser(request, env);
   if (!user) return reply(request, env, { error: "auth_required" }, 401);
+
+  const submissionRateKey = await portalRateKey(
+    env,
+    "submission",
+    user.id,
+  );
+
+  if (!(await portalRate(
+    env,
+    submissionRateKey,
+    20,
+  ))) {
+    return reply(
+      request,
+      env,
+      { error: "rate_limited" },
+      429,
+    );
+  }
   const key = clinicalKey(env);
   if (!key) {
     return reply(
@@ -985,6 +1105,8 @@ async function persistThreadMessage(
 ): Promise<MessagePersistResult> {
   const bucket = mediaBucket(env);
   const files: { file: File; mediaKind: "image" | "video" }[] = [];
+  let totalMediaBytes = 0;
+
   for (const file of content.files) {
     const mime = String(file.type ?? "").toLowerCase();
     const mediaKind = IMAGE_MIME_TYPES.has(mime)
@@ -998,6 +1120,17 @@ async function persistThreadMessage(
     if (file.size <= 0 || file.size > MAX_MEDIA_BYTES) {
       return { ok: false, error: "media_size_rejected", status: 413 };
     }
+
+    totalMediaBytes += file.size;
+
+    if (totalMediaBytes > MAX_TOTAL_MEDIA_BYTES) {
+      return {
+        ok: false,
+        error: "media_total_size_rejected",
+        status: 413,
+      };
+    }
+
     files.push({ file, mediaKind });
   }
   // Fail closed: media requires the private R2 binding. No binding => no upload.
@@ -1339,6 +1472,25 @@ async function portalSendMessage(
   if (thread.status !== "open") {
     return reply(request, env, { error: "portal_thread_closed" }, 409);
   }
+
+  const messageRateKey = await portalRateKey(
+    env,
+    "patient-message",
+    user.id,
+  );
+
+  if (!(await portalRate(
+    env,
+    messageRateKey,
+    30,
+  ))) {
+    return reply(
+      request,
+      env,
+      { error: "rate_limited" },
+      429,
+    );
+  }
   const key = clinicalKey(env);
   if (!key) {
     return reply(
@@ -1428,6 +1580,38 @@ function clinicianCan(clinician: V3User, permission: RuntimePermission) {
   return clinician.permissions.includes(permission);
 }
 
+type PortalSubmissionStatus =
+  | "submitted"
+  | "acknowledged"
+  | "reviewed"
+  | "archived";
+
+function portalSubmissionTransitionAllowed(
+  current: PortalSubmissionStatus,
+  target: PortalSubmissionStatus,
+) {
+  if (current === "submitted") {
+    return (
+      target === "acknowledged" ||
+      target === "reviewed" ||
+      target === "archived"
+    );
+  }
+
+  if (current === "acknowledged") {
+    return (
+      target === "reviewed" ||
+      target === "archived"
+    );
+  }
+
+  if (current === "reviewed") {
+    return target === "archived";
+  }
+
+  return false;
+}
+
 async function adminSubmissionsList(
   request: Request,
   env: V3Env,
@@ -1504,8 +1688,6 @@ async function adminSubmissionStatus(
   clinician: V3User,
   submissionId: string,
 ) {
-  // Physician authority only: acknowledging/reviewing patient-reported data
-  // is a clinical decision, not an administrative convenience.
   if (clinician.role !== "physician") {
     return reply(
       request,
@@ -1514,32 +1696,135 @@ async function adminSubmissionStatus(
       403,
     );
   }
+
   if (!clinicianCan(clinician, "handoff.write")) {
-    return reply(request, env, { error: "permission_denied" }, 403);
+    return reply(
+      request,
+      env,
+      { error: "permission_denied" },
+      403,
+    );
   }
+
   let body: Record<string, unknown>;
+
   try {
     body = await request.json() as Record<string, unknown>;
   } catch {
-    return reply(request, env, { error: "invalid_json" }, 400);
+    return reply(
+      request,
+      env,
+      { error: "invalid_json" },
+      400,
+    );
   }
-  const targetStatus = String(body.status ?? "");
-  if (!["acknowledged", "reviewed", "archived"].includes(targetStatus)) {
-    return reply(request, env, { error: "invalid_submission_status" }, 422);
+
+  const targetStatus =
+    String(body.status ?? "") as PortalSubmissionStatus;
+
+  if (
+    ![
+      "acknowledged",
+      "reviewed",
+      "archived",
+    ].includes(targetStatus)
+  ) {
+    return reply(
+      request,
+      env,
+      { error: "invalid_submission_status" },
+      422,
+    );
   }
+
   const submission = await v3db(env)
     .prepare(
-      `SELECT id,patient_id FROM portal_submissions
+      `SELECT id,patient_id,status,reviewed_by,reviewed_at,encounter_id
+       FROM portal_submissions
        WHERE id=? AND practice_id=?`,
     )
-    .bind(submissionId, clinician.practiceId)
-    .first<{ id: string; patient_id: string }>();
+    .bind(
+      submissionId,
+      clinician.practiceId,
+    )
+    .first<{
+      id: string;
+      patient_id: string;
+      status: PortalSubmissionStatus;
+      reviewed_by: string | null;
+      reviewed_at: string | null;
+      encounter_id: string | null;
+    }>();
 
   if (!submission) {
-    return reply(request, env, { error: "submission_not_found" }, 404);
+    return reply(
+      request,
+      env,
+      { error: "submission_not_found" },
+      404,
+    );
   }
 
-  const encounterIdRaw = stringOrNull(body.encounterId, 64);
+  const encounterIdRaw = stringOrNull(
+    body.encounterId,
+    64,
+  );
+
+  if (
+    encounterIdRaw &&
+    targetStatus !== "reviewed"
+  ) {
+    return reply(
+      request,
+      env,
+      { error: "encounter_reference_requires_review" },
+      422,
+    );
+  }
+
+  if (targetStatus === submission.status) {
+    if (
+      targetStatus === "reviewed" &&
+      encounterIdRaw &&
+      encounterIdRaw !== submission.encounter_id
+    ) {
+      return reply(
+        request,
+        env,
+        { error: "reviewed_submission_locked" },
+        409,
+      );
+    }
+
+    return reply(
+      request,
+      env,
+      {
+        ok: true,
+        status: submission.status,
+        idempotent: true,
+      },
+    );
+  }
+
+  if (
+    !portalSubmissionTransitionAllowed(
+      submission.status,
+      targetStatus,
+    )
+  ) {
+    return reply(
+      request,
+      env,
+      {
+        error: "invalid_submission_transition",
+        currentStatus: submission.status,
+        targetStatus,
+      },
+      409,
+    );
+  }
+
   let encounterId: string | null = null;
 
   if (encounterIdRaw) {
@@ -1566,24 +1851,46 @@ async function adminSubmissionStatus(
 
     encounterId = encounter.id;
   }
+
   const now = v3now();
-  await v3db(env)
+
+  const updated = await v3db(env)
     .prepare(
       `UPDATE portal_submissions
-       SET status=?,reviewed_by=?,reviewed_at=?,
-           encounter_id=COALESCE(?,encounter_id),updated_at=?
-       WHERE id=? AND practice_id=?`,
+       SET status=?,
+           reviewed_by=CASE WHEN ?='reviewed' THEN ? ELSE reviewed_by END,
+           reviewed_at=CASE WHEN ?='reviewed' THEN ? ELSE reviewed_at END,
+           encounter_id=CASE
+             WHEN ?='reviewed' THEN COALESCE(?,encounter_id)
+             ELSE encounter_id
+           END,
+           updated_at=?
+       WHERE id=? AND practice_id=? AND status=?`,
     )
     .bind(
       targetStatus,
+      targetStatus,
       clinician.id,
+      targetStatus,
       now,
+      targetStatus,
       encounterId,
       now,
       submission.id,
       clinician.practiceId,
+      submission.status,
     )
     .run();
+
+  if ((updated.meta.changes ?? 0) !== 1) {
+    return reply(
+      request,
+      env,
+      { error: "submission_status_conflict" },
+      409,
+    );
+  }
+
   await portalAudit(
     env,
     clinician.practiceId,
@@ -1591,15 +1898,26 @@ async function adminSubmissionStatus(
     "portal_submission",
     submission.id,
     {
+      fromStatus: submission.status,
       status: targetStatus,
-      encounterId,
+      encounterId:
+        targetStatus === "reviewed"
+          ? encounterId
+          : null,
       physicianId: clinician.id,
     },
     clinician.id,
   );
-  return reply(request, env, { ok: true, status: targetStatus });
-}
 
+  return reply(
+    request,
+    env,
+    {
+      ok: true,
+      status: targetStatus,
+    },
+  );
+}
 async function adminThreadsList(
   request: Request,
   env: V3Env,

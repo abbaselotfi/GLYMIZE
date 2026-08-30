@@ -44,6 +44,22 @@ function adminError(reason: unknown, fa: boolean) {
       : "This conversation is assigned to another physician.";
   }
 
+  if (
+    code === "invalid_submission_transition" ||
+    code === "submission_status_conflict" ||
+    code === "reviewed_submission_locked"
+  ) {
+    return fa
+      ? "وضعیت این ارسال در مرحله دیگری قرار دارد. فهرست را به‌روزرسانی کنید."
+      : "This submission is already in another workflow state. Refresh the list.";
+  }
+
+  if (code === "encounter_reference_requires_review") {
+    return fa
+      ? "اتصال به ویزیت فقط هنگام تأیید «بررسی شد» مجاز است."
+      : "An encounter can only be linked when marking the submission reviewed.";
+  }
+
   if (code === "PORTAL_MEDIA_NOT_CONFIGURED") {
     return fa
       ? "ارسال رسانه در این محیط فعال نیست."
@@ -123,7 +139,9 @@ export default function PortalReviewClient() {
           method: "POST",
           body: JSON.stringify({
             status: target,
-            ...(encounterId ? { encounterId } : {}),
+            ...(target === "reviewed" && encounterId
+              ? { encounterId }
+              : {}),
           }),
         },
       );
@@ -319,8 +337,12 @@ export default function PortalReviewClient() {
               <div className={styles.actionRow}>
                 <input
                   className={styles.input}
-                  placeholder={fa ? "شناسه ویزیت (اختیاری)" : "Encounter ID (optional)"}
+                  placeholder={fa ? "شناسه ویزیت (فقط هنگام بررسی)" : "Encounter ID (review only)"}
                   value={encounterLinks[item.id] ?? ""}
+                  disabled={
+                    item.status !== "submitted" &&
+                    item.status !== "acknowledged"
+                  }
                   onChange={(event) =>
                     setEncounterLinks((current) => ({
                       ...current,
@@ -330,21 +352,33 @@ export default function PortalReviewClient() {
                 />
                 <button
                   className={styles.ghost}
-                  disabled={busy}
+                  disabled={
+                    busy ||
+                    item.status !== "submitted"
+                  }
                   onClick={() => void updateSubmission(item.id, "acknowledged")}
                 >
                   {fa ? "دریافت شد" : "Acknowledge"}
                 </button>
                 <button
                   className={styles.primary}
-                  disabled={busy}
+                  disabled={
+                    busy ||
+                    (
+                      item.status !== "submitted" &&
+                      item.status !== "acknowledged"
+                    )
+                  }
                   onClick={() => void updateSubmission(item.id, "reviewed")}
                 >
                   {fa ? "بررسی شد" : "Mark reviewed"}
                 </button>
                 <button
                   className={styles.ghost}
-                  disabled={busy}
+                  disabled={
+                    busy ||
+                    item.status === "archived"
+                  }
                   onClick={() => void updateSubmission(item.id, "archived")}
                 >
                   {fa ? "بایگانی" : "Archive"}

@@ -197,9 +197,13 @@ export default function PortalClient() {
           ? fa
             ? "رمز جدید کوتاه است (حداقل ۱۰ کاراکتر)."
             : "New password is too short (minimum 10 characters)."
-          : fa
-            ? "تغییر رمز عبور ناموفق بود."
-            : "Password change failed.",
+          : code === "rate_limited"
+            ? fa
+              ? "تلاش بیش از حد. کمی بعد دوباره امتحان کنید."
+              : "Too many attempts. Please try again later."
+            : fa
+              ? "تغییر رمز عبور ناموفق بود."
+              : "Password change failed.",
       );
     } finally {
       setBusy(false);
@@ -258,9 +262,13 @@ export default function PortalClient() {
           ? fa
             ? "حداقل یک مورد وارد کنید."
             : "Enter at least one item."
-          : fa
-            ? "ارسال ناموفق بود."
-            : "Submission failed.",
+          : code === "rate_limited"
+            ? fa
+              ? "تعداد ارسال‌ها زیاد است. کمی بعد دوباره امتحان کنید."
+              : "Too many submissions. Please try again later."
+            : fa
+              ? "ارسال ناموفق بود."
+              : "Submission failed.",
       );
     } finally {
       setBusy(false);
@@ -307,11 +315,19 @@ export default function PortalClient() {
               : "Only images or videos are allowed."
             : code === "media_size_rejected"
               ? fa
-                ? "حجم فایل بیش از حد مجاز است (حداکثر ۲۵ مگابایت)."
-                : "File is too large (max 25 MB)."
-              : fa
-                ? "ارسال پیام ناموفق بود."
-                : "Failed to send the message.",
+                ? "حجم هر فایل حداکثر ۲۵ مگابایت است."
+                : "Each file may be at most 25 MB."
+              : code === "media_total_size_rejected"
+                ? fa
+                  ? "مجموع حجم فایل‌های یک پیام حداکثر ۵۰ مگابایت است."
+                  : "Total attachments per message may be at most 50 MB."
+                : code === "rate_limited"
+                  ? fa
+                    ? "پیام‌های زیادی ارسال شده است. کمی بعد دوباره امتحان کنید."
+                    : "Too many messages. Please try again later."
+                  : fa
+                    ? "ارسال پیام ناموفق بود."
+                    : "Failed to send the message.",
       );
     } finally {
       setBusy(false);
