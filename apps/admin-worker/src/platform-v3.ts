@@ -1,4 +1,5 @@
 import platformHandler from "./platform-index";
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import { adminRuntimeRoute } from "./platform-v3-admin";
 import { patientPortalRoute } from "./platform-patient-portal";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
@@ -12,7 +13,7 @@ function json(request: Request, env: Env, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...(origin === env.ADMIN_ORIGIN
+      ...(isRuntimeOriginAllowed(origin, env)
         ? {
             "access-control-allow-origin": origin,
             "access-control-allow-headers": "authorization, content-type",

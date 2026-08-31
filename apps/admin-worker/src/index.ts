@@ -1,3 +1,4 @@
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import {
   ADMIN_PERMISSION_KEYS,
   openPayload,
@@ -148,7 +149,7 @@ async function open<T extends OAuthState | AdminSession>(token: string, secret: 
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("origin");
-  return origin === env.ADMIN_ORIGIN ? {
+  return isRuntimeOriginAllowed(origin, env) ? {
     "access-control-allow-origin": origin,
     "access-control-allow-headers": "authorization, content-type",
     "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
@@ -1283,7 +1284,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "OPTIONS") {
-      if (request.headers.get("origin") !== env.ADMIN_ORIGIN) return new Response(null, { status: 403 });
+      if (!isRuntimeOriginAllowed(request.headers.get("origin"), env)) return new Response(null, { status: 403 });
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
     if (request.method === "GET" && url.pathname === "/auth/start") return startAuthentication(request, env);

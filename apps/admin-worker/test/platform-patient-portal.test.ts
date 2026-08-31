@@ -637,8 +637,11 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
     expect(serve).toContain(
       '"attachment_integrity_mismatch"',
     );
-    expect(serve).toContain(
-      'origin === env.ADMIN_ORIGIN',
+        expect(serve).toContain(
+      "isRuntimeOriginAllowed(origin, env)",
+    );
+    expect(serve).not.toContain(
+      "origin === env.ADMIN_ORIGIN",
     );
     expect(serve).toContain(
       '"x-content-type-options":',

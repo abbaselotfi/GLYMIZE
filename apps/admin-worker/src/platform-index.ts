@@ -1,4 +1,5 @@
 
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import adminHandler from "./index";
 import {
   assistantInvitationEmailEnabled,
@@ -124,7 +125,7 @@ const COMMUNICATIONS_EMAIL_SECRET_KEY = "communications:secret:v1:resend";
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("origin");
-  return origin === env.ADMIN_ORIGIN ? {
+  return isRuntimeOriginAllowed(origin, env) ? {
     "access-control-allow-origin": origin,
     "access-control-allow-headers": "authorization, content-type",
     "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
@@ -1520,7 +1521,7 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
 export default {
   async fetch(request:Request,env:Env):Promise<Response> {
     if (request.method==="OPTIONS" && new URL(request.url).pathname.startsWith("/v1/")) {
-      if (request.headers.get("origin")!==env.ADMIN_ORIGIN) return new Response(null,{status:403});
+      if (!isRuntimeOriginAllowed(request.headers.get("origin"),env)) return new Response(null,{status:403});
       return new Response(null,{status:204,headers:corsHeaders(request,env)});
     }
     try {

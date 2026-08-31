@@ -1,3 +1,4 @@
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import adminHandler from "./index";
 import { createCredential, validCredentialValue } from "./platform-v3-credential";
 import { v3db, v3now, type V3Env } from "./platform-v3-base";
@@ -23,7 +24,7 @@ function json(request: Request, env: V3Env, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...(origin === env.ADMIN_ORIGIN
+      ...(isRuntimeOriginAllowed(origin, env)
         ? {
             "access-control-allow-origin": origin,
             "access-control-allow-headers": "authorization, content-type",
@@ -744,7 +745,7 @@ export async function adminRuntimeRoute(
 
   if (request.method === "OPTIONS") {
     const origin = request.headers.get("origin");
-    if (origin !== env.ADMIN_ORIGIN) {
+    if (!isRuntimeOriginAllowed(origin, env)) {
       return new Response(null, { status: 403 });
     }
     return new Response(null, {

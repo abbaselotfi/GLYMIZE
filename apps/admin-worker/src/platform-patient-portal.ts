@@ -10,6 +10,7 @@
 //   * Media bytes live in the private PORTAL_MEDIA R2 bucket. There is no
 //     public URL of any kind; downloads are authenticated and
 //     practice-scoped. A missing binding fails closed with 503.
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import {
   decryptClinicalPayload,
   encryptClinicalPayload,
@@ -91,7 +92,7 @@ function reply(
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...(origin === env.ADMIN_ORIGIN
+      ...(isRuntimeOriginAllowed(origin, env)
         ? {
             "access-control-allow-origin": origin,
             "access-control-allow-headers": "authorization, content-type",
@@ -2045,7 +2046,7 @@ async function serveAttachment(
     bytes,
     {
       headers: {
-        ...(origin === env.ADMIN_ORIGIN
+        ...(isRuntimeOriginAllowed(origin, env)
           ? {
               "access-control-allow-origin":
                 origin,
@@ -2827,7 +2828,7 @@ export async function patientPortalRoute(
 
   if (request.method === "OPTIONS") {
     const origin = request.headers.get("origin");
-    if (origin !== env.ADMIN_ORIGIN) {
+    if (!isRuntimeOriginAllowed(origin, env)) {
       return new Response(null, { status: 403 });
     }
     return new Response(null, {
