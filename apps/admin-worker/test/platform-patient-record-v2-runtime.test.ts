@@ -31,11 +31,63 @@ const runtimeSecurity = fs.readFileSync(
   new URL("../src/runtime-security.ts", import.meta.url),
   "utf8",
 );
+const encounterRevisionMigration = fs.readFileSync(
+  new URL(
+    "../migrations/0004_encounter_snapshot_revisions.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const handoffClient = fs.readFileSync(
   new URL("../../web/lib/patient-handoff-client.ts", import.meta.url),
   "utf8",
 );
+const careTeamRecordClient = fs.readFileSync(
+  new URL("../../web/lib/care-team-record-client.ts", import.meta.url),
+  "utf8",
+);
+const careTeamPage = fs.readFileSync(
+  new URL("../../web/app/care-team/care-team-client.tsx", import.meta.url),
+  "utf8",
+);
 
+const physicianHandoffLookup = fs.readFileSync(
+  new URL(
+    "../../web/app/components/patient-handoff-lookup.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const recordsPage = fs.readFileSync(
+  new URL(
+    "../../web/app/records/records-client.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+
+const patientRecordArchiveClient = fs.readFileSync(
+  new URL(
+    "../../web/lib/patient-record-archive-client.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const legacyPatientHandoffApiController = fs.readFileSync(
+  new URL(
+    "../../api/src/patient-handoff/patient-handoff.controller.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
+
+const legacyPatientHandoffApiService = fs.readFileSync(
+  new URL(
+    "../../api/src/patient-handoff/patient-handoff.service.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
 type PrepareBind = {
   sql: string;
   bindCount: number;
@@ -160,21 +212,41 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(handoffClient).not.toContain("const PERSIAN_DIGITS");
   });
 
-  it("wires one authenticated v2 route without replacing the legacy handoff path", () => {
+  it("keeps legacy handoff transport read-only after Patient Record v2 cutover", () => {
     expect(platform).toContain(
       'import { patientRecordV2Route } from "./platform-patient-record-v2"',
     );
-    expect(platform).toContain('url.pathname.startsWith("/v1/patients")');
-    expect(platform).toContain("patientRecordV2Route(request");
-    expect(platform).toContain('"/v1/patient-handoff/upsert"');
-    expect(platform).toContain('"/v1/patient-handoff/lookup"');
+    expect(platform).toContain(
+      'url.pathname.startsWith("/v1/patients")',
+    );
+    expect(platform).toContain(
+      "patientRecordV2Route(request",
+    );
+    expect(platform).toContain(
+      "LEGACY_HANDOFF_WRITE_RETIRED",
+    );
+    expect(platform).toContain(
+      "/v1/patient-handoff/lookup",
+    );
+    expect(platform).toContain(
+      "/v1/patient-handoff/list",
+    );
+    expect(platform).toContain(
+      "handoffRecordMatch",
+    );
+    expect(platform).not.toContain(
+      "async function upsertHandoff",
+    );
+    expect(platform).not.toContain(
+      "async function codeStatusHandoff",
+    );
   });
-
   it("exposes the bounded Patient Record v2 foundation endpoints", () => {
     for (const marker of [
       '"/v1/patients/file-number-allocator"',
       '"/v1/patients/file-number-allocator/initialize"',
       '"/v1/patients/resolve"',
+      '"/v1/patients/promote-legacy-handoff"',
       '"/v1/patients"',
       "/identifiers",
       "/encounters",
@@ -182,7 +254,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
     ]) {
       expect(runtime).toContain(marker);
     }
-    expect(runtime).not.toContain("patient_handoff_legacy_links");
+    expect(runtime).toContain("patient_handoff_legacy_links");
   });
 
   it("keeps one typed web client aligned with the new runtime endpoints", () => {
@@ -190,14 +262,20 @@ describe("Patient Record v2 runtime vertical slice", () => {
       "getPatientFileNumberAllocator",
       "initializePatientFileNumberAllocator",
       "resolvePatient",
+      "promoteLegacyHandoff",
+      "createCareTeamPatientIntake",
       "createPatient",
       "attachPatientIdentifier",
       "createPatientEncounter",
+      "getPatientEncounter",
+      "revisePatientEncounter",
       "getPatientWorkspace",
     ]) {
       expect(client).toContain(marker);
     }
     expect(client).toContain('"/v1/patients/resolve"');
+    expect(client).toContain('"/v1/patients/promote-legacy-handoff"');
+    expect(client).toContain('"/v1/patients/care-team-intake"');
     expect(client).toContain('"/v1/patients"');
   });
 
@@ -209,6 +287,105 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(runtime).not.toContain("autoMigrateLegacy");
   });
 
+  it("promotes a legacy handoff only through explicit, practice-scoped, idempotent v2 migration", () => {
+    const start = runtime.indexOf("async function promoteLegacyHandoff");
+    const end = runtime.indexOf("function conflictResponse", start);
+    const promotion = runtime.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(promotion).toContain('!can(context, "handoff.read")');
+    expect(promotion).toContain('!can(context, "handoff.write")');
+    expect(promotion).toContain("expectedLegacyRevision");
+    expect(promotion).toContain("LEGACY_HANDOFF_REVISION_CONFLICT");
+    expect(promotion).toContain("LEGACY_HANDOFF_IDENTIFIER_MISMATCH");
+    expect(promotion).toContain("LEGACY_HANDOFF_REVIEWED_LOCKED");
+    expect(promotion).toContain("PATIENT_IDENTIFIER_EXISTS");
+    expect(promotion).toContain("INSERT INTO patient_handoff_legacy_links");
+    expect(promotion).toContain("context.database.batch(statements)");
+    expect(promotion).toContain('"patient.legacy_handoff_promoted"');
+    expect(promotion).toContain('"care_team"');
+    expect(promotion).toContain("migrationProvenance");
+    expect(promotion).toContain("...payload");
+    expect(promotion).toContain("legacyRevision: legacy.revision");
+    expect(promotion).toContain("legacyCreatedAt: legacy.created_at");
+    expect(promotion).toContain("legacyUpdatedAt: legacy.updated_at");
+    expect(promotion).not.toContain("UPDATE patient_handoffs");
+    expect(promotion).not.toContain("DELETE FROM patient_handoffs");
+  });
+  it("retires legacy handoff writes across Worker, web transport, and local API while preserving reads", () => {
+    expect(platform).toContain(
+      "LEGACY_HANDOFF_WRITE_RETIRED",
+    );
+    expect(platform).toContain("410");
+
+    for (const forbidden of [
+      "async function upsertHandoff",
+      "async function codeStatusHandoff",
+      "INSERT INTO patient_handoffs",
+      "UPDATE patient_handoffs",
+    ]) {
+      expect(platform).not.toContain(forbidden);
+    }
+
+    expect(platform).toContain(
+      "/v1/patient-handoff/lookup",
+    );
+    expect(platform).toContain(
+      "/v1/patient-handoff/list",
+    );
+    expect(platform).toContain(
+      "handoffRecordMatch",
+    );
+
+    expect(handoffClient).not.toContain(
+      "savePatientHandoff",
+    );
+    expect(handoffClient).not.toContain(
+      "checkPatientHandoffCode",
+    );
+    expect(handoffClient).not.toContain(
+      "/v1/patient-handoff/upsert",
+    );
+    expect(handoffClient).not.toContain(
+      "/v1/patient-handoff/code-status",
+    );
+    expect(handoffClient).toContain(
+      "lookupPatientHandoff",
+    );
+    expect(handoffClient).toContain(
+      "getPatientHandoffById",
+    );
+
+    expect(careTeamRecordClient).toContain(
+      "checkCareTeamPatientCode",
+    );
+    expect(careTeamRecordClient).toContain(
+      "saveCareTeamPatientRecord",
+    );
+    expect(careTeamPage).toContain(
+      "checkCareTeamPatientCode",
+    );
+    expect(careTeamPage).toContain(
+      "saveCareTeamPatientRecord",
+    );
+
+    expect(
+      legacyPatientHandoffApiController,
+    ).not.toContain('@Post("upsert")');
+    expect(
+      legacyPatientHandoffApiController,
+    ).toContain('@Post("lookup")');
+
+    expect(
+      legacyPatientHandoffApiService,
+    ).not.toContain("async upsert(");
+    expect(
+      legacyPatientHandoffApiService,
+    ).not.toContain("writeFile(");
+    expect(
+      legacyPatientHandoffApiService,
+    ).toContain("async lookup(");
+  });
   it("uses a monotonic allocator with server-side conflict and concurrency guards", () => {
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_UNINITIALIZED");
     expect(runtime).toContain("FILE_NUMBER_ALLOCATOR_OUT_OF_SYNC");
@@ -233,6 +410,42 @@ describe("Patient Record v2 runtime vertical slice", () => {
     );
   });
 
+  it("creates a new Care Team patient and first encounter atomically in Patient Record v2", () => {
+    const start = runtime.indexOf(
+      "async function createCareTeamPatientIntake",
+    );
+    const end = runtime.indexOf(
+      "async function createPatient(",
+      start,
+    );
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const intake = runtime.slice(start, end);
+    expect(intake).toContain(
+      'context.user.role !== "assistant"',
+    );
+    expect(intake).toContain(
+      "FILE_NUMBER_ALLOCATOR_UNINITIALIZED",
+    );
+    expect(intake).toContain(
+      "INSERT INTO patient_registry",
+    );
+    expect(intake).toContain(
+      "INSERT INTO patient_encounters",
+    );
+    expect(intake).toContain(
+      "INSERT INTO patient_encounter_snapshots",
+    );
+    expect(intake).toContain(
+      "await context.database.batch(statements)",
+    );
+    expect(intake).toContain(
+      "'care_team','ready_for_physician'",
+    );
+    expect(runtime).toContain(
+      'url.pathname === "/v1/patients/care-team-intake"',
+    );
+  });
   it("creates a separate encounter and append-only revision-1 snapshot", () => {
     expect(runtime).toContain("INSERT INTO patient_encounters");
     expect(runtime).toContain("INSERT INTO patient_encounter_snapshots");
@@ -241,6 +454,58 @@ describe("Patient Record v2 runtime vertical slice", () => {
     );
     expect(runtime).toContain('"patient.encounter_created"');
     expect(runtime).not.toContain("UPDATE patient_encounter_snapshots");
+  });
+
+  it("adds optimistic same-encounter revisions without overwriting history", () => {
+    expect(runtime).toContain("ENCOUNTER_REVISION_CONFLICT");
+    expect(runtime).toContain("expectedRevision");
+    expect(runtime).toContain('"patient.encounter_revised"');
+    expect(runtime).toContain('request.method === "PATCH"');
+    expect(runtime).toContain("nextRevision = currentRevision + 1");
+    expect(runtime).toContain("snapshotAad(");
+    expect(runtime).not.toContain("UPDATE patient_encounter_snapshots");
+  });
+
+  it("links indexed observations to the snapshot revision via additive migration 0004", () => {
+    expect(encounterRevisionMigration).toContain(
+      "ADD COLUMN snapshot_revision",
+    );
+    expect(encounterRevisionMigration).toContain(
+      "patient_observations_encounter_revision_idx",
+    );
+    expect(runtime).toContain("snapshot_revision");
+    expect(runtime).toContain("nextRevision");
+  });
+
+  it("locks completed and signed encounters from in-place clinical revision", () => {
+    expect(runtime).toContain("ENCOUNTER_COMPLETED_IMMUTABLE");
+    expect(runtime).toContain("ENCOUNTER_SIGNED_PLAN_LOCKED");
+    expect(runtime).toContain(
+      "physician_encounter_revision_forbidden",
+    );
+  });
+
+  it("locks physician-reviewed care_team encounters from assistant revision (WS-1 authorization fix)", () => {
+    expect(runtime).toContain("ENCOUNTER_REVIEWED_ASSISTANT_LOCKED");
+    expect(runtime).toContain(
+      '"patient.encounter_assistant_revision_denied"',
+    );
+    const gate = runtime.slice(
+      runtime.indexOf("async function reviseEncounter"),
+      runtime.indexOf("async function workspace"),
+    );
+    expect(gate).toContain('encounter.source === "care_team"');
+    expect(gate).toContain('encounter.status !== "draft"');
+    expect(gate).toContain('encounter.status !== "ready_for_physician"');
+  });
+
+  it("gives assistants no reachable target statuses after physician review", () => {
+    const fn = runtime.slice(
+      runtime.indexOf("function allowedRevisionStatuses"),
+      runtime.indexOf("async function reviseEncounter"),
+    );
+    expect(fn).toContain('return currentStatus === "draft" ||');
+    expect(fn).toContain(": [];");
   });
 
   it("encrypts observations and marks timestamp fallback instead of inventing a source date", () => {
@@ -273,6 +538,161 @@ describe("Patient Record v2 runtime vertical slice", () => {
     expect(queue).toContain("Production is unchanged");
   });
 
+  it("cuts Care Team persistence over to Patient Record v2 without legacy writes", () => {
+    expect(careTeamPage).toContain(
+      'from "../../lib/care-team-record-client";',
+    );
+    expect(careTeamPage).not.toContain(
+      'from "../../lib/patient-handoff-client";',
+    );
+    for (const marker of [
+      "resolvePatient",
+      "promoteLegacyHandoff",
+      "createCareTeamPatientIntake",
+      "createPatientEncounter",
+      "getPatientEncounter",
+      "getPatientWorkspace",
+      "revisePatientEncounter",
+      "expectedRevision",
+      "displayMask",
+      "input.expectedRevision !== 0",
+      'status: "ready_for_physician"',
+    ]) {
+      expect(careTeamRecordClient).toContain(marker);
+    }
+    expect(careTeamRecordClient).not.toContain("/v1/patient-handoff/");
+    expect(careTeamRecordClient).not.toContain("patient-handoff-client");
+    expect(careTeamPage).toContain("FILE_NUMBER_ALLOCATOR_UNINITIALIZED");
+    expect(careTeamPage).toContain("ENCOUNTER_REVIEWED_ASSISTANT_LOCKED");
+  });
+
+  it("loads physician pre-visit handoff from Patient Record v2 first without implicit promotion", () => {
+    expect(physicianHandoffLookup).toContain(
+      "lookupPatientHandoffForReview",
+    );
+    expect(physicianHandoffLookup).toContain(
+      "lookupPatientHandoff as lookupLegacyPatientHandoff",
+    );
+    expect(physicianHandoffLookup).toContain(
+      'v2Result.resolution === "legacy"',
+    );
+
+    const start = careTeamRecordClient.indexOf(
+      "export async function lookupPatientHandoffForReview",
+    );
+    const end = careTeamRecordClient.indexOf(
+      "async function codeStatusFromResolved",
+      start,
+    );
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+
+    const reviewLookup = careTeamRecordClient.slice(
+      start,
+      end,
+    );
+
+    for (const marker of [
+      "resolvePatient",
+      "getPatientWorkspace",
+      "getPatientEncounter",
+      'item.status === "ready_for_physician"',
+      'kinds.unshift("national_id")',
+      "patientIds.size + legacyIds.size > 1",
+      "AMBIGUOUS_PATIENT_CODE",
+      'resolution: "legacy"',
+    ]) {
+      expect(reviewLookup).toContain(marker);
+    }
+
+    expect(reviewLookup).not.toContain(
+      "promoteLegacyHandoff(",
+    );
+    expect(reviewLookup).not.toContain(
+      "createCareTeamPatientIntake(",
+    );
+    expect(reviewLookup).not.toContain(
+      "createPatientEncounter(",
+    );
+    expect(reviewLookup).not.toContain(
+      "revisePatientEncounter(",
+    );
+  });
+  it("cuts Patient Archive over to v2 encounters plus only unpromoted legacy rows", () => {
+    expect(runtime).toContain(
+      'url.pathname === "/v1/patients/archive"',
+    );
+
+    const start = runtime.indexOf(
+      "async function listPatientArchive",
+    );
+    const end = runtime.indexOf(
+      "async function workspace",
+      start,
+    );
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+
+    const archiveRuntime = runtime.slice(
+      start,
+      end,
+    );
+
+    for (const marker of [
+      "patient_encounters",
+      "patient_identifiers",
+      "patient_handoffs",
+      "patient_handoff_legacy_links",
+      "NOT EXISTS",
+      "UNION ALL",
+      "record_key",
+      "ORDER BY updated_at DESC,record_key DESC",
+      '"handoff.read"',
+    ]) {
+      expect(archiveRuntime).toContain(marker);
+    }
+
+    expect(recordsPage).toContain(
+      'from "../../lib/patient-record-archive-client";',
+    );
+    expect(recordsPage).not.toContain(
+      "../../lib/patient-handoff-client",
+    );
+    expect(recordsPage).not.toContain(
+      "listPatientHandoffs",
+    );
+    expect(recordsPage).not.toContain(
+      "getPatientHandoffById",
+    );
+
+    for (const marker of [
+      "/v1/patients/archive",
+      "getPatientWorkspace",
+      "getPatientEncounter",
+      "resolvePatient",
+      "getLegacyPatientHandoffById",
+      "lookupLegacyPatientHandoff",
+      "AMBIGUOUS_PATIENT_CODE",
+    ]) {
+      expect(
+        patientRecordArchiveClient,
+      ).toContain(marker);
+    }
+
+    for (const forbidden of [
+      "promoteLegacyHandoff",
+      "createCareTeamPatientIntake",
+      "createPatientEncounter",
+      "revisePatientEncounter",
+      "savePatientHandoff",
+    ]) {
+      expect(
+        patientRecordArchiveClient,
+      ).not.toContain(forbidden);
+    }
+  });
   it("keeps every static D1 prepare placeholder aligned with bind arity", () => {
     const calls = scanPrepareBindCalls(runtime);
     expect(calls.length).toBeGreaterThanOrEqual(20);

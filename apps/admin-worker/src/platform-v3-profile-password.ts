@@ -1,3 +1,4 @@
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import { validCredentialValue } from "./platform-v3-credential";
 import { verifyCurrentCredential } from "./platform-v3-current-credential";
 import { saveCredential } from "./platform-v3-store-credential";
@@ -9,7 +10,7 @@ function reply(request: Request, env: V3Env, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...(origin === env.ADMIN_ORIGIN
+      ...(isRuntimeOriginAllowed(origin, env)
         ? {
             "access-control-allow-origin": origin,
             "access-control-allow-headers": "authorization, content-type",

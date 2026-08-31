@@ -1,5 +1,7 @@
 import platformHandler from "./platform-index";
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import { adminRuntimeRoute } from "./platform-v3-admin";
+import { patientPortalRoute } from "./platform-patient-portal";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -11,7 +13,7 @@ function json(request: Request, env: Env, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...(origin === env.ADMIN_ORIGIN
+      ...(isRuntimeOriginAllowed(origin, env)
         ? {
             "access-control-allow-origin": origin,
             "access-control-allow-headers": "authorization, content-type",
@@ -53,9 +55,18 @@ export default {
           assistantPasswordLogin: true,
           passwordSetup: true,
           adminUsers: true,
+          patientPortal:
+            String(env.PATIENT_PORTAL_V1_ENABLED ?? "")
+              .trim()
+              .toLowerCase() === "true",
         },
       });
     }
+
+    // WS-2/WS-3: patient portal + clinician portal review namespace.
+    // Fails closed unless PATIENT_PORTAL_V1_ENABLED === "true".
+    const portal = await patientPortalRoute(request, env);
+    if (portal) return portal;
 
     const adminRuntime = await adminRuntimeRoute(request, env);
     if (adminRuntime) return adminRuntime;

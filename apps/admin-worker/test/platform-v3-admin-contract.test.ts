@@ -111,6 +111,50 @@ describe("platform v3 admin user-management and page-permission contract", () =>
     expect(admin).not.toContain("DELETE FROM patient_handoffs");
   });
 
+  it("blocks hard-delete when Patient Record v2 clinical history exists", () => {
+    const admin = fs.readFileSync(
+      new URL("../src/platform-v3-admin.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(admin).toContain("directClinicalRefs");
+    expect(admin).toContain(
+      "patient_encounters WHERE created_by=? OR updated_by=?",
+    );
+    expect(admin).toContain(
+      "patient_note_threads WHERE created_by=?",
+    );
+    expect(admin).toContain(
+      "patient_note_revisions WHERE authored_by=?",
+    );
+    expect(admin).toContain(
+      "patient_encounter_snapshots WHERE created_by=?",
+    );
+    expect(admin).toContain(
+      "patient_observations WHERE created_by=?",
+    );
+    expect(admin).toContain(
+      "patient_final_plans WHERE authored_by=? OR signed_by=?",
+    );
+    expect(admin).toContain(
+      "patient_order_fulfillment_events WHERE updated_by=?",
+    );
+    expect(admin).toContain(
+      "patient_investigation_result_links WHERE linked_by=?",
+    );
+    expect(admin).toContain(
+      "portal_users WHERE created_by=?",
+    );
+    expect(admin).toContain(
+      "portal_threads WHERE physician_id=?",
+    );
+    expect(admin).toContain(
+      "patient_registry WHERE practice_id=?",
+    );
+    expect(admin).toContain(
+      "(practiceStats?.patients_v2 ?? 0) === 0",
+    );
+  });
   it("accepts runtime admins by page scope but keeps GitHub publishing superadmin-only", () => {
     const legacy = fs.readFileSync(
       new URL("../src/index.ts", import.meta.url),

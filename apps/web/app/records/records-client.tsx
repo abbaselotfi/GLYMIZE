@@ -3,21 +3,21 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type {
-  PatientHandoffArchiveItem,
   PatientHandoffRecord,
+  PatientRecordArchiveItem,
 } from "@glymize/contracts";
 import {
-  getPatientHandoffById,
-  listPatientHandoffs,
-  lookupPatientHandoff,
-} from "../../lib/patient-handoff-client";
+  listPatientRecordArchive,
+  openPatientRecordArchiveItem,
+  searchPatientRecordArchive,
+} from "../../lib/patient-record-archive-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import styles from "./records.module.css";
 
 const PAGE_SIZE = 50;
 
 function recordKindLabel(
-  kind: PatientHandoffArchiveItem["patientCodeKind"],
+  kind: PatientRecordArchiveItem["patientCodeKind"],
   fa: boolean,
 ) {
   if (kind === "national_id") {
@@ -33,7 +33,7 @@ export default function RecordsClient() {
   const { locale, isRtl } = useGlymizeLocale();
   const fa = locale === "fa";
 
-  const [items, setItems] = useState<PatientHandoffArchiveItem[]>([]);
+  const [items, setItems] = useState<PatientRecordArchiveItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<PatientHandoffRecord | null>(null);
   const [searchCode, setSearchCode] = useState("");
@@ -45,7 +45,7 @@ export default function RecordsClient() {
     setStatus("");
 
     try {
-      const page = await listPatientHandoffs(
+      const page = await listPatientRecordArchive(
         reset ? null : nextCursor,
         PAGE_SIZE,
       );
@@ -86,12 +86,12 @@ export default function RecordsClient() {
     }
   }
 
-  async function openRecord(id: string) {
+  async function openRecord(item: PatientRecordArchiveItem) {
     setBusy(true);
     setStatus("");
 
     try {
-      setSelected(await getPatientHandoffById(id));
+      setSelected(await openPatientRecordArchiveItem(item));
     } catch (reason) {
       const code =
         reason instanceof Error
@@ -130,7 +130,7 @@ export default function RecordsClient() {
     setStatus("");
 
     try {
-      const result = await lookupPatientHandoff(searchCode);
+      const result = await searchPatientRecordArchive(searchCode);
       if (!result.found || !result.record) {
         setSelected(null);
         setStatus(
@@ -295,7 +295,7 @@ export default function RecordsClient() {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => void openRecord(item.id)}
+                    onClick={() => void openRecord(item)}
                   >
                     {fa ? "\u0628\u0627\u0632 \u06a9\u0631\u062f\u0646" : "Open"}
                   </button>

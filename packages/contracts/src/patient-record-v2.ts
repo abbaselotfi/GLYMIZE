@@ -11,6 +11,7 @@ import type {
   PatientHandoffFieldProvenanceMap,
   PatientHandoffLab,
   PatientHandoffMedication,
+  PatientHandoffStatus,
   PatientHandoffVitals,
 } from "./patient-handoff.js";
 
@@ -73,6 +74,30 @@ export interface PatientLongitudinalSummary {
   latestEncounterAt?: string;
 }
 
+export type PatientRecordArchiveSource =
+  | "patient_record_v2"
+  | "legacy_handoff";
+
+export interface PatientRecordArchiveItem {
+  /** Opaque key used only by the archive read model. */
+  id: string;
+  source: PatientRecordArchiveSource;
+  patientId?: string;
+  encounterId?: string;
+  legacyHandoffId?: string;
+  patientCodeKind: PatientIdentifierKind;
+  /** Masked identifier only. Raw identifiers are never returned by archive list. */
+  patientCodeDisplay: string;
+  status: PatientHandoffStatus;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PatientRecordArchivePage {
+  items: PatientRecordArchiveItem[];
+  nextCursor: string | null;
+}
 export interface PatientFileNumberAllocatorState {
   status: "uninitialized" | "ready";
   /** Serialized decimal string to avoid JavaScript integer precision loss. */
@@ -127,6 +152,23 @@ export interface PatientResolveResult {
   legacyHandoff?: PatientLegacyHandoffReference;
 }
 
+export interface PatientLegacyHandoffPromotionInput {
+  /** Existing legacy handoff selected after an explicit identifier lookup. */
+  legacyHandoffId: string;
+  /** Optimistic-concurrency guard for the legacy current-row revision. */
+  expectedLegacyRevision: number;
+  /** Raw identifier is re-entered so the server can verify the legacy HMAC exactly. */
+  identifier: PatientIdentifierInput;
+}
+export interface PatientLegacyHandoffPromotionResult {
+  legacyHandoffId: string;
+  legacyRevision: number;
+  patientId: string;
+  encounterId: string;
+  /** True when this legacy handoff had already been promoted earlier. */
+  alreadyPromoted: boolean;
+}
+
 export interface PatientCreateInput {
   identifiers?: PatientIdentifierInput[];
   /**
@@ -143,6 +185,24 @@ export interface PatientCreateInput {
 export interface PatientCreateResult {
   patient: PatientLongitudinalSummary;
   assignedFileNumber?: string;
+  allocator: PatientFileNumberAllocatorState;
+}
+
+export interface PatientCareTeamIntakeInput {
+  identifier: PatientIdentifierInput;
+  demographics?: Pick<
+    PatientLongitudinalDemographics,
+    "firstName" | "lastName" | "dateOfBirth"
+  >;
+  encounterAt?: string;
+  encounterKind?: PatientEncounterKind;
+  /** Full first encounter snapshot; creation is atomic with the Patient row. */
+  snapshot: PatientEncounterClinicalSnapshot;
+}
+export interface PatientCareTeamIntakeResult {
+  patient: PatientLongitudinalSummary;
+  encounter: PatientEncounterSummary;
+  observationCount: number;
   allocator: PatientFileNumberAllocatorState;
 }
 
@@ -196,6 +256,44 @@ export interface PatientEncounterCreateInput {
 
 export interface PatientEncounterCreateResult {
   encounter: PatientEncounterSummary;
+  observationCount: number;
+}
+
+export type PatientEncounterSnapshotKind =
+  | "clinical"
+  | "care_team"
+  | "physician_review"
+  | "final";
+
+export interface PatientEncounterSnapshotRevision {
+  revision: number;
+  snapshotKind: PatientEncounterSnapshotKind;
+  snapshot: PatientEncounterClinicalSnapshot;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface PatientEncounterDetail {
+  encounter: PatientEncounterSummary;
+  latestSnapshot?: PatientEncounterSnapshotRevision;
+}
+
+export interface PatientEncounterRevisionInput {
+  /**
+   * Latest snapshot revision previously read by the editor. Use 0 only when
+   * the encounter has no snapshot yet. A stale value must fail with HTTP 409.
+   */
+  expectedRevision: number;
+  /** Full current encounter snapshot; historical revisions remain immutable. */
+  snapshot: PatientEncounterClinicalSnapshot;
+  /** Optional lifecycle transition; encounter date/kind are immutable here. */
+  status?: PatientEncounterStatus;
+}
+
+export interface PatientEncounterRevisionResult {
+  encounter: PatientEncounterSummary;
+  previousRevision: number;
+  revision: number;
   observationCount: number;
 }
 

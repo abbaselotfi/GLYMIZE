@@ -24,12 +24,12 @@ import {
   type OcrProgress,
 } from "../../lib/client-ocr";
 import {
-  checkPatientHandoffCode,
+  checkCareTeamPatientCode,
   lookupPatientHandoff,
   PatientHandoffCodeConflictError,
-  savePatientHandoff,
+  saveCareTeamPatientRecord,
   validateIranianNationalId,
-} from "../../lib/patient-handoff-client";
+} from "../../lib/care-team-record-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import styles from "./care-team.module.css";
 
@@ -955,7 +955,7 @@ async function checkPatientCodeAvailability() {
   setPatientCodeCheckBusy(true);
 
   try {
-    const result = await checkPatientHandoffCode(
+    const result = await checkCareTeamPatientCode(
       codeAtCheck,
       kindAtCheck,
     );
@@ -1160,7 +1160,7 @@ async function save(): Promise<boolean> {
         ? "create" as const
         : "update" as const;
 
-    const record = await savePatientHandoff({
+    const record = await saveCareTeamPatientRecord({
       patientCode,
       patientCodeKind,
       writeMode,
@@ -1231,7 +1231,19 @@ async function save(): Promise<boolean> {
                 ? "API محلی handoff اجرا نشده است. برنامه را با start-local.ps1 اجرا کنید."
                 : "The local handoff API is not running. Start GLYMIZE with start-local.ps1."
             )
-          : code === "HANDOFF_INPUT_INVALID"
+          : code === "FILE_NUMBER_ALLOCATOR_UNINITIALIZED"
+            ? (
+                fa
+                  ? "شماره‌دهی پرونده برای این مطب هنوز توسط پزشک راه‌اندازی نشده است؛ پیش از ثبت بیمار جدید، آخرین شماره پرونده باید تأیید شود."
+                  : "File-number allocation has not been initialized by the physician for this practice. Confirm the latest assigned file number before creating a new patient."
+              )
+            : code === "ENCOUNTER_REVIEWED_ASSISTANT_LOCKED"
+              ? (
+                  fa
+                    ? "این ویزیت توسط پزشک بازبینی شده و دیگر توسط دستیار قابل ویرایش نیست؛ برای مراجعه جدید یک پرونده ویزیت تازه ایجاد کنید."
+                    : "This encounter has been reviewed by the physician and can no longer be edited by the assistant. Start a new encounter for a new visit."
+                )
+              : code === "HANDOFF_INPUT_INVALID"
             ? (
                 fa
                   ? "شناسه بیمار یا هدف ویرایش معتبر نیست؛ نوع کد و وضعیت پرونده را بررسی کنید."

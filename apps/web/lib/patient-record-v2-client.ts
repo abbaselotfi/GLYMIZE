@@ -1,14 +1,21 @@
 "use client";
 
 import type {
+  PatientCareTeamIntakeInput,
+  PatientCareTeamIntakeResult,
   PatientCreateInput,
   PatientCreateResult,
   PatientEncounterCreateInput,
   PatientEncounterCreateResult,
+  PatientEncounterDetail,
+  PatientEncounterRevisionInput,
+  PatientEncounterRevisionResult,
   PatientFileNumberAllocatorInitializeInput,
   PatientFileNumberAllocatorState,
   PatientIdentifierAttachInput,
   PatientIdentifierAttachResult,
+  PatientLegacyHandoffPromotionInput,
+  PatientLegacyHandoffPromotionResult,
   PatientResolveInput,
   PatientResolveResult,
   PatientWorkspaceSnapshot,
@@ -101,6 +108,38 @@ export async function resolvePatient(
   );
 }
 
+export async function promoteLegacyHandoff(
+  input: PatientLegacyHandoffPromotionInput,
+) {
+  const response = await runtimeFetch(
+    "/v1/patients/promote-legacy-handoff",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return checkedJson<PatientLegacyHandoffPromotionResult>(
+    response,
+    "PATIENT_LEGACY_HANDOFF_PROMOTION_FAILED",
+  );
+}
+
+export async function createCareTeamPatientIntake(
+  input: PatientCareTeamIntakeInput,
+) {
+  const response = await runtimeFetch(
+    "/v1/patients/care-team-intake",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return checkedJson<PatientCareTeamIntakeResult>(
+    response,
+    "PATIENT_CARE_TEAM_INTAKE_FAILED",
+  );
+}
+
 export async function createPatient(
   input: PatientCreateInput,
 ) {
@@ -148,6 +187,37 @@ export async function createPatientEncounter(
   return checkedJson<PatientEncounterCreateResult>(
     response,
     "PATIENT_ENCOUNTER_CREATE_FAILED",
+  );
+}
+
+export async function getPatientEncounter(
+  patientId: string,
+  encounterId: string,
+) {
+  const response = await runtimeFetch(
+    `/v1/patients/${encodeURIComponent(patientId)}/encounters/${encodeURIComponent(encounterId)}`,
+  );
+  return checkedJson<PatientEncounterDetail>(
+    response,
+    "PATIENT_ENCOUNTER_READ_FAILED",
+  );
+}
+
+export async function revisePatientEncounter(
+  patientId: string,
+  encounterId: string,
+  input: PatientEncounterRevisionInput,
+) {
+  const response = await runtimeFetch(
+    `/v1/patients/${encodeURIComponent(patientId)}/encounters/${encodeURIComponent(encounterId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+  return checkedJson<PatientEncounterRevisionResult>(
+    response,
+    "PATIENT_ENCOUNTER_REVISION_FAILED",
   );
 }
 

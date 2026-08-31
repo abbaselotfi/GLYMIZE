@@ -3,10 +3,8 @@
 import type {
   PatientCodeKind,
   PatientHandoffArchivePage,
-  PatientHandoffCodeStatus,
   PatientHandoffLookupResult,
   PatientHandoffRecord,
-  PatientHandoffUpsertInput,
 } from "@glymize/contracts";
 import { normalizePatientCode } from "@glymize/contracts";
 export {
@@ -54,86 +52,6 @@ async function responsePayload(response: Response) {
   } catch {
     return null;
   }
-}
-
-export class PatientHandoffCodeConflictError
-  extends Error {
-  readonly codeStatus?: PatientHandoffCodeStatus;
-
-  constructor(codeStatus?: PatientHandoffCodeStatus) {
-    super("PATIENT_CODE_EXISTS");
-    this.name = "PatientHandoffCodeConflictError";
-    this.codeStatus = codeStatus;
-  }
-}
-
-export async function savePatientHandoff(
-  input: PatientHandoffUpsertInput,
-): Promise<PatientHandoffRecord> {
-  const response = await runtimeFetch(
-    "/v1/patient-handoff/upsert",
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
-
-  if (!response.ok) {
-    const payload = await responsePayload(response);
-    const serverCode = String(
-      payload?.error ?? "",
-    );
-
-    if (
-      response.status === 409 &&
-      serverCode === "PATIENT_CODE_EXISTS"
-    ) {
-      throw new PatientHandoffCodeConflictError(
-        payload?.codeStatus as
-          | PatientHandoffCodeStatus
-          | undefined,
-      );
-    }
-
-    throw new Error(
-      handoffError(
-        response.status,
-        "HANDOFF_SAVE_FAILED",
-        serverCode,
-      ),
-    );
-  }
-
-  return response.json() as Promise<PatientHandoffRecord>;
-}
-
-export async function checkPatientHandoffCode(
-  patientCode: string,
-  patientCodeKind: PatientCodeKind,
-): Promise<PatientHandoffCodeStatus> {
-  const response = await runtimeFetch(
-    "/v1/patient-handoff/code-status",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        patientCode,
-        patientCodeKind,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const payload = await responsePayload(response);
-    throw new Error(
-      handoffError(
-        response.status,
-        "HANDOFF_CODE_STATUS_FAILED",
-        String(payload?.error ?? ""),
-      ),
-    );
-  }
-
-  return response.json() as Promise<PatientHandoffCodeStatus>;
 }
 
 export async function lookupPatientHandoff(

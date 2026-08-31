@@ -1,3 +1,4 @@
+import { isRuntimeOriginAllowed } from "./platform-cors";
 import adminHandler from "./index";
 import { createCredential, validCredentialValue } from "./platform-v3-credential";
 import { v3db, v3now, type V3Env } from "./platform-v3-base";
@@ -23,7 +24,7 @@ function json(request: Request, env: V3Env, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...(origin === env.ADMIN_ORIGIN
+      ...(isRuntimeOriginAllowed(origin, env)
         ? {
             "access-control-allow-origin": origin,
             "access-control-allow-headers": "authorization, content-type",
@@ -590,16 +591,38 @@ async function purgeOrDeleteUser(
     .bind(userId)
     .first<{ id: string }>();
 
-  const directHandoffRefs = await db
+  const directClinicalRefs = await db
     .prepare(
-      `SELECT count(*) AS count
-       FROM patient_handoffs
-       WHERE created_by=? OR updated_by=?`,
+      `SELECT (
+         (SELECT count(*) FROM patient_handoffs WHERE created_by=? OR updated_by=?) +
+         (SELECT count(*) FROM patient_encounters WHERE created_by=? OR updated_by=?) +
+         (SELECT count(*) FROM patient_note_threads WHERE created_by=?) +
+         (SELECT count(*) FROM patient_note_revisions WHERE authored_by=?) +
+         (SELECT count(*) FROM patient_encounter_snapshots WHERE created_by=?) +
+         (SELECT count(*) FROM patient_observations WHERE created_by=?) +
+         (SELECT count(*) FROM patient_final_plans WHERE authored_by=? OR signed_by=?) +
+         (SELECT count(*) FROM patient_order_fulfillment_events WHERE updated_by=?) +
+         (SELECT count(*) FROM patient_investigation_result_links WHERE linked_by=?) +
+         (SELECT count(*) FROM portal_users WHERE created_by=?) +
+         (SELECT count(*) FROM portal_threads WHERE physician_id=?)
+       ) AS count`,
     )
-    .bind(userId, userId)
+    .bind(
+      userId, userId,
+      userId, userId,
+      userId,
+      userId,
+      userId,
+      userId,
+      userId, userId,
+      userId,
+      userId,
+      userId,
+      userId,
+    )
     .first<{ count: number }>();
 
-  let canHardDelete = !directHandoffRefs?.count;
+  let canHardDelete = (directClinicalRefs?.count ?? 0) === 0;
   let practiceId: string | null = null;
 
   if (ownerPractice?.id) {
@@ -608,13 +631,24 @@ async function purgeOrDeleteUser(
       .prepare(
         `SELECT
            (SELECT count(*) FROM patient_handoffs WHERE practice_id=?) AS handoffs,
+           (SELECT count(*) FROM patient_registry WHERE practice_id=?) AS patients_v2,
            (SELECT count(*) FROM practice_memberships WHERE practice_id=? AND user_id<>?) AS other_members`,
       )
-      .bind(ownerPractice.id, ownerPractice.id, userId)
-      .first<{ handoffs: number; other_members: number }>();
+      .bind(
+        ownerPractice.id,
+        ownerPractice.id,
+        ownerPractice.id,
+        userId,
+      )
+      .first<{
+        handoffs: number;
+        patients_v2: number;
+        other_members: number;
+      }>();
     canHardDelete =
       canHardDelete &&
       (practiceStats?.handoffs ?? 0) === 0 &&
+      (practiceStats?.patients_v2 ?? 0) === 0 &&
       (practiceStats?.other_members ?? 0) === 0;
   } else {
     const membership = await db
@@ -711,7 +745,7 @@ export async function adminRuntimeRoute(
 
   if (request.method === "OPTIONS") {
     const origin = request.headers.get("origin");
-    if (origin !== env.ADMIN_ORIGIN) {
+    if (!isRuntimeOriginAllowed(origin, env)) {
       return new Response(null, { status: 403 });
     }
     return new Response(null, {

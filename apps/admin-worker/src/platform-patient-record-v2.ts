@@ -74,6 +74,26 @@ type LegacyReference = {
   updated_at: string;
 };
 
+type LegacyPromotionRow = {
+  id: string;
+  patient_code_hash: string;
+  patient_code_kind: PatientIdentifierKind;
+  patient_code_display: string;
+  ciphertext: string;
+  iv: string;
+  auth_tag: string;
+  status: "draft" | "ready_for_physician" | "reviewed";
+  revision: number;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+};
+type LegacyLinkRow = {
+  patient_id: string;
+  encounter_id: string;
+};
+
 const MAX_PAYLOAD_CHARS = 250_000;
 const MAX_LABS = 500;
 
@@ -284,8 +304,9 @@ function demographicsAad(
 function snapshotAad(
   practiceId: string,
   encounterId: string,
+  revision: number,
 ) {
-  return `patient-snapshot:${practiceId}:${encounterId}:1`;
+  return `patient-snapshot:${practiceId}:${encounterId}:${revision}`;
 }
 
 function observationAad(
@@ -719,6 +740,475 @@ async function resolvePatient(
   }, legacy ? 200 : 404);
 }
 
+async function promoteLegacyHandoff(
+  request: Request,
+  context: PatientRecordV2RouteContext,
+) {
+  if (
+    !can(context, "handoff.read") ||
+    !can(context, "handoff.write")
+  ) {
+    return context.respond({ error: "permission_denied" }, 403);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return context.respond({ error: "invalid_json" }, 400);
+  }
+  if (JSON.stringify(body).length > MAX_PAYLOAD_CHARS) {
+    return context.respond(
+      { error: "promotion_payload_too_large" },
+      413,
+    );
+  }
+
+  const legacyHandoffId = String(
+    body.legacyHandoffId ?? "",
+  ).trim();
+  const expectedLegacyRevision = Number(
+    body.expectedLegacyRevision,
+  );
+  if (
+    !/^[A-Za-z0-9-]{8,80}$/.test(legacyHandoffId) ||
+    !Number.isSafeInteger(expectedLegacyRevision) ||
+    expectedLegacyRevision < 1
+  ) {
+    return context.respond(
+      { error: "invalid_legacy_handoff_target" },
+      422,
+    );
+  }
+
+  const identifier = await normalizeIdentifier(
+    context,
+    body.identifier,
+  );
+  if (!identifier) {
+    return context.respond(
+      { error: "invalid_patient_identifier" },
+      422,
+    );
+  }
+
+  const legacy = await context.database.prepare(
+    `SELECT id,patient_code_hash,patient_code_kind,patient_code_display,
+            ciphertext,iv,auth_tag,status,revision,created_by,updated_by,
+            created_at,updated_at
+     FROM patient_handoffs
+     WHERE practice_id=? AND id=?`,
+  ).bind(
+    context.user.practiceId,
+    legacyHandoffId,
+  ).first<LegacyPromotionRow>();
+  if (!legacy) {
+    return context.respond(
+      { error: "legacy_handoff_not_found" },
+      404,
+    );
+  }
+  if (
+    identifier.kind !== legacy.patient_code_kind ||
+    identifier.hash !== legacy.patient_code_hash
+  ) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_IDENTIFIER_MISMATCH" },
+      409,
+    );
+  }
+
+  const existingLink = await context.database.prepare(
+    `SELECT l.patient_id,l.encounter_id
+     FROM patient_handoff_legacy_links l
+     JOIN patient_registry p ON p.id=l.patient_id
+     JOIN patient_encounters e ON e.id=l.encounter_id
+     WHERE l.legacy_handoff_id=?
+       AND p.practice_id=?
+       AND e.practice_id=?`,
+  ).bind(
+    legacyHandoffId,
+    context.user.practiceId,
+    context.user.practiceId,
+  ).first<LegacyLinkRow>();
+  if (existingLink) {
+    return context.respond({
+      legacyHandoffId,
+      legacyRevision: legacy.revision,
+      patientId: existingLink.patient_id,
+      encounterId: existingLink.encounter_id,
+      alreadyPromoted: true,
+    });
+  }
+
+  if (legacy.revision !== expectedLegacyRevision) {
+    return context.respond(
+      {
+        error: "LEGACY_HANDOFF_REVISION_CONFLICT",
+        currentRevision: legacy.revision,
+      },
+      409,
+    );
+  }
+  if (legacy.status === "reviewed") {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_REVIEWED_LOCKED" },
+      409,
+    );
+  }
+  if (
+    legacy.status !== "draft" &&
+    legacy.status !== "ready_for_physician"
+  ) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_STATUS_UNSUPPORTED" },
+      409,
+    );
+  }
+
+  const existingIdentifier = await context.database.prepare(
+    `SELECT patient_id
+     FROM patient_identifiers
+     WHERE practice_id=? AND identifier_kind=? AND identifier_hash=?`,
+  ).bind(
+    context.user.practiceId,
+    identifier.kind,
+    identifier.hash,
+  ).first<{ patient_id: string }>();
+  if (existingIdentifier) {
+    return context.respond(
+      { error: "PATIENT_IDENTIFIER_EXISTS" },
+      409,
+    );
+  }
+
+  const payload = await decryptClinicalPayload<Record<string, unknown>>(
+    {
+      ciphertext: legacy.ciphertext,
+      iv: legacy.iv,
+      authTag: legacy.auth_tag,
+    },
+    context.clinicalSecret,
+    `${context.user.practiceId}:${legacy.patient_code_hash}`,
+  );
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    return context.respond(
+      { error: "legacy_handoff_decryption_failed" },
+      500,
+    );
+  }
+
+  const labs = payload.labs === undefined
+    ? []
+    : Array.isArray(payload.labs)
+      ? payload.labs
+      : null;
+  const medications = payload.medications === undefined
+    ? []
+    : Array.isArray(payload.medications)
+      ? payload.medications
+      : null;
+  if (!labs || !medications || labs.length > MAX_LABS) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_PAYLOAD_INVALID" },
+      500,
+    );
+  }
+  for (const rawLab of labs) {
+    if (
+      !rawLab ||
+      typeof rawLab !== "object" ||
+      Array.isArray(rawLab)
+    ) {
+      return context.respond(
+        { error: "LEGACY_HANDOFF_PAYLOAD_INVALID" },
+        500,
+      );
+    }
+  }
+
+  const snapshotObject: Record<string, unknown> = {
+    ...payload,
+    labs,
+    medications,
+    migrationProvenance: {
+      source: "legacy_patient_handoff",
+      legacyHandoffId,
+      legacyRevision: legacy.revision,
+      legacyStatus: legacy.status,
+      legacyCreatedAt: legacy.created_at,
+      legacyUpdatedAt: legacy.updated_at,
+    },
+  };
+  if (JSON.stringify(snapshotObject).length > MAX_PAYLOAD_CHARS) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_PAYLOAD_INVALID" },
+      500,
+    );
+  }
+
+  const patientId = crypto.randomUUID();
+  const encounterId = crypto.randomUUID();
+  const migratedAt = nowIso();
+  const encounterAt = normalizeEncounterTimestamp(
+    legacy.updated_at,
+    migratedAt,
+  );
+  if (!encounterAt) {
+    return context.respond(
+      { error: "LEGACY_HANDOFF_TIMESTAMP_INVALID" },
+      500,
+    );
+  }
+  const encryptedSnapshot = await encryptClinicalPayload(
+    snapshotObject,
+    context.clinicalSecret,
+    snapshotAad(
+      context.user.practiceId,
+      encounterId,
+      1,
+    ),
+  );
+
+  const statements: D1PreparedStatement[] = [
+    context.database.prepare(
+      `INSERT INTO patient_registry
+       (id,practice_id,status,created_at,updated_at,archived_at)
+       VALUES (?,?,'active',?,?,NULL)`,
+    ).bind(
+      patientId,
+      context.user.practiceId,
+      migratedAt,
+      migratedAt,
+    ),
+    ...(await identifierInsertStatements(
+      context,
+      patientId,
+      [identifier],
+      identifier.kind,
+      migratedAt,
+    )),
+  ];
+
+  const demographicsStatement = await demographicsInsertStatement(
+    context,
+    patientId,
+    {
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+    },
+    migratedAt,
+  );
+  if (demographicsStatement) {
+    statements.push(demographicsStatement);
+  }
+
+  statements.push(
+    context.database.prepare(
+      `INSERT INTO patient_encounters
+       (id,patient_id,practice_id,encounter_at,encounter_kind,source,status,
+        created_by,updated_by,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    ).bind(
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encounterAt,
+      "outpatient",
+      "care_team",
+      legacy.status,
+      context.user.id,
+      context.user.id,
+      migratedAt,
+      migratedAt,
+    ),
+    context.database.prepare(
+      `INSERT INTO patient_encounter_snapshots
+       (id,encounter_id,patient_id,practice_id,revision,snapshot_kind,
+        payload_ciphertext,payload_iv,payload_auth_tag,schema_version,
+        created_by,created_at)
+       VALUES (?,?,?,?,1,'care_team',?,?,?,?,?,?)`,
+    ).bind(
+      crypto.randomUUID(),
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encryptedSnapshot.ciphertext,
+      encryptedSnapshot.iv,
+      encryptedSnapshot.authTag,
+      "patient-record-v2",
+      context.user.id,
+      migratedAt,
+    ),
+  );
+
+  let observationCount = 0;
+  for (const rawLab of labs) {
+    const lab = rawLab as Record<string, unknown>;
+    const observationId = crypto.randomUUID();
+    const time = canonicalObservationTime(
+      lab.observedAt,
+      encounterAt,
+    );
+    const verification = String(
+      lab.verification ?? "unverified",
+    );
+    const safeVerification =
+      verification === "confirmed" ||
+      verification === "rejected"
+        ? verification
+        : "unverified";
+    const encrypted = await encryptClinicalPayload(
+      {
+        ...lab,
+        sourceObservedAt:
+          String(lab.observedAt ?? "").trim() || undefined,
+        observedAtBasis: time.basis,
+      },
+      context.clinicalSecret,
+      observationAad(
+        context.user.practiceId,
+        observationId,
+      ),
+    );
+    statements.push(
+      context.database.prepare(
+        `INSERT INTO patient_observations
+         (id,encounter_id,patient_id,practice_id,snapshot_revision,
+          canonical_key,observed_at,verification,payload_ciphertext,payload_iv,
+          payload_auth_tag,schema_version,created_by,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ).bind(
+        observationId,
+        encounterId,
+        patientId,
+        context.user.practiceId,
+        1,
+        observationIndexKey(
+          lab.canonicalKey,
+          lab.rawName,
+        ),
+        time.observedAt,
+        safeVerification,
+        encrypted.ciphertext,
+        encrypted.iv,
+        encrypted.authTag,
+        "observation-v1",
+        context.user.id,
+        migratedAt,
+      ),
+    );
+    observationCount += 1;
+  }
+
+  if (identifier.kind === "file_number") {
+    const numericFile = parseNumericFileNumber(
+      identifier.normalized,
+    );
+    if (numericFile) {
+      const numericValue = numericFile.number.toString();
+      statements.push(
+        context.database.prepare(
+          `UPDATE patient_file_number_allocators
+           SET last_allocated_number=CAST(? AS INTEGER),
+               display_width=CASE WHEN display_width < ? THEN ? ELSE display_width END,
+               updated_by=?,updated_at=?
+           WHERE practice_id=?
+             AND allocation_status='ready'
+             AND CAST(last_allocated_number AS INTEGER) < CAST(? AS INTEGER)`,
+        ).bind(
+          numericValue,
+          numericFile.width,
+          numericFile.width,
+          context.user.id,
+          migratedAt,
+          context.user.practiceId,
+          numericValue,
+        ),
+      );
+    }
+  }
+
+  statements.push(
+    context.database.prepare(
+      `INSERT INTO patient_handoff_legacy_links
+       (legacy_handoff_id,patient_id,encounter_id,migrated_at)
+       VALUES (?,?,?,?)`,
+    ).bind(
+      legacyHandoffId,
+      patientId,
+      encounterId,
+      migratedAt,
+    ),
+  );
+
+  try {
+    await context.database.batch(statements);
+  } catch (error) {
+    const racedLink = await context.database.prepare(
+      `SELECT l.patient_id,l.encounter_id
+       FROM patient_handoff_legacy_links l
+       JOIN patient_registry p ON p.id=l.patient_id
+       JOIN patient_encounters e ON e.id=l.encounter_id
+       WHERE l.legacy_handoff_id=?
+         AND p.practice_id=?
+         AND e.practice_id=?`,
+    ).bind(
+      legacyHandoffId,
+      context.user.practiceId,
+      context.user.practiceId,
+    ).first<LegacyLinkRow>();
+    if (racedLink) {
+      return context.respond({
+        legacyHandoffId,
+        legacyRevision: legacy.revision,
+        patientId: racedLink.patient_id,
+        encounterId: racedLink.encounter_id,
+        alreadyPromoted: true,
+      });
+    }
+    const racedIdentifier = await context.database.prepare(
+      `SELECT patient_id
+       FROM patient_identifiers
+       WHERE practice_id=? AND identifier_kind=? AND identifier_hash=?`,
+    ).bind(
+      context.user.practiceId,
+      identifier.kind,
+      identifier.hash,
+    ).first<{ patient_id: string }>();
+    if (racedIdentifier) {
+      return context.respond(
+        { error: "PATIENT_IDENTIFIER_EXISTS" },
+        409,
+      );
+    }
+    throw error;
+  }
+
+  await context.audit(
+    "patient.legacy_handoff_promoted",
+    "patient_handoff",
+    legacyHandoffId,
+    {
+      patientId,
+      encounterId,
+      legacyRevision: legacy.revision,
+      observationCount,
+    },
+  );
+  return context.respond({
+    legacyHandoffId,
+    legacyRevision: legacy.revision,
+    patientId,
+    encounterId,
+    alreadyPromoted: false,
+  }, 201);
+}
+
 function conflictResponse(
   context: PatientRecordV2RouteContext,
   conflict: Awaited<ReturnType<typeof firstConflict>>,
@@ -1053,6 +1543,378 @@ async function createPatientAllocated(
     },
     409,
   );
+}
+
+
+async function createCareTeamPatientIntake(
+  request: Request,
+  context: PatientRecordV2RouteContext,
+) {
+  if (
+    context.user.role !== "assistant" ||
+    !can(context, "handoff.write")
+  ) {
+    return context.respond({ error: "assistant_required" }, 403);
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return context.respond({ error: "invalid_json" }, 400);
+  }
+
+  if (JSON.stringify(body).length > MAX_PAYLOAD_CHARS) {
+    return context.respond(
+      { error: "care_team_intake_payload_too_large" },
+      413,
+    );
+  }
+
+  const identifier = await normalizeIdentifier(
+    context,
+    body.identifier,
+  );
+  if (!identifier) {
+    return context.respond(
+      { error: "invalid_patient_identifier" },
+      422,
+    );
+  }
+
+  const numericFile =
+    identifier.kind === "file_number"
+      ? parseNumericFileNumber(identifier.normalized)
+      : null;
+  if (numericFile) {
+    const allocator = await readAllocator(context);
+    if (
+      !allocator ||
+      allocator.allocation_status !== "ready"
+    ) {
+      return context.respond(
+        {
+          error: "FILE_NUMBER_ALLOCATOR_UNINITIALIZED",
+          allocator: allocatorPublicState(allocator),
+        },
+        409,
+      );
+    }
+  }
+
+  const conflict = await findConflict(context, identifier);
+  if (conflict) {
+    return conflictResponse(context, {
+      identifier,
+      conflict,
+    })!;
+  }
+
+  const snapshot = body.snapshot;
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    Array.isArray(snapshot)
+  ) {
+    return context.respond(
+      { error: "invalid_encounter_snapshot" },
+      422,
+    );
+  }
+  const snapshotObject =
+    snapshot as Record<string, unknown>;
+  const labs = snapshotObject.labs === undefined
+    ? []
+    : Array.isArray(snapshotObject.labs)
+      ? snapshotObject.labs
+      : null;
+  if (!labs || labs.length > MAX_LABS) {
+    return context.respond(
+      { error: "too_many_laboratory_observations" },
+      422,
+    );
+  }
+  for (const rawLab of labs) {
+    if (
+      !rawLab ||
+      typeof rawLab !== "object" ||
+      Array.isArray(rawLab)
+    ) {
+      return context.respond(
+        { error: "invalid_laboratory_observation" },
+        422,
+      );
+    }
+  }
+
+  const currentTime = nowIso();
+  const encounterAt = normalizeEncounterTimestamp(
+    body.encounterAt,
+    currentTime,
+  );
+  if (!encounterAt) {
+    return context.respond(
+      { error: "invalid_encounter_at" },
+      422,
+    );
+  }
+
+  const encounterKind = String(
+    body.encounterKind ?? "outpatient",
+  );
+  if (
+    !["outpatient", "telehealth", "other"].includes(
+      encounterKind,
+    )
+  ) {
+    return context.respond(
+      { error: "invalid_encounter_kind" },
+      422,
+    );
+  }
+
+  const patientId = crypto.randomUUID();
+  const encounterId = crypto.randomUUID();
+  const encryptedSnapshot = await encryptClinicalPayload(
+    snapshotObject,
+    context.clinicalSecret,
+    snapshotAad(
+      context.user.practiceId,
+      encounterId,
+      1,
+    ),
+  );
+
+  const statements: D1PreparedStatement[] = [
+    context.database.prepare(
+      `INSERT INTO patient_registry
+       (id,practice_id,status,created_at,updated_at,archived_at)
+       VALUES (?,?,'active',?,?,NULL)`,
+    ).bind(
+      patientId,
+      context.user.practiceId,
+      currentTime,
+      currentTime,
+    ),
+    ...(await identifierInsertStatements(
+      context,
+      patientId,
+      [identifier],
+      identifier.kind,
+      currentTime,
+    )),
+  ];
+
+  let demographicsStatement: D1PreparedStatement | null;
+  try {
+    demographicsStatement =
+      await demographicsInsertStatement(
+        context,
+        patientId,
+        body.demographics,
+        currentTime,
+      );
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "INVALID_DATE_OF_BIRTH"
+    ) {
+      return context.respond(
+        { error: "invalid_date_of_birth" },
+        422,
+      );
+    }
+    throw error;
+  }
+  if (demographicsStatement) {
+    statements.push(demographicsStatement);
+  }
+
+  if (numericFile) {
+    const numericValue = numericFile.number.toString();
+    statements.push(
+      context.database.prepare(
+        `UPDATE patient_file_number_allocators
+         SET last_allocated_number=
+           CASE
+             WHEN last_allocated_number < CAST(? AS INTEGER)
+             THEN CAST(? AS INTEGER)
+             ELSE last_allocated_number
+           END,
+           display_width=
+           CASE WHEN display_width < ? THEN ? ELSE display_width END,
+           updated_by=?,updated_at=?
+         WHERE practice_id=? AND allocation_status='ready'`,
+      ).bind(
+        numericValue,
+        numericValue,
+        numericFile.width,
+        numericFile.width,
+        context.user.id,
+        currentTime,
+        context.user.practiceId,
+      ),
+    );
+  }
+
+  statements.push(
+    context.database.prepare(
+      `INSERT INTO patient_encounters
+       (id,patient_id,practice_id,encounter_at,encounter_kind,source,status,
+        created_by,updated_by,created_at,updated_at)
+       VALUES (?,?,?,?,?,'care_team','ready_for_physician',?,?,?,?)`,
+    ).bind(
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encounterAt,
+      encounterKind,
+      context.user.id,
+      context.user.id,
+      currentTime,
+      currentTime,
+    ),
+    context.database.prepare(
+      `INSERT INTO patient_encounter_snapshots
+       (id,encounter_id,patient_id,practice_id,revision,snapshot_kind,
+        payload_ciphertext,payload_iv,payload_auth_tag,schema_version,
+        created_by,created_at)
+       VALUES (?,?,?,?,1,'care_team',?,?,?,?,?,?)`,
+    ).bind(
+      crypto.randomUUID(),
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      encryptedSnapshot.ciphertext,
+      encryptedSnapshot.iv,
+      encryptedSnapshot.authTag,
+      "patient-record-v2",
+      context.user.id,
+      currentTime,
+    ),
+  );
+
+  let observationCount = 0;
+  for (const rawLab of labs) {
+    const lab = rawLab as Record<string, unknown>;
+    const observationId = crypto.randomUUID();
+    const time = canonicalObservationTime(
+      lab.observedAt,
+      encounterAt,
+    );
+    const verification = String(
+      lab.verification ?? "unverified",
+    );
+    const safeVerification =
+      verification === "confirmed" ||
+      verification === "rejected"
+        ? verification
+        : "unverified";
+    const encrypted = await encryptClinicalPayload(
+      {
+        ...lab,
+        sourceObservedAt:
+          String(lab.observedAt ?? "").trim() ||
+          undefined,
+        observedAtBasis: time.basis,
+      },
+      context.clinicalSecret,
+      observationAad(
+        context.user.practiceId,
+        observationId,
+      ),
+    );
+    statements.push(
+      context.database.prepare(
+        `INSERT INTO patient_observations
+         (id,encounter_id,patient_id,practice_id,snapshot_revision,
+          canonical_key,observed_at,verification,payload_ciphertext,payload_iv,
+          payload_auth_tag,schema_version,created_by,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ).bind(
+        observationId,
+        encounterId,
+        patientId,
+        context.user.practiceId,
+        1,
+        observationIndexKey(
+          lab.canonicalKey,
+          lab.rawName,
+        ),
+        time.observedAt,
+        safeVerification,
+        encrypted.ciphertext,
+        encrypted.iv,
+        encrypted.authTag,
+        "observation-v1",
+        context.user.id,
+        currentTime,
+      ),
+    );
+    observationCount += 1;
+  }
+
+  try {
+    await context.database.batch(statements);
+  } catch (error) {
+    const raced = await findConflict(context, identifier);
+    if (raced) {
+      return conflictResponse(context, {
+        identifier,
+        conflict: raced,
+      })!;
+    }
+    throw error;
+  }
+
+  await context.audit(
+    "patient.created",
+    "patient",
+    patientId,
+    {
+      identifierKinds: [identifier.kind],
+      allocatedFileNumber: false,
+      careTeamAtomicIntake: true,
+    },
+  );
+  await context.audit(
+    "patient.encounter_created",
+    "patient_encounter",
+    encounterId,
+    {
+      patientId,
+      source: "care_team",
+      status: "ready_for_physician",
+      observationCount,
+      careTeamAtomicIntake: true,
+    },
+  );
+
+  const patient = await readPatientSummary(
+    context,
+    patientId,
+  );
+  if (!patient) {
+    throw new Error(
+      "CARE_TEAM_INTAKE_PATIENT_READBACK_FAILED",
+    );
+  }
+
+  return context.respond({
+    patient,
+    encounter: {
+      encounterId,
+      patientId,
+      encounterAt,
+      encounterKind,
+      source: "care_team",
+      status: "ready_for_physician",
+      latestSnapshotRevision: 1,
+    },
+    observationCount,
+    allocator:
+      allocatorPublicState(await readAllocator(context)),
+  }, 201);
 }
 
 async function createPatient(
@@ -1809,6 +2671,7 @@ async function createEncounter(
       snapshotAad(
         context.user.practiceId,
         encounterId,
+        1,
       ),
     );
     statements.push(
@@ -1877,15 +2740,16 @@ async function createEncounter(
       statements.push(
         context.database.prepare(
           `INSERT INTO patient_observations
-           (id,encounter_id,patient_id,practice_id,canonical_key,observed_at,
-            verification,payload_ciphertext,payload_iv,payload_auth_tag,
-            schema_version,created_by,created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           (id,encounter_id,patient_id,practice_id,snapshot_revision,
+            canonical_key,observed_at,verification,payload_ciphertext,payload_iv,
+            payload_auth_tag,schema_version,created_by,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         ).bind(
           observationId,
           encounterId,
           patientId,
           context.user.practiceId,
+          1,
           observationIndexKey(
             lab.canonicalKey,
             lab.rawName,
@@ -1934,6 +2798,803 @@ async function createEncounter(
   }, 201);
 }
 
+type EncounterStateRow = {
+  id: string;
+  patient_id: string;
+  encounter_at: string;
+  encounter_kind: "outpatient" | "telehealth" | "other";
+  source: "care_team" | "physician" | "import" | "other";
+  status:
+    | "draft"
+    | "ready_for_physician"
+    | "reviewed"
+    | "completed"
+    | "archived";
+  current_revision: number | null;
+  latest_signed_plan_id: string | null;
+};
+
+async function readEncounterState(
+  context: PatientRecordV2RouteContext,
+  patientId: string,
+  encounterId: string,
+) {
+  return context.database.prepare(
+    `SELECT e.id,e.patient_id,e.encounter_at,e.encounter_kind,e.source,e.status,
+            (
+              SELECT MAX(s.revision)
+              FROM patient_encounter_snapshots s
+              WHERE s.encounter_id=e.id
+            ) AS current_revision,
+            (
+              SELECT p.id
+              FROM patient_final_plans p
+              WHERE p.encounter_id=e.id AND p.plan_status='signed'
+              ORDER BY p.plan_version DESC
+              LIMIT 1
+            ) AS latest_signed_plan_id
+     FROM patient_encounters e
+     WHERE e.practice_id=? AND e.patient_id=? AND e.id=?`,
+  ).bind(
+    context.user.practiceId,
+    patientId,
+    encounterId,
+  ).first<EncounterStateRow>();
+}
+
+function encounterSummary(row: EncounterStateRow) {
+  return {
+    encounterId: row.id,
+    patientId: row.patient_id,
+    encounterAt: row.encounter_at,
+    encounterKind: row.encounter_kind,
+    source: row.source,
+    status: row.status,
+    ...(row.current_revision !== null
+      ? { latestSnapshotRevision: row.current_revision }
+      : {}),
+    ...(row.latest_signed_plan_id
+      ? { latestSignedPlanId: row.latest_signed_plan_id }
+      : {}),
+  };
+}
+
+async function getEncounter(
+  context: PatientRecordV2RouteContext,
+  patientId: string,
+  encounterId: string,
+) {
+  if (!can(context, "handoff.read")) {
+    return context.respond({ error: "permission_denied" }, 403);
+  }
+  if (!validPatientId(patientId) || !validPatientId(encounterId)) {
+    return context.respond({ error: "invalid_encounter_reference" }, 422);
+  }
+
+  const encounter = await readEncounterState(
+    context,
+    patientId,
+    encounterId,
+  );
+  if (!encounter) {
+    return context.respond({ error: "encounter_not_found" }, 404);
+  }
+
+  const currentRevision = encounter.current_revision ?? 0;
+  if (currentRevision === 0) {
+    return context.respond({
+      encounter: encounterSummary(encounter),
+    });
+  }
+
+  const snapshotRow = await context.database.prepare(
+    `SELECT revision,snapshot_kind,payload_ciphertext,payload_iv,payload_auth_tag,
+            created_by,created_at
+     FROM patient_encounter_snapshots
+     WHERE practice_id=? AND patient_id=? AND encounter_id=? AND revision=?`,
+  ).bind(
+    context.user.practiceId,
+    patientId,
+    encounterId,
+    currentRevision,
+  ).first<{
+    revision: number;
+    snapshot_kind: "clinical" | "care_team" | "physician_review" | "final";
+    payload_ciphertext: string;
+    payload_iv: string;
+    payload_auth_tag: string;
+    created_by: string;
+    created_at: string;
+  }>();
+
+  if (!snapshotRow) {
+    return context.respond(
+      { error: "encounter_snapshot_integrity_error" },
+      500,
+    );
+  }
+
+  const snapshot = await decryptClinicalPayload<Record<string, unknown>>(
+    {
+      ciphertext: snapshotRow.payload_ciphertext,
+      iv: snapshotRow.payload_iv,
+      authTag: snapshotRow.payload_auth_tag,
+    },
+    context.clinicalSecret,
+    snapshotAad(
+      context.user.practiceId,
+      encounterId,
+      currentRevision,
+    ),
+  );
+  if (!snapshot) {
+    return context.respond(
+      { error: "encounter_snapshot_decryption_failed" },
+      500,
+    );
+  }
+
+  return context.respond({
+    encounter: encounterSummary(encounter),
+    latestSnapshot: {
+      revision: snapshotRow.revision,
+      snapshotKind: snapshotRow.snapshot_kind,
+      snapshot,
+      createdBy: snapshotRow.created_by,
+      createdAt: snapshotRow.created_at,
+    },
+  });
+}
+
+function allowedRevisionStatuses(
+  role: RuntimeRole,
+  currentStatus: EncounterStateRow["status"],
+) {
+  if (role === "assistant") {
+    // WS-1 authorization fix (handoff section 15): an assistant may only act
+    // on encounters that have NOT yet reached physician review. Once an
+    // encounter is reviewed/locked, there are no assistant-reachable target
+    // statuses; the reviseEncounter gate rejects earlier with 403.
+    return currentStatus === "draft" ||
+      currentStatus === "ready_for_physician"
+      ? ["draft", "ready_for_physician"]
+      : [];
+  }
+  if (currentStatus === "reviewed") {
+    return ["reviewed", "completed"];
+  }
+  if (currentStatus === "ready_for_physician") {
+    return ["ready_for_physician", "reviewed", "completed"];
+  }
+  return ["draft", "reviewed", "completed"];
+}
+
+async function reviseEncounter(
+  request: Request,
+  context: PatientRecordV2RouteContext,
+  patientId: string,
+  encounterId: string,
+) {
+  if (!can(context, "handoff.write")) {
+    return context.respond({ error: "permission_denied" }, 403);
+  }
+  if (!validPatientId(patientId) || !validPatientId(encounterId)) {
+    return context.respond({ error: "invalid_encounter_reference" }, 422);
+  }
+
+  const encounter = await readEncounterState(
+    context,
+    patientId,
+    encounterId,
+  );
+  if (!encounter) {
+    return context.respond({ error: "encounter_not_found" }, 404);
+  }
+  if (encounter.status === "archived") {
+    return context.respond({ error: "encounter_archived" }, 409);
+  }
+  if (encounter.status === "completed") {
+    return context.respond(
+      { error: "ENCOUNTER_COMPLETED_IMMUTABLE" },
+      409,
+    );
+  }
+  if (encounter.latest_signed_plan_id) {
+    return context.respond(
+      {
+        error: "ENCOUNTER_SIGNED_PLAN_LOCKED",
+        latestSignedPlanId: encounter.latest_signed_plan_id,
+      },
+      409,
+    );
+  }
+  if (
+    context.user.role === "assistant" &&
+    encounter.source !== "care_team"
+  ) {
+    return context.respond(
+      { error: "physician_encounter_revision_forbidden" },
+      403,
+    );
+  }
+  if (
+    context.user.role === "assistant" &&
+    encounter.source === "care_team" &&
+    encounter.status !== "draft" &&
+    encounter.status !== "ready_for_physician"
+  ) {
+    // WS-1 authorization fix (handoff section 15 edge case): once a
+    // care_team encounter has been reviewed/locked by physician policy, an
+    // assistant must not silently revise clinical content or return it to
+    // draft. A deliberate physician-driven amendment workflow with its own
+    // authorization and audit is required instead. Fail closed.
+    await context.audit(
+      "patient.encounter_assistant_revision_denied",
+      "patient_encounter",
+      encounterId,
+      {
+        patientId,
+        status: encounter.status,
+        source: encounter.source,
+      },
+    );
+    return context.respond(
+      { error: "ENCOUNTER_REVIEWED_ASSISTANT_LOCKED" },
+      403,
+    );
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json() as Record<string, unknown>;
+  } catch {
+    return context.respond({ error: "invalid_json" }, 400);
+  }
+  if (JSON.stringify(body).length > MAX_PAYLOAD_CHARS) {
+    return context.respond(
+      { error: "encounter_payload_too_large" },
+      413,
+    );
+  }
+
+  const expectedRevision = Number(body.expectedRevision);
+  if (
+    !Number.isInteger(expectedRevision) ||
+    expectedRevision < 0
+  ) {
+    return context.respond(
+      { error: "invalid_expected_revision" },
+      422,
+    );
+  }
+
+  const currentRevision = encounter.current_revision ?? 0;
+  if (expectedRevision !== currentRevision) {
+    return context.respond(
+      {
+        error: "ENCOUNTER_REVISION_CONFLICT",
+        expectedRevision,
+        currentRevision,
+      },
+      409,
+    );
+  }
+
+  const snapshot = body.snapshot;
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    Array.isArray(snapshot)
+  ) {
+    return context.respond(
+      { error: "invalid_encounter_snapshot" },
+      422,
+    );
+  }
+
+  const snapshotObject = snapshot as Record<string, unknown>;
+  const labs = Array.isArray(snapshotObject.labs)
+    ? snapshotObject.labs
+    : [];
+  if (labs.length > MAX_LABS) {
+    return context.respond(
+      { error: "too_many_laboratory_observations" },
+      422,
+    );
+  }
+
+  const targetStatus = String(
+    body.status ?? encounter.status,
+  ) as EncounterStateRow["status"];
+  if (
+    !allowedRevisionStatuses(
+      context.user.role,
+      encounter.status,
+    ).includes(targetStatus)
+  ) {
+    return context.respond(
+      { error: "invalid_encounter_status_transition" },
+      422,
+    );
+  }
+
+  const nextRevision = currentRevision + 1;
+  const currentTime = nowIso();
+  const snapshotKind =
+    context.user.role === "assistant"
+      ? "care_team"
+      : "physician_review";
+  const snapshotId = crypto.randomUUID();
+
+  const encryptedSnapshot = await encryptClinicalPayload(
+    snapshotObject,
+    context.clinicalSecret,
+    snapshotAad(
+      context.user.practiceId,
+      encounterId,
+      nextRevision,
+    ),
+  );
+
+  const statements: D1PreparedStatement[] = [
+    context.database.prepare(
+      `INSERT INTO patient_encounter_snapshots
+       (id,encounter_id,patient_id,practice_id,revision,snapshot_kind,
+        payload_ciphertext,payload_iv,payload_auth_tag,schema_version,
+        created_by,created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).bind(
+      snapshotId,
+      encounterId,
+      patientId,
+      context.user.practiceId,
+      nextRevision,
+      snapshotKind,
+      encryptedSnapshot.ciphertext,
+      encryptedSnapshot.iv,
+      encryptedSnapshot.authTag,
+      "patient-record-v2",
+      context.user.id,
+      currentTime,
+    ),
+  ];
+
+  let observationCount = 0;
+  for (const rawLab of labs) {
+    if (
+      !rawLab ||
+      typeof rawLab !== "object" ||
+      Array.isArray(rawLab)
+    ) {
+      return context.respond(
+        { error: "invalid_laboratory_observation" },
+        422,
+      );
+    }
+
+    const lab = rawLab as Record<string, unknown>;
+    const observationId = crypto.randomUUID();
+    const time = canonicalObservationTime(
+      lab.observedAt,
+      encounter.encounter_at,
+    );
+    const verification = String(
+      lab.verification ?? "unverified",
+    );
+    const safeVerification =
+      verification === "confirmed" ||
+      verification === "rejected"
+        ? verification
+        : "unverified";
+
+    const encrypted = await encryptClinicalPayload(
+      {
+        ...lab,
+        sourceObservedAt:
+          String(lab.observedAt ?? "").trim() ||
+          undefined,
+        observedAtBasis: time.basis,
+      },
+      context.clinicalSecret,
+      observationAad(
+        context.user.practiceId,
+        observationId,
+      ),
+    );
+
+    statements.push(
+      context.database.prepare(
+        `INSERT INTO patient_observations
+         (id,encounter_id,patient_id,practice_id,snapshot_revision,
+          canonical_key,observed_at,verification,payload_ciphertext,payload_iv,
+          payload_auth_tag,schema_version,created_by,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ).bind(
+        observationId,
+        encounterId,
+        patientId,
+        context.user.practiceId,
+        nextRevision,
+        observationIndexKey(
+          lab.canonicalKey,
+          lab.rawName,
+        ),
+        time.observedAt,
+        safeVerification,
+        encrypted.ciphertext,
+        encrypted.iv,
+        encrypted.authTag,
+        "observation-v1",
+        context.user.id,
+        currentTime,
+      ),
+    );
+    observationCount += 1;
+  }
+
+  statements.push(
+    context.database.prepare(
+      `UPDATE patient_encounters
+       SET status=?,updated_by=?,updated_at=?
+       WHERE practice_id=? AND patient_id=? AND id=?`,
+    ).bind(
+      targetStatus,
+      context.user.id,
+      currentTime,
+      context.user.practiceId,
+      patientId,
+      encounterId,
+    ),
+  );
+
+  try {
+    await context.database.batch(statements);
+  } catch (error) {
+    const latest = await readEncounterState(
+      context,
+      patientId,
+      encounterId,
+    );
+    const latestRevision = latest?.current_revision ?? 0;
+    if (latestRevision !== expectedRevision) {
+      return context.respond(
+        {
+          error: "ENCOUNTER_REVISION_CONFLICT",
+          expectedRevision,
+          currentRevision: latestRevision,
+        },
+        409,
+      );
+    }
+    throw error;
+  }
+
+  await context.audit(
+    "patient.encounter_revised",
+    "patient_encounter",
+    encounterId,
+    {
+      patientId,
+      previousRevision: currentRevision,
+      revision: nextRevision,
+      status: targetStatus,
+      observationCount,
+    },
+  );
+
+  const updated = await readEncounterState(
+    context,
+    patientId,
+    encounterId,
+  );
+  if (!updated) {
+    return context.respond(
+      { error: "encounter_revision_integrity_error" },
+      500,
+    );
+  }
+
+  return context.respond({
+    encounter: encounterSummary(updated),
+    previousRevision: currentRevision,
+    revision: nextRevision,
+    observationCount,
+  });
+}
+
+
+type PatientArchiveRow = {
+  record_key: string;
+  source: "patient_record_v2" | "legacy_handoff";
+  patient_id: string | null;
+  encounter_id: string | null;
+  legacy_handoff_id: string | null;
+  patient_code_kind: PatientIdentifierKind;
+  patient_code_display: string;
+  status: "draft" | "ready_for_physician" | "reviewed";
+  revision: number;
+  created_at: string;
+  updated_at: string;
+};
+
+function validPatientArchiveRecordKey(value: string) {
+  return /^(?:v2:[0-9a-f-]{36}:[0-9a-f-]{36}|legacy:[A-Za-z0-9-]{8,80})$/i.test(
+    value,
+  );
+}
+
+function parsePatientArchiveCursor(raw: string) {
+  const separator = raw.indexOf("|");
+  if (
+    separator <= 0 ||
+    separator >= raw.length - 1
+  ) {
+    return null;
+  }
+
+  const updatedAt = raw.slice(0, separator);
+  const recordKey = raw.slice(separator + 1);
+
+  if (
+    Number.isNaN(Date.parse(updatedAt)) ||
+    !validPatientArchiveRecordKey(recordKey)
+  ) {
+    return null;
+  }
+
+  return {
+    updatedAt,
+    recordKey,
+  };
+}
+
+async function listPatientArchive(
+  request: Request,
+  context: PatientRecordV2RouteContext,
+) {
+  if (!can(context, "handoff.read")) {
+    return context.respond(
+      { error: "permission_denied" },
+      403,
+    );
+  }
+
+  const url = new URL(request.url);
+  const requestedLimit = Number(
+    url.searchParams.get("limit") ?? "50",
+  );
+  const pageSize = Number.isFinite(requestedLimit)
+    ? Math.max(
+        10,
+        Math.min(100, Math.trunc(requestedLimit)),
+      )
+    : 50;
+
+  const rawCursor =
+    url.searchParams.get("cursor")?.trim() ?? "";
+  const cursor = rawCursor
+    ? parsePatientArchiveCursor(rawCursor)
+    : null;
+
+  if (rawCursor && !cursor) {
+    return context.respond(
+      { error: "invalid_archive_cursor" },
+      422,
+    );
+  }
+
+  const result = cursor
+    ? await context.database.prepare(
+        `WITH archive AS (
+           SELECT
+             ('v2:' || e.patient_id || ':' || e.id) AS record_key,
+             'patient_record_v2' AS source,
+             e.patient_id AS patient_id,
+             e.id AS encounter_id,
+             NULL AS legacy_handoff_id,
+             COALESCE(
+               (
+                 SELECT i.identifier_kind
+                 FROM patient_identifiers i
+                 WHERE i.practice_id=e.practice_id
+                   AND i.patient_id=e.patient_id
+                 ORDER BY i.is_primary DESC,i.created_at ASC
+                 LIMIT 1
+               ),
+               'other'
+             ) AS patient_code_kind,
+             COALESCE(
+               (
+                 SELECT i.display_mask
+                 FROM patient_identifiers i
+                 WHERE i.practice_id=e.practice_id
+                   AND i.patient_id=e.patient_id
+                 ORDER BY i.is_primary DESC,i.created_at ASC
+                 LIMIT 1
+               ),
+               '••••'
+             ) AS patient_code_display,
+             CASE
+               WHEN e.status='draft' THEN 'draft'
+               WHEN e.status='ready_for_physician'
+                 THEN 'ready_for_physician'
+               ELSE 'reviewed'
+             END AS status,
+             COALESCE(
+               (
+                 SELECT MAX(s.revision)
+                 FROM patient_encounter_snapshots s
+                 WHERE s.practice_id=e.practice_id
+                   AND s.encounter_id=e.id
+               ),
+               0
+             ) AS revision,
+             e.created_at AS created_at,
+             e.updated_at AS updated_at
+           FROM patient_encounters e
+           WHERE e.practice_id=?
+
+           UNION ALL
+
+           SELECT
+             ('legacy:' || h.id) AS record_key,
+             'legacy_handoff' AS source,
+             NULL AS patient_id,
+             NULL AS encounter_id,
+             h.id AS legacy_handoff_id,
+             h.patient_code_kind AS patient_code_kind,
+             h.patient_code_display AS patient_code_display,
+             h.status AS status,
+             h.revision AS revision,
+             h.created_at AS created_at,
+             h.updated_at AS updated_at
+           FROM patient_handoffs h
+           WHERE h.practice_id=?
+             AND NOT EXISTS (
+               SELECT 1
+               FROM patient_handoff_legacy_links l
+               WHERE l.legacy_handoff_id=h.id
+             )
+         )
+         SELECT record_key,source,patient_id,encounter_id,
+                legacy_handoff_id,patient_code_kind,
+                patient_code_display,status,revision,
+                created_at,updated_at
+         FROM archive
+         WHERE updated_at < ?
+            OR (
+              updated_at = ?
+              AND record_key < ?
+            )
+         ORDER BY updated_at DESC,record_key DESC
+         LIMIT ?`,
+      ).bind(
+        context.user.practiceId,
+        context.user.practiceId,
+        cursor.updatedAt,
+        cursor.updatedAt,
+        cursor.recordKey,
+        pageSize + 1,
+      ).all<PatientArchiveRow>()
+    : await context.database.prepare(
+        `WITH archive AS (
+           SELECT
+             ('v2:' || e.patient_id || ':' || e.id) AS record_key,
+             'patient_record_v2' AS source,
+             e.patient_id AS patient_id,
+             e.id AS encounter_id,
+             NULL AS legacy_handoff_id,
+             COALESCE(
+               (
+                 SELECT i.identifier_kind
+                 FROM patient_identifiers i
+                 WHERE i.practice_id=e.practice_id
+                   AND i.patient_id=e.patient_id
+                 ORDER BY i.is_primary DESC,i.created_at ASC
+                 LIMIT 1
+               ),
+               'other'
+             ) AS patient_code_kind,
+             COALESCE(
+               (
+                 SELECT i.display_mask
+                 FROM patient_identifiers i
+                 WHERE i.practice_id=e.practice_id
+                   AND i.patient_id=e.patient_id
+                 ORDER BY i.is_primary DESC,i.created_at ASC
+                 LIMIT 1
+               ),
+               '••••'
+             ) AS patient_code_display,
+             CASE
+               WHEN e.status='draft' THEN 'draft'
+               WHEN e.status='ready_for_physician'
+                 THEN 'ready_for_physician'
+               ELSE 'reviewed'
+             END AS status,
+             COALESCE(
+               (
+                 SELECT MAX(s.revision)
+                 FROM patient_encounter_snapshots s
+                 WHERE s.practice_id=e.practice_id
+                   AND s.encounter_id=e.id
+               ),
+               0
+             ) AS revision,
+             e.created_at AS created_at,
+             e.updated_at AS updated_at
+           FROM patient_encounters e
+           WHERE e.practice_id=?
+
+           UNION ALL
+
+           SELECT
+             ('legacy:' || h.id) AS record_key,
+             'legacy_handoff' AS source,
+             NULL AS patient_id,
+             NULL AS encounter_id,
+             h.id AS legacy_handoff_id,
+             h.patient_code_kind AS patient_code_kind,
+             h.patient_code_display AS patient_code_display,
+             h.status AS status,
+             h.revision AS revision,
+             h.created_at AS created_at,
+             h.updated_at AS updated_at
+           FROM patient_handoffs h
+           WHERE h.practice_id=?
+             AND NOT EXISTS (
+               SELECT 1
+               FROM patient_handoff_legacy_links l
+               WHERE l.legacy_handoff_id=h.id
+             )
+         )
+         SELECT record_key,source,patient_id,encounter_id,
+                legacy_handoff_id,patient_code_kind,
+                patient_code_display,status,revision,
+                created_at,updated_at
+         FROM archive
+         ORDER BY updated_at DESC,record_key DESC
+         LIMIT ?`,
+      ).bind(
+        context.user.practiceId,
+        context.user.practiceId,
+        pageSize + 1,
+      ).all<PatientArchiveRow>();
+
+  const hasMore = result.results.length > pageSize;
+  const visible = result.results.slice(0, pageSize);
+
+  const items = visible.map((row) => ({
+    id: row.record_key,
+    source: row.source,
+    ...(row.patient_id
+      ? { patientId: row.patient_id }
+      : {}),
+    ...(row.encounter_id
+      ? { encounterId: row.encounter_id }
+      : {}),
+    ...(row.legacy_handoff_id
+      ? { legacyHandoffId: row.legacy_handoff_id }
+      : {}),
+    patientCodeKind: row.patient_code_kind,
+    patientCodeDisplay: row.patient_code_display,
+    status: row.status,
+    revision: row.revision,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+
+  const last = visible[visible.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? `${last.updated_at}|${last.record_key}`
+      : null;
+
+  return context.respond({
+    items,
+    nextCursor,
+  });
+}
 async function workspace(
   context: PatientRecordV2RouteContext,
   patientId: string,
@@ -2037,10 +3698,28 @@ export async function patientRecordV2Route(
     return initializeAllocator(request, context);
   }
   if (
+    url.pathname === "/v1/patients/archive" &&
+    request.method === "GET"
+  ) {
+    return listPatientArchive(request, context);
+  }
+  if (
     url.pathname === "/v1/patients/resolve" &&
     request.method === "POST"
   ) {
     return resolvePatient(request, context);
+  }
+  if (
+    url.pathname === "/v1/patients/promote-legacy-handoff" &&
+    request.method === "POST"
+  ) {
+    return promoteLegacyHandoff(request, context);
+  }
+  if (
+    url.pathname === "/v1/patients/care-team-intake" &&
+    request.method === "POST"
+  ) {
+    return createCareTeamPatientIntake(request, context);
   }
   if (
     url.pathname === "/v1/patients" &&
@@ -2068,6 +3747,25 @@ export async function patientRecordV2Route(
       request,
       context,
       decodeURIComponent(encounterMatch[1]!),
+    );
+  }
+
+  const encounterDetailMatch = url.pathname.match(
+    /^\/v1\/patients\/([^/]+)\/encounters\/([^/]+)$/,
+  );
+  if (encounterDetailMatch && request.method === "GET") {
+    return getEncounter(
+      context,
+      decodeURIComponent(encounterDetailMatch[1]!),
+      decodeURIComponent(encounterDetailMatch[2]!),
+    );
+  }
+  if (encounterDetailMatch && request.method === "PATCH") {
+    return reviseEncounter(
+      request,
+      context,
+      decodeURIComponent(encounterDetailMatch[1]!),
+      decodeURIComponent(encounterDetailMatch[2]!),
     );
   }
 
