@@ -936,3 +936,31 @@ A clinical feature is not complete merely because UI exists. It requires:
 10. documentation in this roadmap/checklist.
 
 This document should be updated whenever a new GLYMIZE product, medical, research or marketing idea is accepted so it is not lost between implementation phases.
+---
+
+## Patient Care Hub / Telehealth extension (P5)
+
+After current P4 Patient Record v2 / Portal hardening and release closure, patient-facing expansion follows the normative companion roadmap:
+
+`docs/GLYMIZE_PATIENT_CARE_HUB_ROADMAP.md`
+
+This extension covers:
+
+- separate patient vs physician/assistant entry and shells;
+- global patient identity with practice-specific clinical records;
+- national-ID + password login;
+- SMS OTP capability designed but OFF by default;
+- provider discovery by name, medical council code and specialty;
+- expiring/revocable referral codes and QR;
+- care relationships;
+- physician availability and appointment scheduling;
+- configurable auto-confirm vs approval-required booking;
+- patient/physician/assistant notifications and 15-minute reminders;
+- asynchronous diabetes care and secure messaging/files;
+- diabetes pre-visit preparation;
+- waiting room and later provider-neutral live audio/video;
+- assistant permissions, file number and medication provenance;
+- access transparency and earlier-slot waitlist;
+- future payment-ready appointment architecture with no active gateway today.
+
+P4 must not be expanded into speculative full scheduling/payment/video implementation. Only low-risk future-facing changes required to avoid architectural rework belong in current open implementation PRs.
