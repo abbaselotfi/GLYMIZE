@@ -38,7 +38,7 @@
   cursor: pointer;
 }
 
-.tab { border: 1px solid #c9d2e3; background: #fff; }
+.tab { border: 1px solid #c9d2e3; background: #fff; color: #152238; }
 
 .tabActive {
   border: 1px solid #1257c4;
@@ -65,6 +65,7 @@
 .ghost {
   border: 1px solid #c9d2e3;
   background: #fff;
+  color: #152238;
   border-radius: 10px;
   padding: 8px 14px;
   min-height: 44px;
@@ -185,6 +186,7 @@
 .attachment {
   border: 1px solid #c9d2e3;
   background: #fff;
+  color: #152238;
   border-radius: 8px;
   padding: 4px 8px;
   font: inherit;
