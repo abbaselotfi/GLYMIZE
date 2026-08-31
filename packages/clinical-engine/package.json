@@ -10,8 +10,8 @@
       "default": "./dist/index.js"
     },
     "./scenario-engine": {
-      "types": "./dist/scenario-engine.d.ts",
-      "default": "./dist/scenario-engine.js"
+      "types": "./dist/scenario-engine-safe.d.ts",
+      "default": "./dist/scenario-engine-safe.js"
     },
     "./insulin-conversion": {
       "types": "./dist/insulin-conversion.d.ts",
@@ -20,12 +20,17 @@
     "./lab-text-parser": {
       "types": "./dist/lab-text-parser.d.ts",
       "default": "./dist/lab-text-parser.js"
+    },
+    "./patient-document-parser": {
+      "types": "./dist/patient-document-parser.d.ts",
+      "default": "./dist/patient-document-parser.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --exclude test/evidence-casebase-uci-v1.test.ts",
+    "test:evidence": "vitest run test/evidence-casebase-uci-v1.test.ts"
   },
   "dependencies": {
     "@glymize/contracts": "workspace:*"

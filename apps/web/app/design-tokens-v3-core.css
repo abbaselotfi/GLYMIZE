@@ -1,0 +1,26 @@
+:root {
+  --g3-type-body: 14px;
+  --g3-type-rationale: 13.5px;
+  --g3-type-label: 13.5px;
+  --g3-type-footnote: 12.5px;
+  --g3-type-meta: 12px;
+  --g3-line-body: 1.72;
+  --g3-line-compact: 1.55;
+  --g3-weight-body: 550;
+  --g3-weight-secondary: 600;
+  --g3-weight-label: 700;
+  --g3-weight-strong: 800;
+  --g3-space-1: 4px;
+  --g3-space-2: 8px;
+  --g3-space-3: 12px;
+  --g3-space-4: 16px;
+  --g3-space-5: 20px;
+  --g3-space-6: 24px;
+  --g3-space-8: 32px;
+  --g3-space-10: 40px;
+  --g3-radius-control: 10px;
+  --g3-radius-card: 16px;
+  --g3-radius-panel: 20px;
+  --g3-radius-shell: 24px;
+  --g3-touch-min: 44px;
+}

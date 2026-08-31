@@ -1,0 +1,40 @@
+name: Validate UIUX v2
+
+on:
+  push:
+    branches:
+      - feature/uiux-command-center-v2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck monorepo
+        run: pnpm typecheck
+      - name: Clinical and security regression tests
+        run: pnpm test
+      - name: Build Worker
+        run: pnpm --filter @glymize/admin-worker build
+      - name: Build static web
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_ADMIN_API_URL: "https://shiny-block-9d4a.abbaselotfi.workers.dev"
+        run: pnpm --filter @glymize/web... build

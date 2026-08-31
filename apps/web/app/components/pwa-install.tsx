@@ -13,24 +13,30 @@ export default function PwaInstall() {
     useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
-  const [catalogRevision, setCatalogRevision] = useState<string | null>(null);
+  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     let registration: ServiceWorkerRegistration | undefined;
-    const catalogRevisionKey = "glymize-catalog-revision-v1";
+    let lastVersionCheckAt = 0;
+    const buildVersionKey = "glymize-build-version-v1";
+    const minimumCheckIntervalMs = 60_000;
 
-    const checkCatalogRevision = async () => {
+    const checkBuildVersion = async (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastVersionCheckAt < minimumCheckIntervalMs) return;
+      lastVersionCheckAt = now;
       try {
-        const response = await fetch(`${withBasePath("/data/admin-catalog.json")}?t=${Date.now()}`, { cache: "no-store" });
+        const response = await fetch(`${withBasePath("/version.json")}?t=${now}`, { cache: "no-store" });
         if (!response.ok) return;
-        const catalog = await response.json() as { revision?: string };
-        if (!catalog.revision) return;
-        const previous = window.localStorage.getItem(catalogRevisionKey);
-        if (!previous) window.localStorage.setItem(catalogRevisionKey, catalog.revision);
-        else if (previous !== catalog.revision) setCatalogRevision(catalog.revision);
+        const payload = await response.json() as { version?: string };
+        const version = String(payload.version ?? "").trim();
+        if (!version) return;
+        const previous = window.localStorage.getItem(buildVersionKey);
+        if (!previous) window.localStorage.setItem(buildVersionKey, version);
+        else if (previous !== version) setAvailableVersion(version);
       } catch {
-        // Offline PWA continues to use the last healthy cached catalogue.
+        // Offline PWA continues to use the last healthy cached application.
       }
     };
 
@@ -91,10 +97,10 @@ export default function PwaInstall() {
             watchInstallingWorker(registered.installing),
           );
           interval = setInterval(
-            () => { void registered.update(); void checkCatalogRevision(); },
+            () => { void registered.update(); void checkBuildVersion(true); },
             5 * 60 * 1000,
           );
-          void checkCatalogRevision();
+          void checkBuildVersion(true);
         });
     }
 
@@ -110,7 +116,7 @@ export default function PwaInstall() {
     const visibilityHandler = () => {
       if (document.visibilityState === "visible") {
         void registration?.update();
-        void checkCatalogRevision();
+        void checkBuildVersion();
       }
     };
 
@@ -160,11 +166,11 @@ export default function PwaInstall() {
     );
   }
 
-  if (catalogRevision) {
+  if (availableVersion) {
     return (
       <div className="update-toast" role="status">
-        <span><b>اطلاعات دارویی جدید آماده است</b><small>قیمت، کدها یا پوشش بیمهٔ تأییدشده به‌روزرسانی شده‌اند.</small></span>
-        <button onClick={() => { window.localStorage.setItem("glymize-catalog-revision-v1", catalogRevision); window.location.reload(); }} type="button">دریافت اطلاعات</button>
+        <span><b>نسخهٔ جدید GLYMIZE آماده است</b><small>رابط و داده‌های نسخهٔ تازه آمادهٔ بارگذاری هستند.</small></span>
+        <button onClick={() => { window.localStorage.setItem("glymize-build-version-v1", availableVersion); window.location.reload(); }} type="button">دریافت نسخه</button>
       </div>
     );
   }

@@ -3,14 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@glymize/contracts": "workspace:*"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260730.1",
-    "wrangler": "4.115.0"
+    "wrangler": "4.115.0",
+    "vitest": "4.1.10"
   }
 }

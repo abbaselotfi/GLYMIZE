@@ -533,3 +533,7 @@ export function buildType2MedicationConsiderations(
 export * from "./insulin-conversion.js";
 
 export * from "./lab-text-parser.js";
+
+export * from "./decision-graph-v2/index.js";
+
+export * from "./investigation-actions.js";

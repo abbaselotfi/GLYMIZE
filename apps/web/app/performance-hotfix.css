@@ -1,0 +1,38 @@
+/* Mobile performance guardrails for data-dense GLYMIZE surfaces. */
+
+/* Do not use content-visibility/contain-intrinsic-size on the medication editor.
+   The editor rows have highly variable dynamic heights and Chrome on Android can
+   reserve incorrect placeholder space, producing giant blank gaps after render. */
+
+@media (max-width: 760px) {
+  /* Live blur on sticky/fixed layers is expensive on Android GPUs and is not
+     required for hierarchy on a phone-sized canvas. */
+  .glymize-internal-shell .global-topbar.glymize-shared-topbar,
+  .glymize-internal-shell .sidebar,
+  .update-toast,
+  [class*="saveBar"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* GLYMIZE_MEDICATION_PAGINATION_V4 */
+.glymize-internal-shell[data-route="admin"] .catalog-toolbar .catalog-pagination{
+  display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+  width:100%;margin-top:12px;padding-top:12px;border-top:1px solid var(--glymize-line)
+}
+.glymize-internal-shell[data-route="admin"] .catalog-pagination button{
+  min-width:68px;min-height:40px;padding:7px 12px
+}
+.glymize-internal-shell[data-route="admin"] .catalog-pagination span{
+  min-width:260px;padding:8px 12px;border-radius:10px;background:var(--glymize-surface-soft);
+  color:var(--glymize-muted);font-size:13px;font-weight:750;text-align:center
+}
+@media(max-width:760px){
+  .glymize-internal-shell[data-route="admin"] .catalog-pagination{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr))
+  }
+  .glymize-internal-shell[data-route="admin"] .catalog-pagination span{
+    grid-column:1/-1;grid-row:1;min-width:0
+  }
+}

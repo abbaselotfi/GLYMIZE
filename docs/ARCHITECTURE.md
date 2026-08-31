@@ -35,8 +35,30 @@
 
 ### API/BFF
 
-API قراردادهای نسخه‌بندی‌شده را ارائه می‌دهد، اعتبارسنجی ساختاری و مجوز را اعمال می‌کند و شناسهٔ همبستگی می‌سازد. BFF متن محلی‌شده و اولویت نمایش دارو را ترکیب می‌کند، اما محاسبهٔ بالینی فقط در Clinical Decision Service انجام می‌شود.
+API قراردادهای نسخه‌بندی‌شده را ارائه می‌دهد، اعتبارسنجی ساختاری و مجوز را اعمال می‌کند و شناسهٔ همبستگی می‌سازد. برای ایجاد/ویرایش handoff بیمار نیز API مرجع تمامیت است: درخواست create روی شناسهٔ موجود باید با conflict fail-closed شود و هر update باید به رکورد و revision بارگذاری‌شده مقید باشد؛ بررسی زودهنگام در UI فقط کمک UX است و جای guard اتمی سرور را نمی‌گیرد. BFF متن محلی‌شده و اولویت نمایش دارو را ترکیب می‌کند، اما محاسبهٔ بالینی فقط در Clinical Decision Service انجام می‌شود.
 
+
+### پروندهٔ طولی بیمار و Patient Workspace
+
+در Patient Record v2، API/BFF باید identifier ورودی را ابتدا به یک `patient_id` پایدار resolve کند و سپس عملیات مراجعه را با `encounter_id` مستقل انجام دهد. «باز کردن بیمار» و «شروع ویزیت جدید» دو command جدا هستند؛ هیچ مسیر compatibility نباید create encounter را به overwrite رکورد/ویزیت قبلی تبدیل کند.
+
+برای شماره پروندهٔ مطب، یک allocator practice-scoped با high-water mark نگهداری می‌شود. practiceهای legacy تا زمانی که آخرین شمارهٔ تخصیص‌یافته توسط کاربر مجاز تأیید نشده باشد در حالت `uninitialized` می‌مانند؛ سیستم نباید از hashهای identifier ادعای max بسازد. تخصیص شمارهٔ پیشنهادی و درج identifier بیمار باید concurrency-safe و اتمی باشد. کد ملی از این allocator مستقل است و در UI می‌تواند lookup پیش‌فرض باشد بدون اینکه کلید اصلی ذخیره‌سازی شود.
+
+Patient Workspace یک read model ترکیبی است:
+
+- Patient header از patient master/demographics/identifiers؛
+- visit timeline از encounterها؛
+- pre-visit medications از medication reconciliation؛
+- post-visit clinical actions از signed Final Plan و orders؛
+- trends از observationهای canonical و تاریخ‌دار؛
+- physician notes از note thread/revisionهای encrypted.
+
+یادداشت پزشک با revision append-only ذخیره می‌شود؛ visibility پیش‌فرض physician-only است. Patient Workspace باید همان `layoutPreset` موجود پزشک (`auto`, `focused_workflow`, `compact_cards`, `command_center`) را مصرف کند؛ یک preference موازی جدید ساخته نمی‌شود و preset فقط projection/progressive disclosure رابط را تغییر می‌دهد، نه clinical rule input/output یا دادهٔ ذخیره‌شده.
+
+پس از اجرای migration `0003` روی D1 ایزولهٔ RC، فایل `0003` immutable/frozen است و هر تغییر schema بعدی باید migration جدید `0004+` باشد. Production تا عبور runtime/browser gate نباید Patient Record v2 را دریافت کند. در rollout تدریجی، legacy `patient_handoffs` و مسیر v2 هم‌زمان باقی می‌مانند؛ تا وقتی optimistic snapshot revision برای draft encounter کامل نشده، Care Team UI نباید repeated save را به create encounter جدید نگاشت کند.
+
+
+> **وضعیت P2-C2C:** پس از cutover، `patient_handoffs` فقط یک منبع legacy read-only برای رکوردهای هنوز promote‌نشده است. Care Team، collision checking، ایجاد بیمار/ویزیت و revision همگی از Patient Record v2 استفاده می‌کنند. مسیرهای legacy `upsert` و `code-status` retired هستند؛ `lookup/list/records/:id` فقط تا پایان promotion داده‌های قدیمی باقی می‌مانند.
 ### سرویس تصمیم بالینی و موتور قوانین
 
 ورودی موتور یک snapshot حداقلی از داده‌های بیمار، زمینهٔ درمان و `rule_bundle_id` است. موتور قطعی و بدون وابستگی به متن نمایشی عمل می‌کند و خروجی زیر را می‌سازد:
@@ -99,6 +121,11 @@ API رویدادهای حداقلی و فاقد دادهٔ بالینی را ب�
 
 در شروع، یک modular monolith با مرزهای ماژولی بالا و worker جدا هزینهٔ عملیاتی را کم می‌کند. قراردادها و مالکیت داده طوری تعریف می‌شوند که موتور قوانین یا کاتالوگ در صورت نیاز مستقل شوند. محیط‌های توسعه، آزمون، staging و production پایگاه داده و کلیدهای جدا دارند؛ migrationها رو به جلو و سازگار با نسخهٔ قبلی‌اند.
 
+
+### درگاه هم‌مبدأ Runtime برای مرورگر
+
+آدرس Runtime بالینی مرورگر از آدرس Admin/OAuth مستقل است. در محیط‌هایی مانند RC که دسترسی مستقیم کاربر نهایی به hostname زیرساختی Worker ممکن است محدود باشد، وب‌اپ می‌تواند از مسیر هم‌مبدأ مانند `/runtime-api/v1/*` استفاده کند. Cloudflare Pages این مسیر را فقط به یک upstream ثابت و از پیش تعیین‌شده هدایت می‌کند؛ مقصد از ورودی کاربر ساخته نمی‌شود و این مسیر open proxy نیست. مسیرهای static باید با `_routes.json` از اجرای Function خارج بمانند و پاسخ‌های Runtime `no-store` باشند. Admin/OAuth تا زمانی که callback و redirect آن جداگانه اعتبارسنجی نشده، base URL مستقل خود را حفظ می‌کند.
+
 ## ۹. تصمیم‌های باز
 
 - استانداردهای تبادل داده (مانند FHIR) و کدگذاری آزمایش/تشخیص؛
@@ -106,3 +133,14 @@ API رویدادهای حداقلی و فاقد دادهٔ بالینی را ب�
 - منبع معتبر و مجوز داده‌های برند/عرضه در ایران؛
 - سیاست نهایی نگهداری داده و محل میزبانی؛
 - فرایند رسمی اعتبارسنجی به‌عنوان نرم‌افزار پزشکی در بازار هدف.
+## Physician Final Plan / Orders boundary (2026-08-15 roadmap extension)
+
+The Clinical Decision Service may produce evidence-bound considerations, including `REQUEST_INVESTIGATION` for missing required data, but it does not sign orders.
+
+The physician creates/signs an encounter-scoped `PhysicianFinalPlan`. The signed plan contains medication and/or investigation orders and is immutable; modifications create a superseding plan.
+
+Care Team users with the required patient-access permission can read the latest signed plan. They may append operational fulfillment events but cannot alter the signed order. Medication payer codes and investigation service codes shown to Care Team are snapshots from the signed order, not ad-hoc UI guesses.
+
+Laboratory results arriving later through OCR/PDF/manual/import use the Lab Master Registry observation model and may be linked to the originating investigation order. This creates the order -> execution -> result chain needed for longitudinal follow-up.
+
+The Patient Record v2 runtime adapter owns this flow. Do not persist signed plans as a temporary field inside legacy `patient_handoffs`.

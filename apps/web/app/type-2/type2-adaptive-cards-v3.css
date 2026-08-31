@@ -1,0 +1,16 @@
+@media (max-width:760px){
+  .glymize-internal-shell[data-route="type-2"] .type2-v3-stepper{position:sticky;top:64px;z-index:18;border-radius:14px;box-shadow:var(--g3-shadow-card)}
+  .glymize-internal-shell[data-route="type-2"] main[class*="page"]{padding-inline:12px!important}
+  .glymize-internal-shell[data-route="type-2"] [class*="hero"]{padding:20px!important;margin-bottom:14px!important;border-radius:20px!important}
+  .glymize-internal-shell[data-route="type-2"] [class*="hero"] h1{font-size:28px!important;line-height:1.25!important}
+  .glymize-internal-shell[data-route="type-2"] [class*="workspace"]{grid-template-columns:1fr!important;gap:12px!important}
+  .glymize-internal-shell[data-route="type-2"] [class*="section"],
+  .glymize-internal-shell[data-route="type-2"] [class*="scenarioCard"]{border-radius:18px!important;box-shadow:var(--g3-shadow-card)!important}
+  .glymize-internal-shell[data-route="type-2"] input,
+  .glymize-internal-shell[data-route="type-2"] select,
+  .glymize-internal-shell[data-route="type-2"] button{min-height:var(--g3-touch-min)}
+  .glymize-internal-shell[data-route="type-2"] [class*="sectionTitle"] p,
+  .glymize-internal-shell[data-route="type-2"] [class*="factor"] small,
+  .glymize-internal-shell[data-route="type-2"] [class*="medTop"] small{font-size:13px!important;line-height:1.65!important}
+  .glymize-internal-shell[data-route="type-2"] [class*="summaryRail"]{display:none!important}
+}

@@ -101,6 +101,35 @@ AuditEvent --> any versioned aggregate
 
 `PatientSnapshot` یک snapshot حداقلی و immutable از داده‌های مؤثر بر محاسبه است؛ در صورت امکان به شناسهٔ pseudonymous پرونده اشاره می‌کند، نه مشخصات مستقیم. داده‌ها به شکل ساخت‌یافته همراه با کد، مقدار، واحد، زمان مشاهده و provenance ذخیره می‌شوند.
 
+در مدل موقت پیش از Patient Record v2، `patient_handoffs` هنوز یک رکورد جاری برای هر hash شناسه دارد؛ بنابراین intent نوشتن باید صریح باشد. `create` فقط در صورت آزاد بودن `(practice_id, patient_code_hash)` مجاز است و conflict نباید به update تبدیل شود. `update` باید به `record_id` بارگذاری‌شده و `expectedRevision` همان رکورد مقید باشد. پیشنهاد شماره پرونده عددی صرفاً first-free در یک دنباله بررسی‌شده و advisory است؛ چون plaintext شناسه عمداً در جدول نگهداری نمی‌شود، نباید از آن به‌عنوان «بزرگ‌ترین شماره پرونده کل مطب» تعبیر شود. پیشنهاد در زمان ذخیره دوباره کنترل می‌شود و برای کد ملی تولید نمی‌شود.
+
+
+> **وضعیت پس از P2-C2C:** توضیح `create/update` روی `patient_handoffs` در پاراگراف‌های بالا فقط رفتار تاریخی bridge پیش از cutover را مستند می‌کند و دیگر write contract فعال نیست. جدول legacy برای migration/read-only fallback حفظ می‌شود؛ تمام ایجاد/ویرایش جدید بیمار و encounter از Patient Record v2 عبور می‌کند.
+### Patient Record v2 longitudinal workspace contract
+
+در Patient Record v2، `Patient` و `Encounter` دو aggregate مستقل هستند. `patient_id` شناسهٔ داخلی پایدار است و کد ملی/شماره پرونده فقط identifierهای قابل resolve همان بیمارند. هر مراجعه `encounter_id` مستقل و `encounter_at` مستقل دارد؛ ذخیرهٔ مراجعهٔ جدید نباید snapshot یا تصمیم مراجعهٔ قبلی را بازنویسی کند.
+
+کد ملی در UI می‌تواند lookup پیش‌فرض باشد، اما هرگز primary key دیتابیس نیست. شماره پروندهٔ مطب یک namespace محلی برای همان practice است و به allocator monotonic نیاز دارد. چون hashهای legacy اجازهٔ محاسبهٔ قابل اعتماد `max(file_number)` را نمی‌دهند، allocator برای practice موجود ابتدا `uninitialized` است و فقط پس از تأیید آخرین شمارهٔ تخصیص‌یافته فعال می‌شود. پس از فعال‌سازی، `last_allocated_number` high-water mark است: gapهای پایین خودکار reuse نمی‌شوند، archive/delete شماره را آزاد نمی‌کند، و تخصیص بعدی باید با ایجاد identifier به‌صورت اتمی انجام شود.
+
+یادداشت پزشک دو scope دارد: `patient` برای نکتهٔ طولی و `encounter` برای همان جلسه. متن یادداشت encrypted است و edit با revision جدید انجام می‌شود؛ revision قبلی immutable می‌ماند. visibility پیش‌فرض `physician_only` است و نمایش به Care Team نیازمند انتخاب صریح و authorization است.
+
+Patient Workspace یک read model است، نه aggregate جدیدِ دارای حقیقت موازی. header از Patient/Demographics/Identifiers، timeline از Encounterها، داروی قبل ویزیت از medication reconciliation، تصمیم بعد ویزیت از signed Final Plan/Orders، و trend از `patient_observations` ساخته می‌شود. برای trend، زمان observation و encounter جدا می‌ماند، unit/specimen compatibility رعایت می‌شود و دادهٔ unverified به‌صورت trusted point نمایش داده نمی‌شود.
+
+Migration `0003_longitudinal_patient_records.sql` پس از rehearsal موفق روی D1 ایزولهٔ RC یک artifact اعمال‌شده و frozen است؛ تغییر همین فایل ممنوع است و هر schema delta جدید باید `0004+` باشد. این RC rehearsal به‌معنای مجوز migration Production نیست.
+
+در bridge runtime، ایجاد Patient/Identifier/Encounter باید practice-scoped و fail-closed باشد. یک identifier جدید می‌تواند بعداً به همان `patient_id` متصل شود (برای مثال افزودن کد ملی به بیماری که ابتدا فقط شماره پرونده داشته)، اما duplicate identifier در Patient Record v2 یا legacy handoff باید conflict بدهد. legacy handoff بدون raw identifier قابل promotion حدسی نیست؛ promotion آینده باید raw identifier ورودی را با HMAC همان legacy row verify کند.
+
+برای draft encounter، create و revise دو intent جدا هستند. create فقط برای `Start new visit` است؛ save مجدد همان ویزیت باید revision جدید snapshot را برای همان `encounter_id` با optimistic concurrency اضافه کند. این constraint قبل از cutover رابط Care Team الزامی است.
+
+
+در Care Team، مقادیر هویتی/پایه‌ای که از OCR یا متن PDF به دست می‌آیند ابتدا suggestion هستند. اعمال انسانی آن‌ها باید provenance شامل source kind، سند/صفحه، confidence موجود و وضعیت verification را حفظ کند. نام، نام خانوادگی/نام کامل، کد ملی، سن گزارش‌شده در encounter، جنس گزارش‌شده، قد و وزن نباید صرفاً به دلیل OCR بودن خودکار روی مقدار موجود نوشته شوند. برای هویت طولی، تاریخ تولد تأییدشده بر سن ثابت ارجح است و کد ملی/شماره پرونده در مدل نهایی شناسه‌های متعدد یک Patient هستند، نه دو Patient جدا.
+
+پیش از parsing سربرگ فارسی، Unicode باید برای Arabic Presentation Forms، شکل‌های عربی/فارسی ی و ک، کشیده و bidi controls canonical شود. همچنین parser باید وارونگی ترتیب value/label در text layerهای RTL را به‌عنوان artifact سند تحمل کند، بدون اینکه از محتوای نامشخص داده بسازد. جنس گزارش‌شده روی برگه فقط source/encounter demographic است و نباید به gender identity تعبیر شود.
+
+برای داده آزمایشگاهی، `parserConfidence` فقط metadata نمایشی نیست: اگر parser برای انتخاب مقدار مجبور به رفع ابهام عددی شود (مثلاً عدد موجود در suffix نام آزمایش در برابر عدد نتیجه کنار واحد)، observation باید تا تأیید انسانی در UI برجسته شود. تأیید انسانی ambiguity نمایشی را برطرف می‌کند ولی provenance منبع را از بین نمی‌برد. Legendهای چاپی مانند `H:High` و `L:Low` نباید به‌عنوان flag خود نتیجه تفسیر شوند.
+
+برای اسناد آزمایشگاهی، متن PDF و تصویر دو منبع استخراج مکمل‌اند: متن embedded می‌تواند برای جدول آزمایش دقیق باشد ولی به دلیل font/RTL mapping برای سربرگ فارسی خراب باشد. در این حالت fallback تصویری فقط برای سربرگ بیمار/metadata اجرا می‌شود. تاریخ صریح آزمایش باید به observationهای همان سند منتقل شود. تا پیش از Patient Record v2، تاریخ شمسی منبع می‌تواند به‌صورت متن تاریخ گزارش‌شده حفظ شود؛ مدل طولی نهایی باید calendar، مقدار خام منبع و تاریخ canonical قابل محاسبه را از هم جدا کند.
+
 `DecisionRecord` شامل موارد زیر است:
 
 - `patient_snapshot_id`, `organization_id`, `requested_by`, `evaluated_at`؛
@@ -135,3 +164,21 @@ DecisionRecord و snapshot مطابق سیاست نگهداری حفاظت/حذ�
 اصلاحات دستی و اعلان‌های بازبینی در migration شماره 005 و سند
 `IRAN_DRUG_DATA_PIPELINE.md` تعریف شده است. snapshotهای منبع immutable هستند؛
 اصلاح ادمین فقط به‌صورت overlay ذخیره می‌شود.
+## Physician Final Plan and Order Execution (2026-08-15 roadmap extension)
+
+`PhysicianFinalPlan` is an encounter-scoped, physician-authored artifact distinct from an engine `DecisionRecord`. A signed plan may contain medication orders, investigation/laboratory orders, both, or no medication order.
+
+`PhysicianMedicationOrder` stores canonical medication/product identity and an encrypted structured payload for dose, route, schedule, duration/quantity and the payer-registration snapshot used at sign-off. The snapshot may include insurer generic code, insurer brand code, generic/brand registry code, IRC code, source and observed/freshness time. Later catalog changes must not rewrite the historical order.
+
+`PhysicianInvestigationOrder` stores a physician-requested laboratory/imaging/procedure/other investigation. For laboratory orders it should use the Lab Master Registry canonical key when known. It may also snapshot the insurer/service registration code when available. An order is not a result: later `PatientObservation` rows may be linked to the originating investigation order.
+
+Signed plan content is immutable. A later clinical change creates a new plan that supersedes the prior plan.
+
+`CareTeamOrderFulfillmentEvent` is append-only operational state (`pending`, payer submission/registration, scheduling, collection, result receipt, completion, inability to process, cancellation). Care Team fulfillment is not permission to alter physician-authored clinical content.
+
+The Patient Record v2 schema must support:
+- latest signed plan lookup by patient/practice;
+- order-level stable IDs;
+- encrypted order payloads;
+- append-only fulfillment events;
+- links from investigation orders to returned observations.

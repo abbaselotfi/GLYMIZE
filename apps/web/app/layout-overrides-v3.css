@@ -1,0 +1,24 @@
+/* Adaptive layout presets for the redesigned clinical workspace. */
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="command_center"] .page-content,
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] .page-content { max-width:1560px; }
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] .page-content { max-width:1180px; }
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="workspace"] { grid-template-columns:minmax(0,1fr) 280px!important;gap:16px!important; }
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="factorGrid"] { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="focused_workflow"] [class*="heroMetric"] { display:none!important; }
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] .page-content { max-width:1320px;padding-top:22px; }
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="section"] { border-radius:18px!important; }
+.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="factorGrid"] { grid-template-columns:repeat(3,minmax(0,1fr))!important; }
+.type2-v3-frame{min-width:0}.type2-v3-stepper{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 18px;padding:8px;border:1px solid var(--glymize-line);border-radius:16px;background:var(--glymize-surface)}.type2-v3-stepper button{min-height:48px;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--glymize-muted);cursor:pointer}.type2-v3-stepper button:hover,.type2-v3-stepper button.active{border-color:var(--glymize-accent-500);background:var(--glymize-accent-soft);color:var(--glymize-accent-700)}.type2-v3-stepper button>span{display:inline-grid;width:30px;height:30px;place-items:center;margin-inline-end:8px;border-radius:9px;background:var(--glymize-surface-soft);font-weight:900}.type2-v3-stepper button.active>span{background:var(--glymize-accent-600);color:#fff}
+
+/* Keep lighter legacy clinical pathways inside the same v3 visual contract. */
+.glymize-internal-shell[data-route="type-1"] .page-content>main,
+.glymize-internal-shell[data-route="pregnancy"] .page-content>main{max-width:1280px;margin:0 auto;padding:26px 26px 80px}
+.glymize-internal-shell[data-route="type-1"] .page-heading,
+.glymize-internal-shell[data-route="pregnancy"] .page-heading{margin:14px 0 18px;padding:22px;border:1px solid var(--glymize-line);border-radius:20px;background:var(--glymize-surface);box-shadow:var(--g3-shadow-card)}
+.glymize-internal-shell[data-route="type-1"] :is(.compact-panel,.medication-group),
+.glymize-internal-shell[data-route="pregnancy"] :is(.compact-panel,.medication-group){border-color:var(--glymize-line)!important;background:var(--glymize-surface)!important;color:var(--glymize-ink)!important;border-radius:18px!important;box-shadow:var(--g3-shadow-card)!important}
+.glymize-internal-shell[data-route="type-1"] .static-checks span,
+.glymize-internal-shell[data-route="pregnancy"] .static-checks span{min-height:44px;border-color:var(--glymize-line)!important;background:var(--glymize-surface-soft)!important;color:var(--glymize-ink)!important}
+
+@media(max-width:1180px){.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="factorGrid"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:760px){.glymize-internal-shell[data-route="type-2"][data-layout-preset="auto"] .page-content,.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] .page-content{padding-inline:12px}.glymize-internal-shell[data-route="type-2"][data-layout-preset="compact_cards"] [class*="factorGrid"]{grid-template-columns:1fr!important}.type2-v3-stepper{grid-template-columns:repeat(4,1fr);gap:4px;padding:5px}.type2-v3-stepper button b{display:none}.type2-v3-stepper button>span{margin:0}.glymize-internal-shell[data-route="type-1"] .page-content>main,.glymize-internal-shell[data-route="pregnancy"] .page-content>main{padding:14px 12px 90px}}

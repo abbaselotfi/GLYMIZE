@@ -1,0 +1,13 @@
+@import "./admin-legacy-controls-v3.css";
+@import "./admin-mobile-qa-v3.css";
+.nav{position:sticky;top:72px;z-index:14;display:flex;align-items:center;gap:16px;margin:0 auto 18px;max-width:1560px;padding:10px 12px;border:1px solid var(--glymize-line);border-radius:16px;background:color-mix(in srgb,var(--glymize-surface) 94%,transparent);box-shadow:var(--g3-shadow-card);backdrop-filter:blur(14px)}
+.title{display:grid;gap:1px;padding-inline:8px 16px;border-inline-end:1px solid var(--glymize-line);white-space:nowrap}.title span{font-size:10px;font-weight:900;letter-spacing:.12em;color:var(--glymize-accent-700)}.title strong{font-size:13px;color:var(--glymize-ink)}
+.items{display:flex;align-items:center;gap:6px;min-width:0;overflow:auto;scrollbar-width:none}.items::-webkit-scrollbar{display:none}.item,.active{display:inline-flex;align-items:center;gap:7px;min-height:42px;padding:7px 10px;border:1px solid transparent;border-radius:11px;color:var(--glymize-muted);text-decoration:none;font-size:12.5px;font-weight:800;white-space:nowrap}.item:hover{background:var(--glymize-accent-soft);color:var(--glymize-accent-700);border-color:color-mix(in srgb,var(--glymize-accent-500) 30%,var(--glymize-line))}.active{background:var(--glymize-accent-soft-strong);color:var(--glymize-accent-700);border-color:color-mix(in srgb,var(--glymize-accent-500) 52%,var(--glymize-line))}.icon{display:grid;place-items:center;width:27px;height:27px;border-radius:8px;background:var(--glymize-surface-soft);font-size:10px;font-weight:950;color:inherit}
+html[data-glymize-mode="dark"] .nav{background:color-mix(in srgb,var(--glymize-surface) 92%,transparent)}
+@media(max-width:900px){
+ .nav{position:relative;top:auto;z-index:1;margin:8px 10px 18px;padding:6px 8px;gap:0;border-radius:14px;background:var(--glymize-surface);box-shadow:none;backdrop-filter:none;overflow:hidden}
+ .title{display:none}
+ .items{width:100%;padding:2px;gap:5px;scroll-padding-inline:2px;overscroll-behavior-inline:contain;scroll-snap-type:x proximity}
+ .item,.active{min-height:44px;padding:7px 10px;scroll-snap-align:start}
+ html[data-glymize-mode="dark"] .nav{background:var(--glymize-surface)}
+}

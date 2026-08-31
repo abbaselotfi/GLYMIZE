@@ -505,6 +505,150 @@ function buildIndexes() {
   }
 }
 
+type MarketChunkSectionName =
+  | "products"
+  | "presentationSummaries"
+  | "insuranceRecords";
+
+type MarketChunkManifestEntry = {
+  file: string;
+  count: number;
+  bytes: number;
+};
+
+type MarketChunkManifest = {
+  schemaVersion: 1;
+  kind: "glymize_clinician_market_chunk_manifest";
+  deploymentSha256: string;
+  sourceBytes: number;
+  counts: Record<MarketChunkSectionName, number>;
+  header: Record<string, unknown>;
+  sections: Record<MarketChunkSectionName, MarketChunkManifestEntry[]>;
+};
+
+type MarketChunkPayload = {
+  schemaVersion: 1;
+  kind: "glymize_clinician_market_chunk";
+  section: MarketChunkSectionName;
+  items: unknown[];
+};
+
+const MARKET_CHUNK_SECTIONS: MarketChunkSectionName[] = [
+  "products",
+  "presentationSummaries",
+  "insuranceRecords",
+];
+
+function safeMarketChunkFile(file: string) {
+  return (
+    /^glymize-clinician-market-v2-chunks\/[A-Za-z0-9._-]+\.json$/.test(file) &&
+    !file.includes("..")
+  );
+}
+
+async function loadChunkedClinicianMarket(
+  runtimeVersion: string,
+): Promise<ClinicianMarketIndex | null> {
+  const manifestResponse = await fetch(
+    `${withBasePath("/data/glymize-clinician-market-v2.manifest.json")}?v=${encodeURIComponent(runtimeVersion)}`,
+    { cache: "force-cache" },
+  );
+
+  // Local development and older static hosts keep the monolithic asset.
+  if (manifestResponse.status === 404) return null;
+  if (!manifestResponse.ok) {
+    throw new Error(`clinician_market_v2_manifest_http_${manifestResponse.status}`);
+  }
+
+  const manifest = (await manifestResponse.json()) as MarketChunkManifest;
+  if (
+    manifest.schemaVersion !== 1 ||
+    manifest.kind !== "glymize_clinician_market_chunk_manifest"
+  ) {
+    throw new Error("clinician_market_v2_manifest_schema_invalid");
+  }
+
+  if (
+    runtimeVersion !== "v2" &&
+    manifest.deploymentSha256 !== runtimeVersion
+  ) {
+    throw new Error("clinician_market_v2_manifest_version_mismatch");
+  }
+
+  const reconstructed = {
+    ...manifest.header,
+    products: [],
+    presentationSummaries: [],
+    insuranceRecords: [],
+  } as unknown as ClinicianMarketIndex;
+
+  for (const section of MARKET_CHUNK_SECTIONS) {
+    const entries = manifest.sections?.[section];
+    const expectedCount = manifest.counts?.[section];
+
+    if (
+      !Array.isArray(entries) ||
+      entries.length === 0 ||
+      !Number.isInteger(expectedCount) ||
+      expectedCount < 0
+    ) {
+      throw new Error(`clinician_market_v2_manifest_section_invalid:${section}`);
+    }
+
+    let observedCount = 0;
+
+    for (const entry of entries) {
+      if (
+        !entry ||
+        !safeMarketChunkFile(entry.file) ||
+        !Number.isInteger(entry.count) ||
+        entry.count < 0 ||
+        !Number.isFinite(entry.bytes) ||
+        entry.bytes <= 0
+      ) {
+        throw new Error(`clinician_market_v2_manifest_entry_invalid:${section}`);
+      }
+
+      const chunkResponse = await fetch(
+        `${withBasePath(`/data/${entry.file}`)}?v=${encodeURIComponent(runtimeVersion)}`,
+        { cache: "force-cache" },
+      );
+      if (!chunkResponse.ok) {
+        throw new Error(
+          `clinician_market_v2_chunk_http_${section}_${chunkResponse.status}`,
+        );
+      }
+
+      const chunk = (await chunkResponse.json()) as MarketChunkPayload;
+      if (
+        chunk.schemaVersion !== 1 ||
+        chunk.kind !== "glymize_clinician_market_chunk" ||
+        chunk.section !== section ||
+        !Array.isArray(chunk.items) ||
+        chunk.items.length !== entry.count
+      ) {
+        throw new Error(`clinician_market_v2_chunk_invalid:${section}`);
+      }
+
+      observedCount += chunk.items.length;
+
+      if (section === "products") {
+        reconstructed.products.push(...(chunk.items as MarketProduct[]));
+      } else if (section === "presentationSummaries") {
+        reconstructed.presentationSummaries.push(...(chunk.items as MarketSummary[]));
+      } else {
+        reconstructed.insuranceRecords.push(...(chunk.items as MarketInsurance[]));
+      }
+    }
+
+    if (observedCount !== expectedCount) {
+      throw new Error(`clinician_market_v2_chunk_count_mismatch:${section}`);
+    }
+  }
+
+  return reconstructed;
+}
+
 export async function loadClinicianMarketV2() {
   if (marketIndex || typeof window === "undefined") return;
   if (marketLoadPromise) return marketLoadPromise;
@@ -523,12 +667,17 @@ export async function loadClinicianMarketV2() {
       // Runtime remains usable if the small metadata file is temporarily unavailable.
     }
 
-    const response = await fetch(
-      `${withBasePath("/data/glymize-clinician-market-v2.json")}?v=${encodeURIComponent(runtimeVersion)}`,
-      { cache: "force-cache" },
-    );
-    if (!response.ok) throw new Error(`clinician_market_v2_http_${response.status}`);
-    const parsed = await response.json() as ClinicianMarketIndex;
+    let parsed = await loadChunkedClinicianMarket(runtimeVersion);
+
+    if (!parsed) {
+      const response = await fetch(
+        `${withBasePath("/data/glymize-clinician-market-v2.json")}?v=${encodeURIComponent(runtimeVersion)}`,
+        { cache: "force-cache" },
+      );
+      if (!response.ok) throw new Error(`clinician_market_v2_http_${response.status}`);
+      parsed = await response.json() as ClinicianMarketIndex;
+    }
+
     if (parsed.schemaVersion !== 2 || parsed.kind !== "glymize_clinician_market_index") throw new Error("clinician_market_v2_schema_invalid");
     if (parsed.scopeMode !== "full_clinical_market") throw new Error("clinician_market_v2_scope_not_full");
     if ((parsed.scope?.productCount ?? 0) !== parsed.products.length) throw new Error("clinician_market_v2_product_count_mismatch");

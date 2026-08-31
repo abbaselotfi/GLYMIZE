@@ -1,0 +1,164 @@
+/* GLYMIZE UI/UX v2 browser-smoke fixes. */
+
+/* Readability: raise secondary/detail copy without inflating compact badges. */
+.glymize-internal-shell .page-content article p,
+.glymize-internal-shell .page-content section > p,
+.glymize-internal-shell .page-content section > div > p,
+.glymize-internal-shell [class*="cardCopy"] p,
+.glymize-internal-shell [class*="sectionHeading"] p,
+.glymize-internal-shell [class*="sectionTitle"] p,
+.glymize-internal-shell [class*="evidenceNote"],
+.glymize-internal-shell [class*="evidenceNotice"],
+.glymize-internal-shell [class*="statusBar"],
+.glymize-internal-shell [class*="notice"] {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 1.82 !important;
+}
+
+.glymize-internal-shell [class*="factor"] small,
+.glymize-internal-shell [class*="scenario"] small,
+.glymize-internal-shell [class*="cost"] small,
+.glymize-internal-shell [class*="insurance"] span,
+.glymize-internal-shell [class*="summaryRail"] small,
+.glymize-internal-shell [class*="guardrail"],
+.glymize-internal-shell [class*="quickAction"] small,
+.glymize-internal-shell [class*="metric"] small,
+.glymize-internal-shell [class*="managementCard"] p,
+.glymize-internal-shell [class*="evidenceCard"] p,
+.glymize-internal-shell [class*="protocolCard"] small,
+.glymize-internal-shell [class*="toggleRow"] small,
+.glymize-internal-shell [class*="testHint"] {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.72 !important;
+}
+
+.glymize-internal-shell [class*="field"] > span,
+.glymize-internal-shell [class*="selectField"] > span,
+.glymize-internal-shell [class*="formGrid"] label,
+.glymize-internal-shell [class*="toggleRow"] > span {
+  font-size: 13.5px !important;
+  font-weight: 750 !important;
+}
+
+.glymize-internal-shell .sidebar-note small,
+.glymize-internal-shell .topbar-title span {
+  font-size: 12.5px !important;
+  font-weight: 600;
+  line-height: 1.65;
+}
+
+/* Interaction: hover becomes lighter and readable across clinical + admin controls. */
+.glymize-internal-shell button:not(:disabled):not(.secondary):not([class*="danger" i]):hover,
+.glymize-internal-shell a[class*="button" i]:not([class*="danger" i]):hover,
+.glymize-internal-shell a[class*="action" i]:not([class*="danger" i]):hover {
+  border-color: var(--glymize-accent-500) !important;
+  background: var(--glymize-accent-soft-strong) !important;
+  color: var(--glymize-accent-700) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--glymize-accent-500) 14%, transparent) !important;
+}
+
+.glymize-internal-shell button.secondary:not(:disabled):hover,
+.glymize-internal-shell [class*="secondary"]:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--glymize-accent-500) 48%, var(--glymize-line)) !important;
+  background: var(--glymize-accent-soft) !important;
+  color: var(--glymize-accent-700) !important;
+}
+
+.glymize-internal-shell button[class*="danger" i]:not(:disabled):hover,
+.glymize-internal-shell a[class*="danger" i]:hover {
+  border-color: color-mix(in srgb, var(--ds-danger) 58%, var(--glymize-line)) !important;
+  background: var(--ds-danger-bg) !important;
+  color: var(--ds-danger) !important;
+  box-shadow: none !important;
+}
+
+/* Dark-mode bridge for legacy Type 2 surfaces with hard-coded light colors. */
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] .page-content main {
+  --ink: var(--glymize-ink);
+  --muted: var(--glymize-muted);
+  --line: var(--glymize-line);
+  --paper: var(--glymize-surface);
+  --canvas: var(--glymize-canvas);
+  --teal: var(--glymize-accent-600);
+  --teal-dark: var(--glymize-accent-700);
+  --teal-soft: var(--glymize-accent-soft);
+  color: var(--glymize-ink) !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] :is(
+  [class*="formCard"], [class*="resultPanel"], [class*="panel"], [class*="section"],
+  [class*="medCard"], [class*="medRow"], [class*="scenarioCard"], [class*="scenarioMed"],
+  [class*="factor"], [class*="choice"], [class*="radioCard"], [class*="workflowBanner"],
+  [class*="contextBox"], [class*="costBox"], [class*="insurance"], [class*="rationale"],
+  [class*="check"]
+) {
+  border-color: var(--glymize-line) !important;
+  background: var(--glymize-surface) !important;
+  color: var(--glymize-ink) !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] :is(
+  input, select, textarea, [class*="measure"], [class*="costNumbers"] > div, [class*="field"] > div
+) {
+  border-color: var(--glymize-line) !important;
+  background: var(--glymize-surface-soft) !important;
+  color: var(--glymize-ink) !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] :is(h1,h2,h3,strong,label,b) {
+  color: var(--glymize-ink) !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] :is(p,small) {
+  color: var(--glymize-muted) !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] :is(
+  [class*="primaryButton"], [class*="submitBar"] button,
+  [class*="factorCardActive"] [class*="factorButton"], [class*="choiceActive"],
+  [class*="sectionNumber"], [class*="rank"]
+) {
+  border-color: var(--glymize-accent-500) !important;
+  background: var(--glymize-accent-600) !important;
+  color: #fff !important;
+}
+
+html[data-glymize-mode="dark"] .glymize-internal-shell[data-route="type-2"] :is(
+  [class*="primaryButton"], [class*="submitBar"] button,
+  [class*="factorCardActive"] [class*="factorButton"], [class*="choiceActive"],
+  [class*="sectionNumber"], [class*="rank"]
+) :is(strong,small,b,span) {
+  color: inherit !important;
+}
+
+/* Admin follows the same readability contract. */
+.glymize-internal-shell[data-route="admin"] [class*="hero"] p,
+.glymize-internal-shell[data-route="admin"] [class*="sectionHeading"] p,
+.glymize-internal-shell[data-route="admin"] [class*="managementCard"] p,
+.glymize-internal-shell[data-route="admin"] [class*="advancedBody"] p,
+.glymize-internal-shell[data-route="admin"] [class*="saveBar"] p {
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.8 !important;
+}
+
+.glymize-internal-shell[data-route="admin"] [class*="quickAction"] small,
+.glymize-internal-shell[data-route="admin"] [class*="metric"] small,
+.glymize-internal-shell[data-route="admin"] [class*="evidenceCard"] p,
+.glymize-internal-shell[data-route="admin"] [class*="protocolCard"] small,
+.glymize-internal-shell[data-route="admin"] [class*="toggleRow"] small,
+.glymize-internal-shell[data-route="admin"] [class*="identityGrid"] small {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  line-height: 1.7 !important;
+}
+
+@media (max-width: 760px) {
+  .glymize-internal-shell .page-content article p,
+  .glymize-internal-shell .page-content section > p,
+  .glymize-internal-shell .page-content section > div > p {
+    font-size: 14.5px !important;
+  }
+}

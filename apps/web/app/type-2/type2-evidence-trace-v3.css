@@ -1,0 +1,38 @@
+@media(min-width:1000px){
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] .type2-v3-frame{
+    max-width:1500px;margin:0 auto;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] .type2-v3-stepper{
+    max-width:1180px;margin-inline:auto;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] main[class*="page"]{
+    max-width:1450px!important;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="workspace"]{
+    grid-template-columns:minmax(0,1fr) 360px!important;gap:20px!important;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="summaryRail"]{
+    display:block!important;position:sticky!important;top:92px!important;
+    background:linear-gradient(160deg,#102f35,#173f47)!important;
+    border:1px solid color-mix(in srgb,var(--glymize-accent-400) 24%,transparent);
+    box-shadow:0 18px 50px rgba(7,43,48,.18)!important;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] form[class*="form"]>section[class*="section"]{
+    box-shadow:none!important;
+    border-color:color-mix(in srgb,var(--glymize-line) 88%,var(--glymize-accent-300))!important;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="scenarioCard"]{
+    display:flex;flex-direction:column;gap:0;border-radius:20px!important;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="scenarioHead"]{order:0}
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="explainGrid"]{
+    order:1;margin-top:16px!important;grid-template-columns:1fr 1fr!important;
+  }
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="scenarioMeds"]{order:2}
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="parallel"]{order:3}
+  .glymize-internal-shell[data-route="type-2"][data-layout-preset="evidence_trace"] [class*="engineDetails"]{
+    margin-top:18px!important;border:1px solid var(--glymize-accent-500)!important;
+    border-radius:16px!important;
+    background:color-mix(in srgb,var(--glymize-surface) 90%,var(--glymize-accent-soft))!important;
+  }
+}

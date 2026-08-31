@@ -1,18 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import {
-  createCipheriv,
   createDecipheriv,
   createHash,
   createHmac,
-  randomBytes,
-  randomUUID,
 } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type {
   PatientCodeKind,
   PatientHandoffRecord,
-  PatientHandoffUpsertInput,
 } from "@glymize/contracts";
 
 interface StoredPatientHandoffRecord {
@@ -44,15 +40,6 @@ function normalizeCode(value: string) {
   return toAsciiDigits(value).trim().toUpperCase().replace(/[\s\-_/\\.]+/g, "");
 }
 
-function isValidIranianNationalId(value: string) {
-  const code = normalizeCode(value);
-  if (!/^\d{10}$/.test(code) || /^(\d)\1{9}$/.test(code)) return false;
-  const check = Number(code[9]);
-  const sum = code.slice(0, 9).split("").reduce((total, digit, index) => total + Number(digit) * (10 - index), 0);
-  const remainder = sum % 11;
-  return check === (remainder < 2 ? remainder : 11 - remainder);
-}
-
 function requireSecret(name: "hash" | "encryption") {
   const value = name === "hash"
     ? (process.env.PATIENT_HANDOFF_HASH_KEY ?? process.env.PATIENT_HANDOFF_TOKEN)
@@ -69,20 +56,6 @@ function encryptionKey() {
   return createHash("sha256").update(requireSecret("encryption"), "utf8").digest();
 }
 
-function encryptRecord(record: PatientHandoffRecord, patientCodeHash: string): StoredPatientHandoffRecord {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
-  cipher.setAAD(Buffer.from(patientCodeHash, "utf8"));
-  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(record), "utf8"), cipher.final()]);
-  return {
-    patientCodeHash,
-    patientCodeKind: record.patientCodeKind,
-    iv: iv.toString("base64"),
-    authTag: cipher.getAuthTag().toString("base64"),
-    ciphertext: ciphertext.toString("base64"),
-  };
-}
-
 function decryptRecord(record: StoredPatientHandoffRecord): PatientHandoffRecord {
   const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(record.iv, "base64"));
   decipher.setAAD(Buffer.from(record.patientCodeHash, "utf8"));
@@ -94,18 +67,12 @@ function decryptRecord(record: StoredPatientHandoffRecord): PatientHandoffRecord
   return JSON.parse(plaintext) as PatientHandoffRecord;
 }
 
-function maskCode(normalized: string) {
-  const visible = normalized.slice(-4);
-  return `${"•".repeat(Math.max(4, Math.min(8, normalized.length - visible.length)))}${visible}`;
-}
-
 @Injectable()
 export class PatientHandoffService {
   private readonly filePath = process.env.PATIENT_HANDOFF_DATA_PATH
     ? resolve(process.env.PATIENT_HANDOFF_DATA_PATH)
     : resolve(process.cwd(), ".local-data", "patient-handoffs.json");
 
-  private writeChain: Promise<void> = Promise.resolve();
 
   private async readStore(): Promise<PatientHandoffStore> {
     try {
@@ -118,52 +85,6 @@ export class PatientHandoffService {
       if (code === "ENOENT") return { schemaVersion: 2, records: [] };
       throw error;
     }
-  }
-
-  private async writeStore(store: PatientHandoffStore) {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    const temp = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
-    await writeFile(temp, `${JSON.stringify(store, null, 2)}\n`, "utf8");
-    await rename(temp, this.filePath);
-  }
-
-  async upsert(input: PatientHandoffUpsertInput): Promise<PatientHandoffRecord> {
-    const normalized = normalizeCode(input.patientCode);
-    if (normalized.length < 3 || normalized.length > 64) throw new Error("INVALID_PATIENT_CODE");
-    if (input.patientCodeKind === "national_id" && !isValidIranianNationalId(normalized)) throw new Error("INVALID_NATIONAL_ID");
-    const patientCodeHash = hashCode(input.patientCodeKind, normalized);
-    let saved!: PatientHandoffRecord;
-
-    // A failed disk write must not poison every later handoff save. Recover the queue, then serialize the next write.
-    this.writeChain = this.writeChain.catch(() => undefined).then(async () => {
-      const store = await this.readStore();
-      const existingIndex = store.records.findIndex((item) => item.patientCodeHash === patientCodeHash);
-      const existing = existingIndex >= 0 ? decryptRecord(store.records[existingIndex]!) : undefined;
-      const now = new Date().toISOString();
-      saved = {
-        id: existing?.id ?? randomUUID(),
-        patientCodeKind: input.patientCodeKind,
-        patientCodeDisplay: maskCode(normalized),
-        firstName: input.firstName?.trim() || undefined,
-        lastName: input.lastName?.trim() || undefined,
-        status: input.status ?? "ready_for_physician",
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-        revision: (existing?.revision ?? 0) + 1,
-        vitals: input.vitals ?? {},
-        clinicalFlags: input.clinicalFlags ?? {},
-        labs: input.labs ?? [],
-        medications: input.medications ?? [],
-        nurseNotes: input.nurseNotes?.trim() || undefined,
-        ocrText: input.ocrText,
-      };
-      const encrypted = encryptRecord(saved, patientCodeHash);
-      if (existingIndex >= 0) store.records[existingIndex] = encrypted;
-      else store.records.push(encrypted);
-      await this.writeStore(store);
-    });
-    await this.writeChain;
-    return saved;
   }
 
   async lookup(patientCode: string): Promise<PatientHandoffRecord | undefined> {

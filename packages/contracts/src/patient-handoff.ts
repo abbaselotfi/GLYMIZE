@@ -1,6 +1,9 @@
 export type PatientCodeKind = "file_number" | "national_id" | "other";
 export type PatientHandoffStatus = "draft" | "ready_for_physician" | "reviewed";
 export type VerificationState = "unverified" | "confirmed" | "rejected";
+export type LabInterpretation = "N" | "H" | "L" | "HH" | "LL" | "A";
+export type LabObservationSource = "manual" | "ocr" | "pdf_text" | "import";
+export type PatientReportedSex = "male" | "female";
 
 export interface PatientHandoffMedication {
   genericMedicationId?: string;
@@ -16,12 +19,19 @@ export interface PatientHandoffMedication {
 export interface PatientHandoffLab {
   id: string;
   canonicalKey?: string;
+  canonicalName?: string;
   rawName: string;
   value?: number;
   valueText?: string;
   unit?: string;
+  specimen?: string;
   referenceRange?: string;
+  referenceLow?: number;
+  referenceHigh?: number;
   observedAt?: string;
+  sourceKind?: LabObservationSource;
+  interpretation?: LabInterpretation;
+  interpretationSource?: "ocr" | "manual";
   ocrConfidence?: number;
   parserConfidence?: number;
   verification: VerificationState;
@@ -36,6 +46,41 @@ export interface PatientHandoffVitals {
   diastolicBp?: number;
   pulseBpm?: number;
 }
+
+export interface PatientHandoffDemographics {
+  /**
+   * Encounter-reported age from a source such as a laboratory report.
+   * Patient Record v2 should prefer a verified date of birth when available.
+   */
+  reportedAgeYears?: number;
+  /**
+   * Sex explicitly reported on an encounter/source document.
+   * This is not a substitute for a verified longitudinal demographic field.
+   */
+  reportedSex?: PatientReportedSex;
+}
+
+export type PatientHandoffStructuredField =
+  | "firstName"
+  | "lastName"
+  | "nationalId"
+  | "reportedAgeYears"
+  | "reportedSex"
+  | "weightKg"
+  | "heightCm";
+
+export interface PatientHandoffFieldProvenance {
+  sourceKind: "manual" | "ocr" | "pdf_text" | "import";
+  sourceDocumentName?: string;
+  sourcePage?: number;
+  ocrConfidence?: number;
+  parserConfidence?: number;
+  verification: VerificationState;
+}
+
+export type PatientHandoffFieldProvenanceMap = Partial<
+  Record<PatientHandoffStructuredField, PatientHandoffFieldProvenance>
+>;
 
 export interface PatientHandoffClinicalFlags {
   ascvd?: boolean;
@@ -57,6 +102,8 @@ export interface PatientHandoffRecord {
   createdAt: string;
   updatedAt: string;
   revision: number;
+  demographics?: PatientHandoffDemographics;
+  patientFieldProvenance?: PatientHandoffFieldProvenanceMap;
   vitals: PatientHandoffVitals;
   clinicalFlags: PatientHandoffClinicalFlags;
   labs: PatientHandoffLab[];
@@ -65,12 +112,70 @@ export interface PatientHandoffRecord {
   ocrText?: string;
 }
 
+export interface PatientHandoffArchiveItem {
+  id: string;
+  patientCodeKind: PatientCodeKind;
+  patientCodeDisplay: string;
+  status: PatientHandoffStatus;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PatientHandoffArchivePage {
+  items: PatientHandoffArchiveItem[];
+  nextCursor: string | null;
+}
+
+export type PatientHandoffWriteMode = "create" | "update";
+
+export interface PatientHandoffExistingSummary {
+  id: string;
+  patientCodeKind: PatientCodeKind;
+  patientCodeDisplay: string;
+  firstName?: string;
+  lastName?: string;
+  demographics?: PatientHandoffDemographics;
+  revision: number;
+  updatedAt: string;
+}
+
+export interface PatientHandoffCodeSuggestion {
+  /**
+   * Last occupied code in the contiguous sequence probed from the
+   * duplicate code. This is not a global practice-wide maximum.
+   */
+  lastOccupiedCode: string;
+  /** First free numeric file number found immediately after that sequence. */
+  suggestedCode: string;
+  /** Advisory result; the server must recheck on save. */
+  checkedAt: string;
+}
+
+export interface PatientHandoffCodeStatus {
+  available: boolean;
+  patientCodeKind: PatientCodeKind;
+  existing?: PatientHandoffExistingSummary;
+  suggestion?: PatientHandoffCodeSuggestion;
+}
+
 export interface PatientHandoffUpsertInput {
   patientCode: string;
   patientCodeKind: PatientCodeKind;
+  /**
+   * Missing mode is treated by the server as create-only for backward
+   * compatibility. It must never mean blind overwrite.
+   */
+  writeMode?: PatientHandoffWriteMode;
+  /** Required by the server when writeMode is "update". */
+  expectedRecordId?: string;
+  /** Optimistic-concurrency guard required for updates. */
+  expectedRevision?: number;
   firstName?: string;
   lastName?: string;
   status?: PatientHandoffStatus;
+  demographics?: PatientHandoffDemographics;
+  patientFieldProvenance?: PatientHandoffFieldProvenanceMap;
   vitals?: PatientHandoffVitals;
   clinicalFlags?: PatientHandoffClinicalFlags;
   labs?: PatientHandoffLab[];
@@ -81,7 +186,9 @@ export interface PatientHandoffUpsertInput {
 
 export interface PatientHandoffLookupInput {
   patientCode: string;
+  patientCodeKind?: PatientCodeKind;
 }
+
 
 export interface PatientHandoffLookupResult {
   found: boolean;

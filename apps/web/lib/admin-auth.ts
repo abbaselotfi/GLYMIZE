@@ -1,9 +1,15 @@
+import { getRuntimeAccessToken, initializeRuntimeSession } from "./runtime-client";
+import type { RuntimePermission } from "./runtime-permissions";
+
 const adminApiUrl = (process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "").replace(/\/$/, "");
 const sessionStorageKey = "glymize-admin-session";
 
 export interface AdminIdentity {
   login: string;
   expiresAt: string;
+  source: "github" | "runtime";
+  userId?: string;
+  permissions: RuntimePermission[];
 }
 
 export interface CatalogPublishResult {
@@ -36,6 +42,17 @@ export function clearAdminSession() {
   window.sessionStorage.removeItem(sessionStorageKey);
 }
 
+export function getAdminBearerToken() {
+  return getAdminSession() ?? getRuntimeAccessToken();
+}
+
+export async function getFreshAdminBearerToken() {
+  const github = getAdminSession();
+  if (github) return github;
+  await initializeRuntimeSession(true).catch(() => null);
+  return getRuntimeAccessToken();
+}
+
 export function getAdminLoginUrl(returnTo: string) {
   if (!adminApiUrl) return "";
   const url = new URL(`${adminApiUrl}/auth/start`);
@@ -44,7 +61,7 @@ export function getAdminLoginUrl(returnTo: string) {
 }
 
 async function authenticatedFetch(path: string, init?: RequestInit) {
-  const session = getAdminSession();
+  const session = await getFreshAdminBearerToken();
   if (!adminApiUrl || !session) throw new Error("admin_auth_required");
   const headers = new Headers(init?.headers);
   headers.set("authorization", `Bearer ${session}`);
@@ -55,7 +72,7 @@ async function authenticatedFetch(path: string, init?: RequestInit) {
 export async function getAdminIdentity(): Promise<AdminIdentity> {
   const response = await authenticatedFetch("/session");
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) clearAdminSession();
+    if ((response.status === 401 || response.status === 403) && getAdminSession()) clearAdminSession();
     throw new Error("admin_auth_invalid");
   }
   return response.json() as Promise<AdminIdentity>;
@@ -68,7 +85,7 @@ export async function publishAdminCatalog(catalog: unknown): Promise<CatalogPubl
   });
   const result = await response.json() as CatalogPublishResult & { error?: string };
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) clearAdminSession();
+    if ((response.status === 401 || response.status === 403) && getAdminSession()) clearAdminSession();
     throw new Error(result.error ?? "catalog_publish_failed");
   }
   return result;
