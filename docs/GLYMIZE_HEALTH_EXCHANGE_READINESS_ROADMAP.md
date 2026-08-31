@@ -1232,3 +1232,16 @@ Iranian national/payer/operator requirements must be added to the external-requi
 - No unsupported regulatory/certification claim is made.
 
 This document is a normative extension of the GLYMIZE clinical product roadmap and must be consulted whenever future work touches physician identity, patient identifiers, medication/service coding, consent, Final Plan signing, insurance, external APIs, e-prescription, national health exchange, interoperability, security or regulated-software readiness.
+---
+
+## Patient Care Hub companion roadmap
+
+Patient identity, provider discovery/referral, scheduling, telehealth, notifications and future patient-to-physician payment readiness are specified separately in:
+
+`docs/GLYMIZE_PATIENT_CARE_HUB_ROADMAP.md`
+
+Boundary rule:
+
+- health-exchange / insurance / e-prescription integrations remain external-provider adapters;
+- patient service-fee payment is a separate provider-neutral payment domain;
+- neither domain may leak vendor-specific identifiers or credentials into the deterministic clinical core.
