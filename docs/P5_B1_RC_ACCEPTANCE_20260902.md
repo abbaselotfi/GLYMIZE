@@ -55,6 +55,8 @@ An unauthenticated provider listing fails closed with
 - Production build: PASS (`5/5` tasks, `32` static routes)
 - Admin Worker tests: PASS (`20` files, `138` tests)
 - Clinical Engine tests: PASS (`23` files, `196` tests)
+- GitHub Actions runtime validation: PASS
+  ([run `33629077155`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/33629077155))
 - Complete local D1 migration chain `0001` through `0011`: PASS
 - Local D1 foreign-key check: PASS
 - Authenticated local save/hide/publish/search/detail flow: PASS
@@ -77,8 +79,9 @@ credential suite passed immediately when rerun alone (`20/20` files,
   foundation and no user-facing directory route.
 - PR #19 is intentionally stacked on PR #18 and must not merge ahead of its
   dependency.
-- CI/review and a separate activation decision remain required before any
-  production migration or public enablement.
+- GitHub Actions validation passed; PR/dependency review and a separate
+  activation decision remain required before any production migration or
+  public enablement.
 
 The next Roadmap task is P5-B2: a practice-scoped, unpredictable, hashed,
 expiring, revocable, bounded-use and audited Referral Service/QR contract. Code
