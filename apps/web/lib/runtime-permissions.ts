@@ -12,6 +12,7 @@ export const DATA_ACTION_PERMISSIONS = [
   { key: "handoff.read", fa: "مشاهده handoff بیمار", en: "Read patient handoff" },
   { key: "handoff.write", fa: "ثبت/ویرایش handoff بیمار", en: "Write patient handoff" },
   { key: "referrals.manage", fa: "مدیریت کد ارجاع", en: "Manage referral codes" },
+  { key: "care_relationships.manage", fa: "مدیریت ارتباط درمانی", en: "Manage care relationships" },
 ] as const;
 
 export const ADMIN_PAGE_PERMISSIONS = [
@@ -35,7 +36,8 @@ export type AssistantPermission =
   | "care_team"
   | "handoff.read"
   | "handoff.write"
-  | "referrals.manage";
+  | "referrals.manage"
+  | "care_relationships.manage";
 
 export type AdminPermission =
   | "admin.center"
@@ -60,6 +62,7 @@ export const ASSISTANT_PERMISSION_KEYS: readonly AssistantPermission[] = [
   "handoff.read",
   "handoff.write",
   "referrals.manage",
+  "care_relationships.manage",
 ];
 
 export const ADMIN_PERMISSION_KEYS: readonly AdminPermission[] =
