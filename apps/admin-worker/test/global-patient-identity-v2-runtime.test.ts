@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
+import { patientIdentityRoute } from "../src/platform-patient-identity";
 
 const runtime = fs.readFileSync(
   new URL("../src/platform-patient-identity.ts", import.meta.url),
@@ -18,6 +19,20 @@ describe("P5-A3 PatientIdentityService runtime contract", () => {
     expect(runtime).toContain("PATIENT_SMS_OTP_ENABLED");
     expect(runtime).toContain('error: "patient_identity_disabled"');
     expect(runtime).toContain('error: "self_registration_disabled"');
+  });
+
+  it("returns a bodyless CORS preflight for an allowed origin", async () => {
+    const origin = "https://rc.example.test";
+    const response = await patientIdentityRoute(
+      new Request("https://worker.example.test/v1/patient-identity/capabilities", {
+        method: "OPTIONS",
+        headers: { origin },
+      }),
+      { ADMIN_ORIGIN: origin, SESSION_SECRET: "test-only-session-secret" },
+    );
+    expect(response?.status).toBe(204);
+    expect(response?.headers.get("access-control-allow-origin")).toBe(origin);
+    expect(await response?.text()).toBe("");
   });
 
   it("uses national ID only as a protected identifier", () => {

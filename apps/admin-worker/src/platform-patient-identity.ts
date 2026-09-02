@@ -65,7 +65,7 @@ function enabled(value: unknown) {
 
 function reply(request: Request, env: V3Env, body: unknown, status = 200) {
   const origin = request.headers.get("origin");
-  return new Response(JSON.stringify(body), {
+  return new Response(status === 204 ? null : JSON.stringify(body), {
     status,
     headers: {
       ...(isRuntimeOriginAllowed(origin, env)
