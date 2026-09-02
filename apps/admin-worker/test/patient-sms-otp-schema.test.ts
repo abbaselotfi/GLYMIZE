@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
+import { patientIdentityRoute } from "../src/platform-patient-identity";
 
 const migration = fs.readFileSync(
   new URL("../migrations/0010_patient_sms_otp_schema.sql", import.meta.url),
@@ -9,11 +10,6 @@ const runtime = fs.readFileSync(
   new URL("../src/platform-patient-identity.ts", import.meta.url),
   "utf8",
 );
-const staging = fs.readFileSync(
-  new URL("../wrangler.staging.jsonc", import.meta.url),
-  "utf8",
-);
-
 describe("P5-A provider-neutral patient SMS OTP schema", () => {
   it("stores only hashed destination and code material", () => {
     expect(migration).toContain("destination_lookup_hash TEXT NOT NULL");
@@ -29,8 +25,15 @@ describe("P5-A provider-neutral patient SMS OTP schema", () => {
     expect(sql).not.toMatch(/provider|sms\.ir|kavenegar/i);
   });
 
-  it("keeps the runtime capability OFF and exposes no OTP route", () => {
-    expect(staging).toContain('"PATIENT_SMS_OTP_ENABLED": "false"');
+  it("keeps the runtime capability OFF by default and exposes no OTP route", async () => {
+    const response = await patientIdentityRoute(
+      new Request("https://worker.example.test/v1/patient-identity/capabilities"),
+      {
+        ADMIN_ORIGIN: "https://rc.example.test",
+        SESSION_SECRET: "test-only-session-secret",
+      },
+    );
+    expect(await response?.json()).toMatchObject({ smsOtp: false });
     expect(runtime).toContain("PATIENT_SMS_OTP_ENABLED");
     expect(runtime).not.toMatch(/patient-identity\/(auth\/)?otp/);
   });
