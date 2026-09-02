@@ -69,7 +69,7 @@ origin CORS preflight returns `204` with an empty body.
 - Audit/security-event verification: PASS
 - Diff and secret-pattern checks: PASS
 - GitHub Actions runtime validation: PASS
-  ([run `33656789422`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/33656789422))
+  ([run `33657054724`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/33657054724))
 
 ## Isolation and remaining release gates
 
