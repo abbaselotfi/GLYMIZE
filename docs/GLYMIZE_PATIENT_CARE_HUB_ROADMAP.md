@@ -708,6 +708,11 @@ Finish current Patient Record v2 / Portal release work:
 
 ### P5-A â€” Patient Identity v2 and entry separation
 
+Implementation checkpoint (2026-09-02): RC PASS with all new public
+capabilities still OFF. See
+[`P5_A_RC_ACCEPTANCE_20260902.md`](./P5_A_RC_ACCEPTANCE_20260902.md). PR
+CI/review and manual Preview review remain the merge gate before P5-B.
+
 - separate patient vs physician/assistant landing entry;
 - patient-only shell;
 - global patient account;
