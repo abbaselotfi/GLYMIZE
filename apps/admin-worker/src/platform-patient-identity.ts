@@ -183,6 +183,17 @@ async function requirePatientIdentity(
   return account?.status === "active" ? { access, account } : null;
 }
 
+export async function requirePatientAccountSession(request: Request, env: V3Env) {
+  const auth = await requirePatientIdentity(request, env);
+  return auth
+    ? {
+        patientAccountId: auth.account.id,
+        proofingStatus: auth.account.proofing_status,
+        sessionId: auth.access.sessionId,
+      }
+    : null;
+}
+
 function legacyLinkSummary(row: LegacyLinkRow) {
   return {
     portalUserId: row.portal_user_id,

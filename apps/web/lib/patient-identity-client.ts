@@ -99,7 +99,7 @@ export function refreshPatientIdentitySession() {
   return operation;
 }
 
-async function identityFetch(path: string, init: RequestInit = {}, retry = true) {
+export async function patientIdentityFetch(path: string, init: RequestInit = {}, retry = true) {
   const headers: Record<string, string> = {
     ...((init.headers as Record<string, string>) ?? {}),
   };
@@ -108,7 +108,7 @@ async function identityFetch(path: string, init: RequestInit = {}, retry = true)
   if (init.body) headers["content-type"] = "application/json";
   const response = await fetch(`${runtimeApiUrl}${path}`, { ...init, headers });
   if (response.status === 401 && retry && await refreshPatientIdentitySession()) {
-    return identityFetch(path, init, false);
+    return patientIdentityFetch(path, init, false);
   }
   return response;
 }
@@ -152,13 +152,13 @@ export async function loginPatientIdentity(input: PatientIdentityLoginInput) {
 }
 
 export async function getPatientIdentitySession() {
-  const response = await identityFetch("/v1/patient-identity/session");
+  const response = await patientIdentityFetch("/v1/patient-identity/session");
   if (!response.ok) return null;
   return response.json() as Promise<PatientIdentitySessionView>;
 }
 
 export async function listVerifiedPatientLegacyLinks() {
-  const response = await identityFetch("/v1/patient-identity/links");
+  const response = await patientIdentityFetch("/v1/patient-identity/links");
   if (!response.ok) {
     throw new Error(await errorOf(response, "PATIENT_IDENTITY_LINKS_FAILED"));
   }
@@ -170,7 +170,7 @@ export async function exchangeVerifiedPatientLegacyLink(
   portalUserId: string,
   rememberMe: boolean,
 ) {
-  const response = await identityFetch(
+  const response = await patientIdentityFetch(
     `/v1/patient-identity/links/${encodeURIComponent(portalUserId)}/portal-session`,
     {
       method: "POST",
@@ -188,7 +188,7 @@ export async function exchangeVerifiedPatientLegacyLink(
 
 export async function logoutPatientIdentity() {
   try {
-    await identityFetch("/v1/patient-identity/auth/logout", { method: "POST" }, false);
+    await patientIdentityFetch("/v1/patient-identity/auth/logout", { method: "POST" }, false);
   } finally {
     clearPatientIdentitySession();
   }

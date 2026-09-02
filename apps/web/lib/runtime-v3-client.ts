@@ -18,6 +18,7 @@ export interface RuntimeV3Capabilities{
   patientPortal:boolean;
   patientIdentityV2:boolean;
   providerDirectory:boolean;
+  referralService:boolean;
 }
 
 function deviceLabel(){
@@ -42,6 +43,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
     patientPortal:false,
     patientIdentityV2:false,
     providerDirectory:false,
+    referralService:false,
   };
 
   if(!runtimeApiUrl)return empty;
@@ -66,6 +68,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
       patientPortal:result.capabilities?.patientPortal===true,
       patientIdentityV2:result.capabilities?.patientIdentityV2===true,
       providerDirectory:result.capabilities?.providerDirectory===true,
+      referralService:result.capabilities?.referralService===true,
     };
   }catch{
     return empty;
