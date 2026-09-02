@@ -68,6 +68,10 @@ function storeSession(
     );
   }
 }
+
+export function adoptPortalSession(session: PortalLoginResponse) {
+  storeSession(session);
+}
 export function clearPortalSession() {
   if (!browser()) return;
   window.sessionStorage.removeItem(accessKey);

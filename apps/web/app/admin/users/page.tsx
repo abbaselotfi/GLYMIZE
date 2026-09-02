@@ -18,6 +18,7 @@ import {
  type RuntimePermission,
 } from "../../../lib/runtime-permissions";
 import { useGlymizeLocale } from "../../components/use-glymize-locale";
+import PatientIdentityAdminPanel from "./patient-identity-admin-panel";
 import styles from "./admin-users.module.css";
 
 export default function AdminUsersPage(){
@@ -102,6 +103,8 @@ export default function AdminUsersPage(){
 
  return <main className={styles.page} dir={isRtl?"rtl":"ltr"}>
   <section className={styles.hero}><div><span>IDENTITY & ACCESS</span><h1>{fa?"کاربران و کنترل دسترسی":"Users & access control"}</h1><p>{fa?"مدیریت حساب پزشکان و اعضای تیم مراقبت؛ مدیریت می‌تواند پزشک را مستقل از سرویس نظام پزشکی ایجاد کند. حذف حساب، دسترسی و شناسه‌ها را قطع می‌کند و در صورت وجود سابقه بالینی فقط یک رکورد ناشناس برای حفظ یکپارچگی ارجاعات باقی می‌گذارد.":"Manage physician and care-team accounts. Admins can create physicians independently of the Medical Council adapter. Account deletion removes access and identifiers; when clinical history depends on the identity, only an anonymized tombstone is retained for referential integrity."}</p></div><div className={styles.stat}><b>{activeCount}</b><small>{fa?"حساب فعال":"active accounts"}</small></div></section>
+
+  <PatientIdentityAdminPanel />
 
   {!checked?<div className={styles.notice}>{fa?"در حال بررسی سرویس مدیریت کاربران…":"Checking user-management service…"}</div>:!enabled?<div className={styles.notice}>{fa?"Runtime هنوز قابلیت مدیریت کاربران را فعال نکرده است.":"This runtime has not enabled Admin Users yet."}</div>:<>
    <div className={styles.toolbar}>

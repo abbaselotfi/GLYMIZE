@@ -1,0 +1,30 @@
+.state {
+  display: grid;
+  width: min(620px, calc(100% - 28px));
+  min-height: 150px;
+  place-content: center;
+  gap: 8px;
+  margin: 54px auto;
+  padding: 24px;
+  border: 1px solid rgba(18, 56, 61, 0.12);
+  border-radius: 18px;
+  color: #587477;
+  background: rgba(255, 255, 255, 0.88);
+  text-align: center;
+}
+
+.state strong { color: #12383d; }
+.state span { font-size: 0.84rem; }
+
+.switchBack {
+  display: block;
+  min-height: 40px;
+  margin: 16px auto 0;
+  border: 1px solid rgba(8, 125, 117, 0.24);
+  border-radius: 10px;
+  padding: 8px 14px;
+  color: #087d75;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 750;
+}

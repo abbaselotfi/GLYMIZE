@@ -367,7 +367,7 @@ export default function PortalClient() {
       <main className={styles.page} dir={fa ? "rtl" : "ltr"}>
         <div className={styles.card}>
           <h1 className={styles.title}>
-            GLYMIZE — {fa ? "پرتال بیمار" : "Patient Portal"}
+            {fa ? "ورود به پرتال بیمار" : "Patient portal sign in"}
           </h1>
           <label className={styles.label}>
             {fa ? "موبایل یا ایمیل" : "Mobile or email"}
@@ -461,7 +461,7 @@ export default function PortalClient() {
     <main className={styles.page} dir={fa ? "rtl" : "ltr"}>
       <header className={styles.header}>
         <h1 className={styles.title}>
-          GLYMIZE — {fa ? "پرتال بیمار" : "Patient Portal"}
+          {fa ? "پرتال بیمار" : "Patient Portal"}
         </h1>
         <button className={styles.ghost} onClick={() => void handleLogout()}>
           {fa ? "خروج" : "Sign out"}

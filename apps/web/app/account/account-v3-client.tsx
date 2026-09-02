@@ -29,6 +29,8 @@ const EMPTY_CAPS:RuntimeV3Capabilities={
  assistantPasswordLogin:false,
  passwordSetup:false,
  adminUsers:false,
+ patientPortal:false,
+ patientIdentityV2:false,
 };
 
 export default function AccountV3Client(){

@@ -18,10 +18,12 @@ import {
   normalizeIranMobile,
   normalizeMedicalCouncilCode,
   normalizePatientCode,
+  openAuthPayload,
   openPayload,
   randomToken,
   sanitizeAssistantPermissions,
   sanitizeRuntimePermissions,
+  sealAuthPayload,
   sealPayload,
   sha256Hex,
   validLayoutPreset,
@@ -49,6 +51,9 @@ interface Env {
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
   SESSION_SECRET: string;
+  AUTH_TOKEN_SECRET?: string;
+  AUTH_TOKEN_SECRET_PREVIOUS?: string;
+  AUTH_TOKEN_ALLOW_LEGACY_SESSION_SECRET?: string;
   AI_CONFIG_KV: KVNamespace;
   AI_CONFIG_MASTER_KEY: string;
   AI_RUNTIME_SHARED_SECRET: string;
@@ -254,13 +259,13 @@ async function readRuntimeUser(env: Env, userId: string, practiceId: string): Pr
 
 async function issueAccessToken(env: Env, user: RuntimeUser, sessionId: string) {
   const expiresAt = Date.now() + 20 * 60 * 1000;
-  const sealed = await sealPayload({
+  const sealed = await sealAuthPayload({
     kind: "runtime_access",
     userId: user.id,
     practiceId: user.practiceId,
     sessionId,
     expiresAt,
-  } satisfies AccessPayload, env.SESSION_SECRET, "RUNTIME-ACCESS-V1");
+  } satisfies AccessPayload, env, "RUNTIME-ACCESS-V1");
   return {
     accessToken: `${sealed.iv}.${sealed.ciphertext}`,
     accessExpiresAt: new Date(expiresAt).toISOString(),
@@ -270,7 +275,7 @@ async function issueAccessToken(env: Env, user: RuntimeUser, sessionId: string) 
 async function decodeAccessToken(env: Env, token: string) {
   const [iv, ciphertext, extra] = token.split(".");
   if (!iv || !ciphertext || extra) return null;
-  const payload = await openPayload<AccessPayload>({ iv, ciphertext }, env.SESSION_SECRET, "RUNTIME-ACCESS-V1");
+  const payload = await openAuthPayload<AccessPayload>({ iv, ciphertext }, env, "RUNTIME-ACCESS-V1");
   if (!payload || payload.kind !== "runtime_access" || payload.expiresAt <= Date.now()) return null;
   return payload;
 }
@@ -304,16 +309,16 @@ function hasPermission(user: RuntimeUser, permission: AssistantPermission) {
   return user.permissions.includes(permission);
 }
 
-async function issueSession(env: Env, user: RuntimeUser, rememberMe: boolean, deviceLabel?: string) {
+async function issueSession(env: Env, user: RuntimeUser, rememberMe: boolean, deviceLabel?: string, familyId?: string, parentTokenId?: string) {
   const sessionId = crypto.randomUUID();
   const refreshToken = randomToken(32);
   const refreshHash = await sha256Hex(refreshToken);
   const ttlMs = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
   const refreshExpiresAt = new Date(Date.now() + ttlMs).toISOString();
-  await db(env).prepare(
+  const insert = db(env).prepare(
     `INSERT INTO refresh_tokens
-     (id, user_id, practice_id, token_hash, persistent, expires_at, revoked_at, created_at, last_used_at, device_label)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+     (id, user_id, practice_id, token_hash, persistent, expires_at, revoked_at, created_at, last_used_at, device_label, family_id, parent_token_id)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
   ).bind(
     sessionId,
     user.id,
@@ -324,7 +329,26 @@ async function issueSession(env: Env, user: RuntimeUser, rememberMe: boolean, de
     nowIso(),
     nowIso(),
     String(deviceLabel ?? "").slice(0, 180) || null,
-  ).run();
+    familyId ?? sessionId,
+    parentTokenId ?? null,
+  );
+  if (parentTokenId) {
+    const rotatedAt = nowIso();
+    const consumed = await db(env).prepare(
+      `UPDATE refresh_tokens
+       SET revoked_at=?,last_used_at=?,replaced_by_token_id=?
+       WHERE id=? AND revoked_at IS NULL`,
+    ).bind(rotatedAt, rotatedAt, sessionId, parentTokenId).run();
+    if ((consumed.meta.changes ?? 0) !== 1) {
+      throw new Error("refresh_token_rotation_conflict");
+    }
+    // Consume the parent before creating its child. A concurrent logout or
+    // refresh therefore fails closed and can never leave an unreturned live
+    // child session behind.
+    await insert.run();
+  } else {
+    await insert.run();
+  }
   return {
     ...(await issueAccessToken(env, user, sessionId)),
     refreshToken,
@@ -344,20 +368,41 @@ async function refreshSession(request: Request, env: Env) {
   if (token.length < 32 || token.length > 200) return json(request, env, { error: "invalid_refresh_token" }, 401);
   const hash = await sha256Hex(token);
   const row = await db(env).prepare(
-    `SELECT id, user_id, practice_id, persistent, expires_at, revoked_at
+    `SELECT id, user_id, practice_id, persistent, expires_at, revoked_at,
+            family_id, replaced_by_token_id
      FROM refresh_tokens WHERE token_hash = ?`,
-  ).bind(hash).first<{ id:string; user_id:string; practice_id:string; persistent:number; expires_at:string; revoked_at:string|null }>();
-  if (!row || row.revoked_at || Date.parse(row.expires_at) <= Date.now()) {
+  ).bind(hash).first<{ id:string; user_id:string; practice_id:string; persistent:number; expires_at:string; revoked_at:string|null; family_id:string|null; replaced_by_token_id:string|null }>();
+  if (!row || Date.parse(row.expires_at) <= Date.now()) {
+    return json(request, env, { error: "refresh_token_invalid" }, 401);
+  }
+  const familyId = row.family_id ?? row.id;
+  if (row.revoked_at) {
+    if (row.replaced_by_token_id) {
+      const compromisedAt = nowIso();
+      await db(env).prepare(
+        `UPDATE refresh_tokens
+         SET revoked_at=COALESCE(revoked_at,?), compromised_at=?
+         WHERE family_id=?`,
+      ).bind(compromisedAt, compromisedAt, familyId).run();
+      return json(request, env, { error: "refresh_token_reuse_detected" }, 401);
+    }
     return json(request, env, { error: "refresh_token_invalid" }, 401);
   }
   const user = await readRuntimeUser(env, row.user_id, row.practice_id);
   if (!user) return json(request, env, { error: "runtime_user_inactive" }, 403);
 
-  const revoked = await db(env).prepare(
-    "UPDATE refresh_tokens SET revoked_at = ?, last_used_at = ? WHERE id = ? AND revoked_at IS NULL",
-  ).bind(nowIso(), nowIso(), row.id).run();
-  if ((revoked.meta.changes ?? 0) !== 1) return json(request, env, { error: "refresh_token_replayed" }, 401);
-  return json(request, env, await issueSession(env, user, row.persistent === 1, String(body.deviceLabel ?? "")));
+  try {
+    return json(request, env, await issueSession(
+      env,
+      user,
+      row.persistent === 1,
+      String(body.deviceLabel ?? ""),
+      familyId,
+      row.id,
+    ));
+  } catch {
+    return json(request, env, { error: "refresh_token_replayed" }, 401);
+  }
 }
 
 async function logout(request: Request, env: Env) {
@@ -560,7 +605,7 @@ async function verifyLoginOtp(request: Request, env: Env) {
     return json(request, env, { error: "otp_expired_or_invalid" }, 401);
   }
   const expected = await hmacHex(env.SESSION_SECRET, `${challengeId}:${code}`);
-  if (!constantTimeEqual(expected, row.code_hash) || !row.user_id) {
+  if (!(await constantTimeEqual(expected, row.code_hash)) || !row.user_id) {
     await db(env).prepare("UPDATE otp_challenges SET attempts=attempts+1 WHERE id=?").bind(challengeId).run();
     return json(request, env, { error: "otp_expired_or_invalid" }, 401);
   }

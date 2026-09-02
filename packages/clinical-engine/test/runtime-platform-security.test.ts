@@ -72,10 +72,10 @@ describe("GLYMIZE runtime security primitives", () => {
     expect(await decryptClinicalPayload(encrypted, `${secret}!`, aad)).toBeNull();
   });
 
-  it("uses fixed-work comparison for secret-derived strings", () => {
-    expect(constantTimeEqual("abcdef", "abcdef")).toBe(true);
-    expect(constantTimeEqual("abcdef", "abcdeg")).toBe(false);
-    expect(constantTimeEqual("short", "longer-value")).toBe(false);
+  it("uses fixed-work comparison for secret-derived strings", async () => {
+    await expect(constantTimeEqual("abcdef", "abcdef")).resolves.toBe(true);
+    await expect(constantTimeEqual("abcdef", "abcdeg")).resolves.toBe(false);
+    await expect(constantTimeEqual("short", "longer-value")).resolves.toBe(false);
   });
 });
 

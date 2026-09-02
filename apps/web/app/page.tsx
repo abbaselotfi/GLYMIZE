@@ -14,7 +14,10 @@ type Copy = {
   headline: string;
   description: string;
   start: string;
-  how: string;
+  patientStart: string;
+  entryLabel: string;
+  patientEntry: string;
+  clinicianEntry: string;
   disclaimer: string;
   patientTitle: string;
   patientBody: string;
@@ -33,8 +36,11 @@ const COPY: Record<Locale, Copy> = {
     headline: "از عوامل فردی بیمار تا برنامه درمانی بهینه.",
     description:
       "توصیه‌هایی مبتنی بر شواهد و منطبق با دستورالعمل‌های بالینی، فهرست دارویی، پوشش بیمه و ملاحظات هزینه.",
-    start: "شروع ارزیابی بالینی",
-    how: "مشاهده نحوه عملکرد",
+    start: "ورود پزشک و دستیار",
+    patientStart: "ورود به فضای بیمار",
+    entryLabel: "مسیرهای ورود به GLYMIZE",
+    patientEntry: "بیمار",
+    clinicianEntry: "پزشک و دستیار",
     disclaimer:
       "پشتیبانی تصمیم بالینی جایگزین قضاوت پزشک نیست و مسئولیت نهایی تصمیم درمانی بر عهده پزشک است.",
     patientTitle: "مشخصات بیمار",
@@ -52,8 +58,11 @@ const COPY: Record<Locale, Copy> = {
     headline: "From patient factors to an optimized treatment plan.",
     description:
       "Evidence-aligned recommendations informed by clinical guidelines, formulary, coverage, and cost.",
-    start: "Start clinical assessment",
-    how: "See how it works",
+    start: "Physician & assistant sign in",
+    patientStart: "Open patient area",
+    entryLabel: "GLYMIZE sign-in paths",
+    patientEntry: "Patient",
+    clinicianEntry: "Physician & assistant",
     disclaimer:
       "For healthcare professionals. Clinical decision support does not replace physician judgment.",
     patientTitle: "Patient profile",
@@ -185,10 +194,16 @@ export default function HomePage() {
             </button>
           </div>
 
-          <div className={styles.clinicianPill}>
-            <PatientIcon />
-            <span>{copy.clinicianLabel}</span>
-          </div>
+          <nav className={styles.entryNav} aria-label={copy.entryLabel}>
+            <Link className={styles.entryLink} data-actor="patient" href="/portal">
+              <span className={styles.entryMark} aria-hidden="true">P</span>
+              <span>{copy.patientEntry}</span>
+            </Link>
+            <Link className={styles.entryLink} data-actor="clinician" href="/account">
+              <span className={styles.entryMark} aria-hidden="true">MD</span>
+              <span>{copy.clinicianEntry}</span>
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -208,23 +223,18 @@ export default function HomePage() {
           <p className={styles.description}>{copy.description}</p>
 
           <div className={styles.ctaRow}>
-            <Link className={styles.primaryCta} href="/type-2">
+            <Link className={styles.primaryCta} href="/account">
               <span>{copy.start}</span>
               <ArrowIcon rtl={isRtl} />
             </Link>
 
-            <button
-              type="button"
+            <Link
               className={styles.secondaryCta}
-              onClick={() =>
-                document
-                  .getElementById("how-it-works")
-                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
-              }
+              href="/portal"
             >
-              <span>{copy.how}</span>
+              <span>{copy.patientStart}</span>
               <ArrowIcon rtl={isRtl} />
-            </button>
+            </Link>
           </div>
 
           <div className={styles.disclaimer}>

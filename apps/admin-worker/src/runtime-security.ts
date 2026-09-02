@@ -4,6 +4,7 @@ import {
   toAsciiDigits,
   validateIranianNationalId,
 } from "@glymize/contracts";
+import { timingSafeEqual } from "node:crypto";
 
 export {
   normalizePatientCode,
@@ -102,13 +103,16 @@ export function base64UrlToBytes(value: string) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-export function constantTimeEqual(left: string, right: string) {
-  const maxLength = Math.max(left.length, right.length);
-  let diff = left.length ^ right.length;
-  for (let index = 0; index < maxLength; index += 1) {
-    diff |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
-  }
-  return diff === 0;
+export async function constantTimeEqual(left: string, right: string) {
+  const encoder = new TextEncoder();
+  const [leftDigest, rightDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(left)),
+    crypto.subtle.digest("SHA-256", encoder.encode(right)),
+  ]);
+  return timingSafeEqual(
+    new Uint8Array(leftDigest),
+    new Uint8Array(rightDigest),
+  );
 }
 
 export function randomToken(byteLength = 32) {
@@ -168,6 +172,49 @@ export async function openPayload<T>(
   } catch {
     return null;
   }
+}
+
+type AuthTokenSecretEnv = {
+  SESSION_SECRET: string;
+  AUTH_TOKEN_SECRET?: unknown;
+  AUTH_TOKEN_SECRET_PREVIOUS?: unknown;
+  AUTH_TOKEN_ALLOW_LEGACY_SESSION_SECRET?: unknown;
+};
+
+function configuredSecret(value: unknown) {
+  const secret = typeof value === "string" ? value.trim() : "";
+  return secret || null;
+}
+
+export function authTokenSealSecret(env: AuthTokenSecretEnv) {
+  return configuredSecret(env.AUTH_TOKEN_SECRET) ?? env.SESSION_SECRET;
+}
+
+export function authTokenOpenSecrets(env: AuthTokenSecretEnv) {
+  const allowLegacy = String(
+    env.AUTH_TOKEN_ALLOW_LEGACY_SESSION_SECRET ?? "true",
+  ).trim().toLowerCase() !== "false";
+  return [...new Set([
+    authTokenSealSecret(env),
+    configuredSecret(env.AUTH_TOKEN_SECRET_PREVIOUS),
+    allowLegacy ? env.SESSION_SECRET : null,
+  ].filter((value): value is string => Boolean(value)))];
+}
+
+export async function sealAuthPayload(payload: unknown, env: AuthTokenSecretEnv, context: string) {
+  return sealPayload(payload, authTokenSealSecret(env), context);
+}
+
+export async function openAuthPayload<T>(
+  sealed: { iv: string; ciphertext: string },
+  env: AuthTokenSecretEnv,
+  context: string,
+): Promise<T | null> {
+  for (const secret of authTokenOpenSecrets(env)) {
+    const payload = await openPayload<T>(sealed, secret, context);
+    if (payload) return payload;
+  }
+  return null;
 }
 
 export async function encryptClinicalPayload(

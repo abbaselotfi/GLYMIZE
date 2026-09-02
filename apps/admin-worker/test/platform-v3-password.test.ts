@@ -12,6 +12,16 @@ import {
   credentialMatches,
   validCredentialValue,
 } from "../src/platform-v3-credential";
+import {
+  authTokenOpenSecrets,
+  authTokenSealSecret,
+  constantTimeEqual,
+} from "../src/runtime-security";
+
+const legacyRuntime = fs.readFileSync(
+  new URL("../src/platform-index.ts", import.meta.url),
+  "utf8",
+);
 
 describe("platform v3 password security", () => {
   it("enforces the 10-128 character password policy", () => {
@@ -45,6 +55,38 @@ describe("platform v3 password security", () => {
         iterations: 600000,
       }),
     ).resolves.toBe(false);
+  });
+
+  it("uses the runtime timing-safe primitive for fixed-size secret comparison", async () => {
+    await expect(constantTimeEqual("same-value", "same-value")).resolves.toBe(true);
+    await expect(constantTimeEqual("short", "a-different-length-value")).resolves.toBe(false);
+  });
+
+  it("supports staged auth-token key rotation and explicit legacy retirement", () => {
+    const rotating = {
+      SESSION_SECRET: "legacy-session-secret",
+      AUTH_TOKEN_SECRET: "current-auth-secret",
+      AUTH_TOKEN_SECRET_PREVIOUS: "previous-auth-secret",
+    };
+    expect(authTokenSealSecret(rotating)).toBe("current-auth-secret");
+    expect(authTokenOpenSecrets(rotating)).toEqual([
+      "current-auth-secret",
+      "previous-auth-secret",
+      "legacy-session-secret",
+    ]);
+    expect(authTokenOpenSecrets({
+      ...rotating,
+      AUTH_TOKEN_ALLOW_LEGACY_SESSION_SECRET: "false",
+    })).toEqual(["current-auth-secret", "previous-auth-secret"]);
+  });
+
+  it("consumes a refresh parent before issuing its child", () => {
+    const start = legacyRuntime.indexOf("async function issueSession(");
+    const end = legacyRuntime.indexOf("async function refreshSession(", start);
+    const issue = legacyRuntime.slice(start, end);
+    expect(issue.indexOf("SET revoked_at=?,last_used_at=?,replaced_by_token_id=?"))
+      .toBeLessThan(issue.indexOf("await insert.run();"));
+    expect(issue).toContain("consumed.meta.changes");
   });
 
   it("keeps routing, persistence, current-password and session-revocation contracts enabled", () => {
