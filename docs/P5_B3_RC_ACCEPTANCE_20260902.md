@@ -73,7 +73,8 @@ Allowed-origin CORS preflight returns `204` with an empty body.
 - Two-practice isolation: PASS (patient sees both; practice sees only its row;
   cross-practice transition returns `404`)
 - Diff and secret-pattern checks: PASS
-- GitHub Actions runtime validation: pending at the time of this evidence commit
+- GitHub Actions runtime validation: PASS
+  ([run `33661069418`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/33661069418))
 
 ## Isolation and remaining release gates
 
