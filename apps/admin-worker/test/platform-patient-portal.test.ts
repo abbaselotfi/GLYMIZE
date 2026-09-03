@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const runtime = fs.readFileSync(
-  new URL("../src/platform-patient-portal.ts", import.meta.url),
-  "utf8",
-);
+const runtime = [
+  "../src/platform-patient-portal.ts",
+  "../src/patient-portal/media-policy.ts",
+].map((path) => fs.readFileSync(new URL(path, import.meta.url), "utf8")).join("\n");
 const entry = fs.readFileSync(
   new URL("../src/platform-v3.ts", import.meta.url),
   "utf8",

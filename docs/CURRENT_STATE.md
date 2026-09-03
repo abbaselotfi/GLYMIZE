@@ -14,7 +14,7 @@ Run `node scripts/generate-current-state.mjs` from the repository root to reprod
 | Repository fact | Count |
 | --- | ---: |
 | Web App Router entries | 27 (27 pages, 0 route handlers) |
-| Automated test files | 63 (58 JS/TS, 5 Python) |
+| Automated test files | 65 (60 JS/TS, 5 Python) |
 | SQL migration files | 23 (18 Worker/D1, 5 PostgreSQL foundation) |
 <!-- current-state:generated:end -->
 
@@ -50,6 +50,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 - Repository-wide TypeScript typechecking, Biome linting, Vitest suites, a 275,000-case deterministic clinical stress campaign, and Playwright coverage for four critical web journeys.
 - Every pull request targeting `main` runs frozen install, typecheck, lint, unit/stress tests, and the critical Playwright flows.
+- The five previously oversized modules identified in roadmap §8.24 now expose compatibility façades over cohesive archive, portal-media, generated-catalogue, Care Team form-model, and browser-catalogue state modules, with equivalence tests.
 - GitHub Pages build/deploy automation and a separately deployable Wrangler Worker package.
 
 ## Partial or disabled by default
@@ -64,7 +65,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Planned in the canonical execution order
 
-- Phase 0 Tasks 7–9: decomposition of five oversized modules, CSS consolidation, and the catalogue-persistence ADR.
+- Phase 0 Tasks 8–9: CSS consolidation and the catalogue-persistence ADR.
 - Phase 3 Tasks 1–5: trace the live Type 2 call path, converge on decision-graph-v2, remove independent threshold duplication, make hard contraindications structural exclusions, and improve product/dose evidence indexing.
 - Phase 4 Tasks 6–10: verified multi-domain inventory, sourced blood-pressure/lipid objectives and product-dose rules, scenario-diversity acceptance, and extended stress validation.
 - Patient Care Hub work after the completed P5-C scheduling checkpoint remains subject to its own feature gates, security review, and release acceptance.

@@ -869,8 +869,8 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 7 — God-file decomposition
 
-- [ ] Decompose the five files listed in §8.24 into cohesive submodules.
-- [ ] Preserve their public API and behavior with equivalence tests.
+- [x] Decompose the five files listed in §8.24 into cohesive submodules.
+- [x] Preserve their public API and behavior with equivalence tests.
 
 #### Task 8 — CSS consolidation
 
@@ -1059,16 +1059,16 @@ An improvement should not be marked complete until all relevant items below are 
 
 The immediate next task is:
 
-> **Phase 0 / Task 7 — decompose the five oversized modules named in §8.24 without changing behavior or public APIs.**
+> **Phase 0 / Task 8 — consolidate versioned, legacy, final, hotfix, and smoke-fix CSS into maintained sources of truth.**
 
 The task must:
 
-- use `packages/clinical-engine/src/decision-graph-v2` as the modular reference pattern;
-- split each named file into cohesive submodules while preserving its public API;
-- add or retain equivalence tests before and after each extraction;
-- avoid clinical, product, or presentation behavior changes.
+- inventory every versioned or patch-suffixed stylesheet under `apps/web/app`;
+- consolidate tokens and overlapping rules into maintained source files;
+- screenshot-compare the five key surfaces before deleting superseded files;
+- preserve Persian RTL, English LTR, responsive, print, and accessibility behavior.
 
-Phase 0 / Tasks 1–6 established linting, universal pull-request validation, web unit/E2E coverage, explicit runtime authority, a reproducible factual current-state snapshot, and persisted request-time RBAC for patient-adjacent Worker routes. The previously identified rebranding work remains in Phase 1.
+Phase 0 / Tasks 1–7 established linting, universal pull-request validation, web unit/E2E coverage, explicit runtime authority, a reproducible factual current-state snapshot, persisted request-time RBAC, and tested module boundaries for the five oversized files. The previously identified rebranding work remains in Phase 1.
 
 ---
 
@@ -1086,7 +1086,8 @@ Phase 0 / Tasks 1–6 established linting, universal pull-request validation, we
 - Completed Phase 0 / Task 4 with an accepted runtime-of-record ADR and an explicit local-development-only classification for `apps/api`.
 - Completed Phase 0 / Task 5 with a generated repository inventory, a factual implemented/partial/planned snapshot, and an accurate multi-surface README introduction.
 - Completed Phase 0 / Task 6 with migration `0018`, request-time patient-route roles, self-approval guards, authorization tests, and an explicit catalogue-publisher exception.
-- Set Phase 0 / Task 7 as the immediate next task.
+- Completed Phase 0 / Task 7 with compatibility façades, cohesive extracted modules, and public-behavior equivalence tests for all five named files.
+- Set Phase 0 / Task 8 as the immediate next task.
 
 ### 2026-07-31
 
