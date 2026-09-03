@@ -741,11 +741,17 @@ still OFF. See
 [`P5_B3_RC_ACCEPTANCE_20260902.md`](./P5_B3_RC_ACCEPTANCE_20260902.md). PR #21
 is intentionally stacked on the P5-B2 branch from PR #20.
 
+Implementation checkpoint (2026-09-03): P5-B4 Multi-practice patient context
+RC PASS with context activation and all clinical/cross-practice access grants
+still OFF. See
+[`P5_B4_RC_ACCEPTANCE_20260903.md`](./P5_B4_RC_ACCEPTANCE_20260903.md). PR #22
+is intentionally stacked on the P5-B3 branch from PR #21.
+
 - provider profile/directory — P5-B1 RC PASS, activation OFF;
 - name / medical council code / specialty search — P5-B1 RC PASS, activation OFF;
 - referral code/QR — P5-B2 RC PASS, activation OFF;
 - care relationship lifecycle — P5-B3 RC PASS, activation/authorization OFF;
-- multi-practice patient account.
+- multi-practice patient account — P5-B4 RC PASS, activation/access grants OFF.
 
 ### P5-C â€” Scheduling core
 
