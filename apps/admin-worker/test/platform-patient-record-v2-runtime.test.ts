@@ -5,6 +5,10 @@ const runtime = fs.readFileSync(
   new URL("../src/platform-patient-record-v2.ts", import.meta.url),
   "utf8",
 );
+const archiveRuntime = fs.readFileSync(
+  new URL("../src/patient-record-v2/archive.ts", import.meta.url),
+  "utf8",
+);
 const platform = fs.readFileSync(
   new URL("../src/platform-index.ts", import.meta.url),
   "utf8",
@@ -624,18 +628,15 @@ describe("Patient Record v2 runtime vertical slice", () => {
       'url.pathname === "/v1/patients/archive"',
     );
 
-    const start = runtime.indexOf(
-      "async function listPatientArchive",
+    const start = archiveRuntime.indexOf(
+      "export async function listPatientArchive",
     );
-    const end = runtime.indexOf(
-      "async function workspace",
-      start,
-    );
+    const end = archiveRuntime.length;
 
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
 
-    const archiveRuntime = runtime.slice(
+    const archiveImplementation = archiveRuntime.slice(
       start,
       end,
     );
@@ -651,7 +652,7 @@ describe("Patient Record v2 runtime vertical slice", () => {
       "ORDER BY updated_at DESC,record_key DESC",
       '"handoff.read"',
     ]) {
-      expect(archiveRuntime).toContain(marker);
+      expect(archiveImplementation).toContain(marker);
     }
 
     expect(recordsPage).toContain(

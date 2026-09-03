@@ -10,10 +10,10 @@ describe("patient archive and manual lab contracts", () => {
     new URL("../../web/lib/patient-handoff-client.ts", import.meta.url),
     "utf8",
   );
-  const careTeam = fs.readFileSync(
-    new URL("../../web/app/care-team/care-team-client.tsx", import.meta.url),
-    "utf8",
-  );
+  const careTeam = [
+    "../../web/app/care-team/care-team-client.tsx",
+    "../../web/app/care-team/care-team-form-model.ts",
+  ].map((path) => fs.readFileSync(new URL(path, import.meta.url), "utf8")).join("\n");
   const clientOcr = fs.readFileSync(
     new URL("../../web/lib/client-ocr.ts", import.meta.url),
     "utf8",
