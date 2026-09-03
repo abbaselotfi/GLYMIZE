@@ -21,6 +21,7 @@ export interface RuntimeV3Capabilities{
   referralService:boolean;
   careRelationships:boolean;
   multiPracticePatient:boolean;
+  schedulingAvailability:boolean;
 }
 
 function deviceLabel(){
@@ -48,6 +49,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
     referralService:false,
     careRelationships:false,
     multiPracticePatient:false,
+    schedulingAvailability:false,
   };
 
   if(!runtimeApiUrl)return empty;
@@ -75,6 +77,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
       referralService:result.capabilities?.referralService===true,
       careRelationships:result.capabilities?.careRelationships===true,
       multiPracticePatient:result.capabilities?.multiPracticePatient===true,
+      schedulingAvailability:result.capabilities?.schedulingAvailability===true,
     };
   }catch{
     return empty;

@@ -607,12 +607,14 @@ async function purgeOrDeleteUser(
          (SELECT count(*) FROM portal_threads WHERE physician_id=?) +
          (SELECT count(*) FROM referral_invites
           WHERE issuer_user_id=? OR intended_physician_user_id=? OR revoked_by_user_id=?) +
-         (SELECT count(*) FROM care_relationships WHERE assigned_physician_user_id=?)
+         (SELECT count(*) FROM care_relationships WHERE assigned_physician_user_id=?) +
+         (SELECT count(*) FROM provider_scheduling_policies WHERE physician_user_id=?)
        ) AS count`,
     )
     .bind(
       userId, userId,
       userId, userId,
+      userId,
       userId,
       userId,
       userId, userId, userId,
@@ -640,9 +642,11 @@ async function purgeOrDeleteUser(
            (SELECT count(*) FROM referral_invites WHERE practice_id=?) AS referrals,
            (SELECT count(*) FROM referral_redemptions WHERE practice_id=?) AS referral_redemptions,
            (SELECT count(*) FROM care_relationships WHERE practice_id=?) AS care_relationships,
+           (SELECT count(*) FROM provider_scheduling_policies WHERE practice_id=?) AS scheduling_policies,
            (SELECT count(*) FROM practice_memberships WHERE practice_id=? AND user_id<>?) AS other_members`,
       )
       .bind(
+        ownerPractice.id,
         ownerPractice.id,
         ownerPractice.id,
         ownerPractice.id,
@@ -657,6 +661,7 @@ async function purgeOrDeleteUser(
         referrals: number;
         referral_redemptions: number;
         care_relationships: number;
+        scheduling_policies: number;
         other_members: number;
       }>();
     canHardDelete =
@@ -666,6 +671,7 @@ async function purgeOrDeleteUser(
       (practiceStats?.referrals ?? 0) === 0 &&
       (practiceStats?.referral_redemptions ?? 0) === 0 &&
       (practiceStats?.care_relationships ?? 0) === 0 &&
+      (practiceStats?.scheduling_policies ?? 0) === 0 &&
       (practiceStats?.other_members ?? 0) === 0;
   } else {
     const membership = await db
