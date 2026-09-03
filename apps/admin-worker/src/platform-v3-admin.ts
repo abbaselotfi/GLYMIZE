@@ -604,7 +604,9 @@ async function purgeOrDeleteUser(
          (SELECT count(*) FROM patient_order_fulfillment_events WHERE updated_by=?) +
          (SELECT count(*) FROM patient_investigation_result_links WHERE linked_by=?) +
          (SELECT count(*) FROM portal_users WHERE created_by=?) +
-         (SELECT count(*) FROM portal_threads WHERE physician_id=?)
+         (SELECT count(*) FROM portal_threads WHERE physician_id=?) +
+         (SELECT count(*) FROM referral_invites
+          WHERE issuer_user_id=? OR intended_physician_user_id=? OR revoked_by_user_id=?)
        ) AS count`,
     )
     .bind(
@@ -612,6 +614,7 @@ async function purgeOrDeleteUser(
       userId, userId,
       userId,
       userId,
+      userId, userId, userId,
       userId,
       userId,
       userId, userId,
@@ -632,9 +635,13 @@ async function purgeOrDeleteUser(
         `SELECT
            (SELECT count(*) FROM patient_handoffs WHERE practice_id=?) AS handoffs,
            (SELECT count(*) FROM patient_registry WHERE practice_id=?) AS patients_v2,
+           (SELECT count(*) FROM referral_invites WHERE practice_id=?) AS referrals,
+           (SELECT count(*) FROM referral_redemptions WHERE practice_id=?) AS referral_redemptions,
            (SELECT count(*) FROM practice_memberships WHERE practice_id=? AND user_id<>?) AS other_members`,
       )
       .bind(
+        ownerPractice.id,
+        ownerPractice.id,
         ownerPractice.id,
         ownerPractice.id,
         ownerPractice.id,
@@ -643,12 +650,16 @@ async function purgeOrDeleteUser(
       .first<{
         handoffs: number;
         patients_v2: number;
+        referrals: number;
+        referral_redemptions: number;
         other_members: number;
       }>();
     canHardDelete =
       canHardDelete &&
       (practiceStats?.handoffs ?? 0) === 0 &&
       (practiceStats?.patients_v2 ?? 0) === 0 &&
+      (practiceStats?.referrals ?? 0) === 0 &&
+      (practiceStats?.referral_redemptions ?? 0) === 0 &&
       (practiceStats?.other_members ?? 0) === 0;
   } else {
     const membership = await db

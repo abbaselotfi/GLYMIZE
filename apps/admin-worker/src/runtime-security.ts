@@ -25,6 +25,7 @@ export const ASSISTANT_PERMISSION_KEYS = [
   "care_team",
   "handoff.read",
   "handoff.write",
+  "referrals.manage",
 ] as const;
 
 export type AssistantPermission = typeof ASSISTANT_PERMISSION_KEYS[number];

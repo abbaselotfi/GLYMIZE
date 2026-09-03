@@ -11,6 +11,7 @@ export const CLINICAL_PAGE_PERMISSIONS = [
 export const DATA_ACTION_PERMISSIONS = [
   { key: "handoff.read", fa: "مشاهده handoff بیمار", en: "Read patient handoff" },
   { key: "handoff.write", fa: "ثبت/ویرایش handoff بیمار", en: "Write patient handoff" },
+  { key: "referrals.manage", fa: "مدیریت کد ارجاع", en: "Manage referral codes" },
 ] as const;
 
 export const ADMIN_PAGE_PERMISSIONS = [
@@ -33,7 +34,8 @@ export type AssistantPermission =
   | "evidence"
   | "care_team"
   | "handoff.read"
-  | "handoff.write";
+  | "handoff.write"
+  | "referrals.manage";
 
 export type AdminPermission =
   | "admin.center"
@@ -57,6 +59,7 @@ export const ASSISTANT_PERMISSION_KEYS: readonly AssistantPermission[] = [
   "care_team",
   "handoff.read",
   "handoff.write",
+  "referrals.manage",
 ];
 
 export const ADMIN_PERMISSION_KEYS: readonly AdminPermission[] =
@@ -80,8 +83,8 @@ export const RUNTIME_PERMISSION_GROUPS = [
   },
   {
     id: "data",
-    fa: "دسترسی به handoff بیمار",
-    en: "Patient handoff access",
+    fa: "دسترسی داده و گردش‌کار",
+    en: "Data & workflow access",
     items: DATA_ACTION_PERMISSIONS,
   },
   {

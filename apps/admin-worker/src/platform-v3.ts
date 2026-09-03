@@ -4,6 +4,7 @@ import { adminRuntimeRoute } from "./platform-v3-admin";
 import { patientPortalRoute } from "./platform-patient-portal";
 import { patientIdentityRoute } from "./platform-patient-identity";
 import { providerDirectoryRoute } from "./platform-provider-directory";
+import { referralServiceRoute } from "./platform-referral-service";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -69,6 +70,10 @@ export default {
             String(env.PROVIDER_DIRECTORY_ENABLED ?? "")
               .trim()
               .toLowerCase() === "true",
+          referralService:
+            String(env.REFERRAL_SERVICE_ENABLED ?? "")
+              .trim()
+              .toLowerCase() === "true",
         },
       });
     }
@@ -78,6 +83,9 @@ export default {
 
     const providerDirectory = await providerDirectoryRoute(request, env);
     if (providerDirectory) return providerDirectory;
+
+    const referralService = await referralServiceRoute(request, env);
+    if (referralService) return referralService;
 
     // WS-2/WS-3: patient portal + clinician portal review namespace.
     // Fails closed unless PATIENT_PORTAL_V1_ENABLED === "true".

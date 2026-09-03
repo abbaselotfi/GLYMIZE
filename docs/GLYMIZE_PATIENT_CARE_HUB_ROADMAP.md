@@ -729,9 +729,15 @@ the public capability still OFF. See
 is intentionally stacked on the P5-A branch from PR #18; dependency review and
 the already-passing CI validation remain merge gates.
 
+Implementation checkpoint (2026-09-02): P5-B2 Referral Service/QR contract RC
+PASS with activation still OFF. See
+[`P5_B2_RC_ACCEPTANCE_20260902.md`](./P5_B2_RC_ACCEPTANCE_20260902.md). PR #20
+is intentionally stacked on the P5-B1 branch from PR #19; dependency review,
+CI validation and a separate activation decision remain merge/release gates.
+
 - provider profile/directory — P5-B1 RC PASS, activation OFF;
 - name / medical council code / specialty search — P5-B1 RC PASS, activation OFF;
-- referral code/QR;
+- referral code/QR — P5-B2 RC PASS, activation OFF;
 - care relationship lifecycle;
 - multi-practice patient account.
 
