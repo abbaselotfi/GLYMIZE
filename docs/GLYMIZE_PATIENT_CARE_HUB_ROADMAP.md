@@ -723,8 +723,14 @@ CI/review and manual Preview review remain the merge gate before P5-B.
 
 ### P5-B â€” Provider discovery, referral and care relationships
 
-- provider profile/directory;
-- name / medical council code / specialty search;
+Implementation checkpoint (2026-09-02): P5-B1 Provider Directory RC PASS with
+the public capability still OFF. See
+[`P5_B1_RC_ACCEPTANCE_20260902.md`](./P5_B1_RC_ACCEPTANCE_20260902.md). PR #19
+is intentionally stacked on the P5-A branch from PR #18; dependency review and
+the already-passing CI validation remain merge gates.
+
+- provider profile/directory — P5-B1 RC PASS, activation OFF;
+- name / medical council code / specialty search — P5-B1 RC PASS, activation OFF;
 - referral code/QR;
 - care relationship lifecycle;
 - multi-practice patient account.

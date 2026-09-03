@@ -3,6 +3,7 @@ import { isRuntimeOriginAllowed } from "./platform-cors";
 import { adminRuntimeRoute } from "./platform-v3-admin";
 import { patientPortalRoute } from "./platform-patient-portal";
 import { patientIdentityRoute } from "./platform-patient-identity";
+import { providerDirectoryRoute } from "./platform-provider-directory";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -64,12 +65,19 @@ export default {
             String(env.PATIENT_IDENTITY_V2_ENABLED ?? "")
               .trim()
               .toLowerCase() === "true",
+          providerDirectory:
+            String(env.PROVIDER_DIRECTORY_ENABLED ?? "")
+              .trim()
+              .toLowerCase() === "true",
         },
       });
     }
 
     const patientIdentity = await patientIdentityRoute(request, env);
     if (patientIdentity) return patientIdentity;
+
+    const providerDirectory = await providerDirectoryRoute(request, env);
+    if (providerDirectory) return providerDirectory;
 
     // WS-2/WS-3: patient portal + clinician portal review namespace.
     // Fails closed unless PATIENT_PORTAL_V1_ENABLED === "true".

@@ -17,6 +17,7 @@ export interface RuntimeV3Capabilities{
   adminUsers:boolean;
   patientPortal:boolean;
   patientIdentityV2:boolean;
+  providerDirectory:boolean;
 }
 
 function deviceLabel(){
@@ -40,6 +41,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
     adminUsers:false,
     patientPortal:false,
     patientIdentityV2:false,
+    providerDirectory:false,
   };
 
   if(!runtimeApiUrl)return empty;
@@ -63,6 +65,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
       adminUsers:result.capabilities?.adminUsers===true,
       patientPortal:result.capabilities?.patientPortal===true,
       patientIdentityV2:result.capabilities?.patientIdentityV2===true,
+      providerDirectory:result.capabilities?.providerDirectory===true,
     };
   }catch{
     return empty;
