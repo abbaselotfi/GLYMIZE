@@ -44,9 +44,11 @@ Supported canonical states are `requested`, `confirmed`, `cancelled`,
 Optimistic `version` checks reject stale transitions. Every successful state
 change appends an `appointment_events` row; runtime-user changes also append to
 the practice audit log, while patient changes append a patient security event.
+Database triggers reject update or deletion of lifecycle event rows.
 
-Patient cancellation and rescheduling use server time and the policy's captured
-notice rules. A reschedule consumes a new hold, marks the former appointment
+Patient cancellation and rescheduling use server time and booking-time snapshots
+of the policy's notice rules, so later policy edits cannot rewrite an existing
+appointment's terms. A reschedule consumes a new hold, marks the former appointment
 `rescheduled`, creates a linked successor, and records both sides atomically.
 Starting and completing care require the assigned physician. Assistants need
 the explicit `appointments.manage` permission and cannot start or complete a

@@ -69,6 +69,8 @@ export interface ManagedAppointment {
   visitMode: SchedulingVisitMode;
   confirmationPolicy: SchedulingConfirmationPolicy;
   policyRevision: number;
+  cancellationNoticeMinutes: number;
+  rescheduleNoticeMinutes: number;
   status: AppointmentStatus;
   version: number;
   financialSnapshot: AppointmentFinancialSnapshot;

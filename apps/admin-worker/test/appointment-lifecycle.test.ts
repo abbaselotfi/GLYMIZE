@@ -6,6 +6,10 @@ const migration = fs.readFileSync(
   new URL("../migrations/0016_appointment_lifecycle.sql", import.meta.url),
   "utf8",
 );
+const hardeningMigration = fs.readFileSync(
+  new URL("../migrations/0017_appointment_policy_snapshot_guards.sql", import.meta.url),
+  "utf8",
+);
 const runtime = fs.readFileSync(
   new URL("../src/platform-scheduling-appointments.ts", import.meta.url),
   "utf8",
@@ -40,6 +44,8 @@ describe("P5-C3 appointment booking and lifecycle", () => {
     expect(migration).toContain("CREATE TABLE IF NOT EXISTS appointment_events");
     expect(migration).toContain("appointment_financial_snapshots_no_update");
     expect(migration).toContain("appointment_financial_snapshots_no_delete");
+    expect(hardeningMigration).toContain("appointment_events_no_update");
+    expect(hardeningMigration).toContain("appointment_events_no_delete");
     expect(migration).not.toMatch(/CREATE TABLE IF NOT EXISTS payment_(?:intents|events)/i);
     expect(migration).not.toMatch(/(?:ALTER|UPDATE|DELETE FROM)\s+patient_registry/i);
   });
@@ -91,6 +97,8 @@ describe("P5-C3 appointment booking and lifecycle", () => {
   it("enforces notice windows, actor authority and explicit confirmation", () => {
     expect(runtime).toContain("current.cancellation_notice_minutes");
     expect(runtime).toContain("current.reschedule_notice_minutes");
+    expect(hardeningMigration).toContain("cancellation_notice_minutes INTEGER NOT NULL");
+    expect(hardeningMigration).toContain("reschedule_notice_minutes INTEGER NOT NULL");
     expect(runtime).toContain('actor.permissions.includes("appointments.manage")');
     expect(runtime).toContain("assigned_physician_required");
     expect(runtime).toContain("explicit_confirmation_required");

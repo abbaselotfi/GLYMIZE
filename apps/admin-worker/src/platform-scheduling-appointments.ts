@@ -25,6 +25,8 @@ type AppointmentRow = {
   visit_mode: SchedulingVisitMode;
   confirmation_policy: SchedulingConfirmationPolicy;
   policy_revision: number;
+  cancellation_notice_minutes: number;
+  reschedule_notice_minutes: number;
   status: AppointmentStatus;
   version: number;
   fee_amount_minor: number | null;
@@ -35,11 +37,6 @@ type AppointmentRow = {
   captured_at: string;
   created_at: string;
   updated_at: string;
-};
-
-type AppointmentStateRow = AppointmentRow & {
-  cancellation_notice_minutes: number;
-  reschedule_notice_minutes: number;
 };
 
 type BookingHoldRow = {
@@ -56,6 +53,8 @@ type BookingHoldRow = {
   visit_mode: SchedulingVisitMode;
   policy_revision: number;
   confirmation_policy: SchedulingConfirmationPolicy;
+  cancellation_notice_minutes: number;
+  reschedule_notice_minutes: number;
 };
 
 type PatientActor = {
@@ -117,7 +116,8 @@ function appointmentSelect(alias = "a") {
     (SELECT next.id FROM appointments next WHERE next.rescheduled_from_appointment_id=${alias}.id)
       AS replacement_appointment_id,
     ${alias}.starts_at,${alias}.ends_at,${alias}.visit_mode,${alias}.confirmation_policy,
-    ${alias}.policy_revision,${alias}.status,${alias}.version,
+    ${alias}.policy_revision,${alias}.cancellation_notice_minutes,
+    ${alias}.reschedule_notice_minutes,${alias}.status,${alias}.version,
     f.fee_amount_minor,f.currency_code,f.pricing_policy_version,f.payment_required,
     f.payment_state,f.captured_at,${alias}.created_at,${alias}.updated_at`;
 }
@@ -137,6 +137,8 @@ function managed(row: AppointmentRow): ManagedAppointment {
     visitMode: row.visit_mode,
     confirmationPolicy: row.confirmation_policy,
     policyRevision: row.policy_revision,
+    cancellationNoticeMinutes: row.cancellation_notice_minutes,
+    rescheduleNoticeMinutes: row.reschedule_notice_minutes,
     status: row.status,
     version: row.version,
     financialSnapshot: {
@@ -197,14 +199,13 @@ function canManage(actor: RuntimeActor, appointment: AppointmentRow) {
 
 async function appointmentById(env: V3Env, appointmentId: string) {
   return v3db(env).prepare(
-    `SELECT ${appointmentSelect()},s.cancellation_notice_minutes,s.reschedule_notice_minutes
+    `SELECT ${appointmentSelect()}
      FROM appointments a
-     JOIN provider_scheduling_policies s ON s.id=a.scheduling_policy_id
      JOIN provider_profiles p
        ON p.practice_id=a.practice_id AND p.physician_user_id=a.physician_user_id
      JOIN appointment_financial_snapshots f ON f.appointment_id=a.id
      WHERE a.id=?`,
-  ).bind(appointmentId).first<AppointmentStateRow>();
+  ).bind(appointmentId).first<AppointmentRow>();
 }
 
 async function bookingHold(
@@ -217,7 +218,8 @@ async function bookingHold(
     `SELECT h.id,h.scheduling_policy_id,h.practice_id,h.physician_user_id,
             h.patient_account_id,h.care_relationship_id,h.starts_at,h.ends_at,
             h.lock_starts_at,h.lock_ends_at,h.visit_mode,h.policy_revision,
-            s.confirmation_policy
+            s.confirmation_policy,s.cancellation_notice_minutes,
+            s.reschedule_notice_minutes
      FROM appointment_slot_holds h
      JOIN provider_scheduling_policies s ON s.id=h.scheduling_policy_id
      JOIN care_relationships c ON c.id=h.care_relationship_id
@@ -258,12 +260,13 @@ async function bookAppointment(request: Request, env: V3Env) {
          (id,scheduling_policy_id,slot_hold_id,practice_id,physician_user_id,
           patient_account_id,care_relationship_id,rescheduled_from_appointment_id,
           starts_at,ends_at,lock_starts_at,lock_ends_at,visit_mode,
-          confirmation_policy,policy_revision,status,version,requested_at,
+          confirmation_policy,policy_revision,cancellation_notice_minutes,
+          reschedule_notice_minutes,status,version,requested_at,
           confirmed_at,cancelled_at,rescheduled_at,checked_in_at,started_at,
           completed_at,no_show_at,created_at,updated_at)
          SELECT ?,h.scheduling_policy_id,h.id,h.practice_id,h.physician_user_id,
                 h.patient_account_id,h.care_relationship_id,NULL,h.starts_at,h.ends_at,
-                h.lock_starts_at,h.lock_ends_at,h.visit_mode,?,h.policy_revision,?,1,?,
+                h.lock_starts_at,h.lock_ends_at,h.visit_mode,?,h.policy_revision,?,?,?,1,?,
                 ?,NULL,NULL,NULL,NULL,NULL,NULL,?,?
          FROM appointment_slot_holds h
          WHERE h.id=? AND h.patient_account_id=? AND h.status='held' AND h.expires_at>?
@@ -274,7 +277,8 @@ async function bookAppointment(request: Request, env: V3Env) {
                AND a.lock_starts_at<h.lock_ends_at AND a.lock_ends_at>h.lock_starts_at
            ) RETURNING *`,
       ).bind(
-        appointmentId, hold.confirmation_policy, status, now,
+        appointmentId, hold.confirmation_policy, hold.cancellation_notice_minutes,
+        hold.reschedule_notice_minutes, status, now,
         status === "confirmed" ? now : null, now, now,
         holdId, patient.patientAccountId, now,
       ),
@@ -554,18 +558,19 @@ async function rescheduleAppointment(request: Request, env: V3Env, appointmentId
     : "requested";
   const database = v3db(env);
   try {
-    const results = await database.batch<AppointmentRow>([
+    const statements: D1PreparedStatement[] = [
       database.prepare(
         `INSERT INTO appointments
          (id,scheduling_policy_id,slot_hold_id,practice_id,physician_user_id,
           patient_account_id,care_relationship_id,rescheduled_from_appointment_id,
           starts_at,ends_at,lock_starts_at,lock_ends_at,visit_mode,
-          confirmation_policy,policy_revision,status,version,requested_at,
+          confirmation_policy,policy_revision,cancellation_notice_minutes,
+          reschedule_notice_minutes,status,version,requested_at,
           confirmed_at,cancelled_at,rescheduled_at,checked_in_at,started_at,
           completed_at,no_show_at,created_at,updated_at)
          SELECT ?,h.scheduling_policy_id,h.id,h.practice_id,h.physician_user_id,
                 h.patient_account_id,h.care_relationship_id,old.id,h.starts_at,h.ends_at,
-                h.lock_starts_at,h.lock_ends_at,h.visit_mode,?,h.policy_revision,?,1,?,
+                h.lock_starts_at,h.lock_ends_at,h.visit_mode,?,h.policy_revision,?,?,?,1,?,
                 ?,NULL,NULL,NULL,NULL,NULL,NULL,?,?
          FROM appointment_slot_holds h JOIN appointments old ON old.id=?
          WHERE h.id=? AND h.patient_account_id=old.patient_account_id
@@ -581,7 +586,8 @@ async function rescheduleAppointment(request: Request, env: V3Env, appointmentId
                AND conflict.lock_ends_at>h.lock_starts_at
            ) RETURNING *`,
       ).bind(
-        replacementId, hold.confirmation_policy, replacementStatus, now,
+        replacementId, hold.confirmation_policy, hold.cancellation_notice_minutes,
+        hold.reschedule_notice_minutes, replacementStatus, now,
         replacementStatus === "confirmed" ? now : null, now, now,
         appointmentId, holdId, now, current.status, current.version,
       ),
@@ -644,28 +650,43 @@ async function rescheduleAppointment(request: Request, env: V3Env, appointmentId
          SELECT ?,id,practice_id,'consumed',?,?,?
          FROM appointment_slot_holds WHERE id=? AND status='consumed' AND consumed_at=?`,
       ).bind(crypto.randomUUID(), actor.kind, actor.id, now, holdId, now),
-    ]);
-    if (!results[0]?.results[0] || (results[1]?.meta.changes ?? 0) !== 1) {
-      return reply(request, env, { error: "appointment_reschedule_conflict" }, 409);
-    }
+    ];
     if (actor.kind === "runtime_user") {
-      await database.prepare(
+      statements.push(database.prepare(
         `INSERT INTO audit_log
          (id,actor_user_id,practice_id,action,target_type,target_id,meta_json,created_at)
-         VALUES(?,?,?,'appointment.rescheduled','appointment',?,?,?)`,
+         SELECT ?,?,practice_id,'appointment.rescheduled','appointment',id,?,?
+         FROM appointments
+         WHERE id=? AND status='rescheduled' AND version=?
+           AND EXISTS(
+             SELECT 1 FROM appointments next
+             WHERE next.id=? AND next.rescheduled_from_appointment_id=appointments.id
+           )`,
       ).bind(
-        crypto.randomUUID(), actor.id, current.practice_id, appointmentId,
-        JSON.stringify({ replacementAppointmentId: replacementId, reasonCode: reason }), now,
-      ).run();
+        crypto.randomUUID(), actor.id,
+        JSON.stringify({ replacementAppointmentId: replacementId, reasonCode: reason }),
+        now, appointmentId, current.version + 1, replacementId,
+      ));
     } else {
-      await database.prepare(
+      statements.push(database.prepare(
         `INSERT INTO patient_account_security_events
          (id,patient_account_id,event_type,actor_type,actor_id,meta_json,created_at)
-         VALUES(?,?,'appointment.rescheduled','patient',?,?,?)`,
+         SELECT ?,patient_account_id,'appointment.rescheduled','patient',patient_account_id,?,?
+         FROM appointments
+         WHERE id=? AND status='rescheduled' AND version=?
+           AND EXISTS(
+             SELECT 1 FROM appointments next
+             WHERE next.id=? AND next.rescheduled_from_appointment_id=appointments.id
+           )`,
       ).bind(
-        crypto.randomUUID(), actor.id, actor.id,
-        JSON.stringify({ appointmentId, replacementAppointmentId: replacementId }), now,
-      ).run();
+        crypto.randomUUID(),
+        JSON.stringify({ appointmentId, replacementAppointmentId: replacementId }),
+        now, appointmentId, current.version + 1, replacementId,
+      ));
+    }
+    const results = await database.batch<AppointmentRow>(statements);
+    if (!results[0]?.results[0] || (results[1]?.meta.changes ?? 0) !== 1) {
+      return reply(request, env, { error: "appointment_reschedule_conflict" }, 409);
     }
     const replacement = await appointmentById(env, replacementId);
     return replacement
