@@ -36,6 +36,8 @@ const EMPTY_CAPS:RuntimeV3Capabilities={
  careRelationships:false,
  multiPracticePatient:false,
  schedulingAvailability:false,
+ schedulingSlotDiscovery:false,
+ schedulingSlotLocking:false,
 };
 
 export default function AccountV3Client(){

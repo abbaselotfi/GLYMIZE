@@ -22,6 +22,8 @@ export interface RuntimeV3Capabilities{
   careRelationships:boolean;
   multiPracticePatient:boolean;
   schedulingAvailability:boolean;
+  schedulingSlotDiscovery:boolean;
+  schedulingSlotLocking:boolean;
 }
 
 function deviceLabel(){
@@ -50,6 +52,8 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
     careRelationships:false,
     multiPracticePatient:false,
     schedulingAvailability:false,
+    schedulingSlotDiscovery:false,
+    schedulingSlotLocking:false,
   };
 
   if(!runtimeApiUrl)return empty;
@@ -78,6 +82,8 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
       careRelationships:result.capabilities?.careRelationships===true,
       multiPracticePatient:result.capabilities?.multiPracticePatient===true,
       schedulingAvailability:result.capabilities?.schedulingAvailability===true,
+      schedulingSlotDiscovery:result.capabilities?.schedulingSlotDiscovery===true,
+      schedulingSlotLocking:result.capabilities?.schedulingSlotLocking===true,
     };
   }catch{
     return empty;

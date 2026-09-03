@@ -3,6 +3,9 @@
 import type {
   AvailabilityExceptionInput,
   AvailabilityRuleInput,
+  AppointmentSlotHold,
+  AppointmentSlotHoldInput,
+  CandidateAppointmentSlotResult,
   ManagedAvailabilityException,
   ManagedAvailabilityRule,
   ManagedSchedulingConfiguration,
@@ -102,4 +105,47 @@ export async function setSchedulingPublication(publish: boolean) {
   });
   if (!response.ok) throw new Error(await errorOf(response, "SCHEDULING_PUBLICATION_FAILED"));
   return (await response.json() as { policy: ManagedSchedulingPolicy }).policy;
+}
+
+export async function listCandidateAppointmentSlots(input: {
+  providerProfileId: string;
+  from: string;
+  to: string;
+  mode?: "in_person" | "audio" | "video";
+}) {
+  if (!runtimeApiUrl) throw new Error("RUNTIME_API_NOT_CONFIGURED");
+  const query = new URLSearchParams({ from: input.from, to: input.to });
+  if (input.mode) query.set("mode", input.mode);
+  const response = await fetch(
+    `${runtimeApiUrl}/v1/scheduling/providers/${encodeURIComponent(input.providerProfileId)}/slots?${query}`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) throw new Error(await errorOf(response, "SLOT_DISCOVERY_FAILED"));
+  return response.json() as Promise<CandidateAppointmentSlotResult>;
+}
+
+export async function acquireAppointmentSlotHold(
+  input: Omit<AppointmentSlotHoldInput, "confirmed">,
+) {
+  const response = await schedulingFetch("/slot-holds", {
+    method: "POST",
+    body: JSON.stringify({ ...input, confirmed: true }),
+  });
+  if (!response.ok) throw new Error(await errorOf(response, "SLOT_HOLD_FAILED"));
+  return (await response.json() as { hold: AppointmentSlotHold }).hold;
+}
+
+export async function listAppointmentSlotHolds() {
+  const response = await schedulingFetch("/slot-holds");
+  if (!response.ok) throw new Error(await errorOf(response, "SLOT_HOLD_LIST_FAILED"));
+  return (await response.json() as { holds: AppointmentSlotHold[] }).holds;
+}
+
+export async function releaseAppointmentSlotHold(holdId: string) {
+  const response = await schedulingFetch(`/slot-holds/${encodeURIComponent(holdId)}/release`, {
+    method: "POST",
+    body: JSON.stringify({ confirmed: true }),
+  });
+  if (!response.ok) throw new Error(await errorOf(response, "SLOT_HOLD_RELEASE_FAILED"));
+  return response.json() as Promise<{ released: true; holdId: string }>;
 }
