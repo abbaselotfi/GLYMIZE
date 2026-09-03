@@ -66,7 +66,8 @@ The protected context-list endpoint fails closed with
 - Clinical and cross-practice grants remain false: PASS
 - Legacy bridge remains unavailable while record-linking is OFF: PASS
 - Diff, TODO and secret-pattern checks: PASS
-- GitHub Actions runtime validation: pending final documentation commit
+- GitHub Actions runtime validation: PASS
+  ([run `33698527551`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/33698527551))
 
 ## Isolation and remaining release gates
 
