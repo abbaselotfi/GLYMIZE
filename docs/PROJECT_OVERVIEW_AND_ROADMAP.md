@@ -837,9 +837,9 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 2 — CI on every pull request
 
-- [ ] Add an additive workflow for every pull request targeting `main`.
-- [ ] Run install, typecheck, lint, and tests.
-- [ ] Retain existing specialized workflows.
+- [x] Add an additive workflow for every pull request targeting `main`.
+- [x] Run install, typecheck, lint, and tests.
+- [x] Retain existing specialized workflows.
 
 #### Task 3 — Tests for `apps/web`
 
@@ -1059,17 +1059,16 @@ An improvement should not be marked complete until all relevant items below are 
 
 The recommended first task is:
 
-> **Phase 0 / Task 2 — add an additive GitHub Actions workflow for every pull request targeting `main`, running install, typecheck, lint, and tests while retaining the specialized workflows.**
+> **Phase 0 / Task 3 — add unit and Playwright coverage for `apps/web`, diagnose the Care Team patient-handoff save failure, and ship its fix with a regression test.**
 
-The task must remain an additive CI change:
+The task must keep test scope focused while covering the four required user journeys:
 
-- trigger on `pull_request` events targeting `main`;
-- use the repository-pinned pnpm and Node versions;
-- run a frozen install followed by `pnpm typecheck`, `pnpm lint`, and `pnpm test`;
-- keep branch-specific and deployment workflows intact;
-- make no runtime, clinical-rule, migration, or Cloudflare change.
+- unit-test pure behavior and error paths in the five named `apps/web/lib` clients;
+- add Playwright coverage for admin login, a ranked Type 2 result, Care Team handoff save, and portal record viewing;
+- trace implementation-queue item 4 to its root cause instead of masking the failure;
+- preserve clinical decision behavior and prove the fix through the full monorepo suite.
 
-Phase 0 / Task 1 established the root Biome baseline and is complete. The previously identified rebranding work remains in Phase 1.
+Phase 0 / Tasks 1–2 established linting and universal pull-request validation. The previously identified rebranding work remains in Phase 1.
 
 ---
 
@@ -1082,7 +1081,8 @@ Phase 0 / Task 1 established the root Biome baseline and is complete. The previo
 - Added the ordered Phase 0 engineering-hygiene program, Phase 3 clinical-engine convergence program, and Phase 4 multi-domain scenario program.
 - Recorded one-PR-per-task, full-suite, clinical-source, and sequencing constraints.
 - Completed Phase 0 / Task 1 with a pinned root Biome configuration, Turborepo package lint tasks, and lint gates in existing CI workflows.
-- Set Phase 0 / Task 2 as the immediate next task.
+- Completed Phase 0 / Task 2 with an additive `pull_request` workflow for frozen install, typecheck, lint, and tests.
+- Set Phase 0 / Task 3 as the immediate next task.
 
 ### 2026-07-31
 
