@@ -1,8 +1,12 @@
-# Diabetes Clinical Decision Support Platform
+# GLYMIZE — Bilingual Clinical Decision-Support Platform
 
-پلتفرم دوزبانهٔ فارسی و انگلیسی برای پشتیبانی تصمیم‌گیری بالینی پزشکان در مدیریت دیابت.
+GLYMIZE یک پلتفرم چندسطحی فارسی/انگلیسی در توسعهٔ فعال است که رابط پزشک، Care Team، پرتال بیمار، پروندهٔ طولی، دستیار شواهد، ابزارهای انسولین و پنل مدیریت را در یک monorepo گرد هم می‌آورد.
 
-> **وضعیت پروژه:** این مخزن در مرحلهٔ طراحی اولیه است. اسناد فعلی مرزهای محصول و معماری پیشنهادی را تعریف می‌کنند و جایگزین قضاوت بالینی پزشک نیستند.
+GLYMIZE is an actively developed bilingual, multi-surface clinical decision-support platform spanning clinician workflows, Care Team intake, a patient portal, longitudinal records, an Evidence Assistant, insulin tools, and administration.
+
+> **وضعیت پروژه:** این مخزن یک prototype پیشرفته و پیش‌بالینی است و برای استفادهٔ بالینی آماده نیست. اسناد فعلی مرزهای محصول و معماری پیشنهادی را تعریف می‌کنند و جایگزین قضاوت بالینی پزشک نیستند.
+
+وضعیت قابل اثبات پیاده‌سازی، بخش‌های ناقص و قابلیت‌های برنامه‌ریزی‌شده در [Current State](docs/CURRENT_STATE.md) جدا از Roadmap ثبت می‌شوند.
 
 ## چشم‌انداز / Vision
 
@@ -10,7 +14,7 @@
 
 The platform turns authoritative ADA and EASD guidance into traceable, versioned recommendations while keeping the clinician responsible for the final decision. Clinical content and user interfaces are available in Persian and English, with configurable generic/brand medication display for the Iranian market.
 
-## قابلیت‌های هدف / Planned capabilities
+## دامنهٔ محصول / Product scope
 
 - ثبت داده‌های ضروری بیمار و تولید پیشنهاد همراه با دلیل، منبع و نسخهٔ قانون؛
 - نسخه‌بندی مستقل مجموعه‌قوانین بالینی و انتشار کنترل‌شدهٔ آن‌ها؛
@@ -33,6 +37,8 @@ The platform turns authoritative ADA and EASD guidance into traceable, versioned
 
 | سند | موضوع |
 | --- | --- |
+| [وضعیت فعلی](docs/CURRENT_STATE.md) | snapshot قابل بازتولید از قابلیت‌های پیاده‌شده، ناقص و برنامه‌ریزی‌شده |
+| [مرجع Runtime](docs/architecture/RUNTIME_OF_RECORD.md) | مرجع فعلی کاتالوگ، موتور بالینی و دادهٔ بیمار/ویزیت |
 | [معماری](docs/ARCHITECTURE.md) | اجزا، جریان درخواست، امنیت، بومی‌سازی و استقرار |
 | [پنل مدیریت](docs/ADMIN_PANEL.md) | نقش‌ها، گردش‌کار انتشار و تجربهٔ کاربر غیر برنامه‌نویس |
 | [مدل داده](docs/DATA_MODEL.md) | موجودیت‌ها، ارتباط‌ها، تاریخچه و قواعد تمامیت |
@@ -42,13 +48,14 @@ The platform turns authoritative ADA and EASD guidance into traceable, versioned
 
 ```text
 apps/
-  web/                 # رابط پزشک و پنل مدیریت Next.js
-  api/                 # API ماژولار NestJS/Fastify
+  web/                 # رابط‌های پزشک، Care Team، بیمار و Admin در Next.js
+  admin-worker/        # Runtime فعال Cloudflare Worker با D1/R2/KV
+  api/                 # سرویس سازگاری NestJS/Fastify فقط برای توسعه محلی
 packages/
   clinical-engine/     # موتور قطعی و مستقل از نمایش دارو
   contracts/           # قراردادهای type-safe بین وب، API و موتور
 infra/
-  postgres/            # migration و جداسازی چندسازمانی
+  postgres/            # فونداسیون migration و جداسازی چندسازمانی؛ runtime فعال نیست
 docs/                  # تصمیم‌های معماری، محصول و حاکمیت
 ```
 
@@ -65,7 +72,7 @@ pnpm dev
 
 مسیر اولیهٔ Type 2 در `http://localhost:3000/type-2` و پنل مدیریت در `http://localhost:3000/admin` قرار دارد. هیچ پروتکل درمانی تا زمان بازبینی و تأیید پزشک خروجی بالینی تولید نمی‌کند. جزئیات در [پایهٔ پروتکل Type 2](docs/TYPE_2_PROTOCOL_FOUNDATION.md) آمده است.
 
-در وضعیت فعلی، همهٔ مسیرهای بالینی وب بدون gate تأیید پزشک یا Admin قابل استفاده‌اند. پنل مدیریت فقط با نشانی مستقیم `/admin` باز می‌شود و در ناوبری عمومی نمایش داده نمی‌شود.
+در وضعیت فعلی، مسیرهای داخلی وب با نشست و مجوزهای پزشک/دستیار gate می‌شوند، پرتال بیمار boundary مستقل دارد و پنل مدیریت از GitHub OAuth مالک یا مجوزهای صریح حساب Runtime استفاده می‌کند. قابلیت‌های Runtime جدیدی که feature flag آنها خاموش است صرفاً به‌عنوان implementation checkpoint محسوب می‌شوند، نه قابلیت فعال production.
 
 رابط وب به‌صورت PWA قابل نصب است و manifest، service worker و آیکن‌های نصب را در خود دارد. در مرورگرهای پشتیبان، دکمهٔ «نصب برنامه» در نوار بالای برنامه نمایش داده می‌شود.
 
