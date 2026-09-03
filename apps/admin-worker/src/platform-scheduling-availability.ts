@@ -12,6 +12,7 @@ import {
 import { isRuntimeOriginAllowed } from "./platform-cors";
 import { v3db, v3now, type V3Env } from "./platform-v3-base";
 import { v3RequireRuntime } from "./platform-v3-session";
+import { slotDiscoveryEnabled, slotLockingEnabled } from "./platform-scheduling-slots";
 
 type PolicyRow = {
   id: string;
@@ -641,7 +642,8 @@ export async function schedulingAvailabilityRoute(
   if (url.pathname === "/v1/scheduling/capabilities" && request.method === "GET") {
     return reply(request, env, {
       availabilityManagement: enabled(env.SCHEDULING_AVAILABILITY_ENABLED),
-      patientSlotDiscovery: false,
+      patientSlotDiscovery: slotDiscoveryEnabled(env),
+      slotLocking: slotLockingEnabled(env),
       booking: false,
       paymentGateway: false,
     });

@@ -761,10 +761,16 @@ still OFF. See
 [`P5_C1_RC_ACCEPTANCE_20260903.md`](./P5_C1_RC_ACCEPTANCE_20260903.md). PR #23
 is intentionally stacked on the P5-B4 branch from PR #22.
 
+Implementation checkpoint (2026-09-03): P5-C2 Candidate Slots and
+Transactional Holds RC PASS with discovery, locking, booking and payment all
+still OFF. See
+[`P5_C2_RC_ACCEPTANCE_20260903.md`](./P5_C2_RC_ACCEPTANCE_20260903.md). PR #24
+is intentionally stacked on the P5-C1 branch from PR #23.
+
 - clinician availability — P5-C1 RC PASS, activation OFF;
 - exceptions/leave — P5-C1 RC PASS, activation OFF;
 - configurable confirmation policy — P5-C1 RC PASS, activation OFF;
-- slot locking;
+- slot locking — P5-C2 RC PASS, activation OFF;
 - booking/reschedule/cancel;
 - appointment lifecycle;
 - payment-ready financial snapshot without gateway activation.

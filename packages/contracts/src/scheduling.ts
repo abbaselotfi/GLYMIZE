@@ -16,9 +16,50 @@ export type AvailabilityExceptionKind = (typeof availabilityExceptionKinds)[numb
 
 export interface SchedulingCapabilities {
   availabilityManagement: boolean;
-  patientSlotDiscovery: false;
+  patientSlotDiscovery: boolean;
+  slotLocking: boolean;
   booking: false;
   paymentGateway: false;
+}
+
+export interface CandidateAppointmentSlot {
+  providerProfileId: string;
+  practiceId: string;
+  startsAt: string;
+  endsAt: string;
+  visitMode: SchedulingVisitMode;
+  timeZone: string;
+  policyRevision: number;
+  informational: true;
+  reserved: false;
+}
+
+export interface CandidateAppointmentSlotResult {
+  slots: CandidateAppointmentSlot[];
+  serverTime: string;
+  bookingEnabled: false;
+}
+
+export interface AppointmentSlotHoldInput {
+  providerProfileId: string;
+  startsAt: string;
+  visitMode: SchedulingVisitMode;
+  confirmed: true;
+}
+
+export interface AppointmentSlotHold {
+  id: string;
+  providerProfileId: string;
+  practiceId: string;
+  startsAt: string;
+  endsAt: string;
+  visitMode: SchedulingVisitMode;
+  status: "held" | "released" | "expired" | "consumed";
+  expiresAt: string;
+  bookingCreated: false;
+  grantsClinicalAccess: false;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SchedulingPolicyInput {

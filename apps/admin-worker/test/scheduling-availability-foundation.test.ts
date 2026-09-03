@@ -85,6 +85,7 @@ describe("P5-C1 scheduling availability foundation", () => {
     expect(await capability?.json()).toEqual({
       availabilityManagement: false,
       patientSlotDiscovery: false,
+      slotLocking: false,
       booking: false,
       paymentGateway: false,
     });
