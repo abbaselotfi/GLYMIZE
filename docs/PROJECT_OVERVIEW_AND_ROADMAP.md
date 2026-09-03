@@ -856,9 +856,9 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 5 — Current-state documentation
 
-- [ ] Add `docs/CURRENT_STATE.md` with implemented, partial, and planned capabilities.
-- [ ] Add a script that counts web routes, test files, and Worker migrations and prints the doc's summary block.
-- [ ] Link the snapshot from `README.md` and update its product description while retaining safety disclaimers verbatim.
+- [x] Add `docs/CURRENT_STATE.md` with implemented, partial, and planned capabilities.
+- [x] Add a script that counts web routes, test files, and Worker migrations and prints the doc's summary block.
+- [x] Link the snapshot from `README.md` and update its product description while retaining safety disclaimers verbatim.
 
 #### Task 6 — RBAC in `apps/admin-worker`
 
@@ -1059,16 +1059,16 @@ An improvement should not be marked complete until all relevant items below are 
 
 The recommended first task is:
 
-> **Phase 0 / Task 5 — generate a factual `CURRENT_STATE.md` from the repository and link it from the root README without changing existing safety disclaimers.**
+> **Phase 0 / Task 6 — add server-enforced editor/approver RBAC to patient-adjacent Worker routes, with separation-of-duties tests and the next numbered migration.**
 
 The task must:
 
-- report only code, migrations, tests, workflows, and runtime paths verifiable in the repository;
-- separate current implementation facts from roadmap intent;
-- link the snapshot from the root README while preserving every existing safety disclaimer verbatim;
-- avoid runtime behavior changes.
+- replace login-only checks with persisted server-side roles enforced per route;
+- reject unauthenticated and unauthorized access at the affected route, not only at login;
+- prevent an editor from approving their own change and prove it with tests;
+- state explicitly if the existing GitHub-owner catalogue publish path remains a temporary exception.
 
-Phase 0 / Tasks 1–4 established linting, universal pull-request validation, web unit/E2E coverage, and explicit runtime authority. The previously identified rebranding work remains in Phase 1.
+Phase 0 / Tasks 1–5 established linting, universal pull-request validation, web unit/E2E coverage, explicit runtime authority, and a reproducible factual current-state snapshot. The previously identified rebranding work remains in Phase 1.
 
 ---
 
@@ -1084,7 +1084,8 @@ Phase 0 / Tasks 1–4 established linting, universal pull-request validation, we
 - Completed Phase 0 / Task 2 with an additive `pull_request` workflow for frozen install, typecheck, lint, and tests.
 - Completed Phase 0 / Task 3 with ten web unit tests, four critical-flow Playwright tests, and explicit Care Team Runtime error mapping.
 - Completed Phase 0 / Task 4 with an accepted runtime-of-record ADR and an explicit local-development-only classification for `apps/api`.
-- Set Phase 0 / Task 5 as the immediate next task.
+- Completed Phase 0 / Task 5 with a generated repository inventory, a factual implemented/partial/planned snapshot, and an accurate multi-surface README introduction.
+- Set Phase 0 / Task 6 as the immediate next task.
 
 ### 2026-07-31
 
