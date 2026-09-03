@@ -755,9 +755,15 @@ is intentionally stacked on the P5-B3 branch from PR #21.
 
 ### P5-C â€” Scheduling core
 
-- clinician availability;
-- exceptions/leave;
-- configurable confirmation policy;
+Implementation checkpoint (2026-09-03): P5-C1 Scheduling Availability RC PASS
+with management activation, patient slot discovery, booking and payment all
+still OFF. See
+[`P5_C1_RC_ACCEPTANCE_20260903.md`](./P5_C1_RC_ACCEPTANCE_20260903.md). PR #23
+is intentionally stacked on the P5-B4 branch from PR #22.
+
+- clinician availability — P5-C1 RC PASS, activation OFF;
+- exceptions/leave — P5-C1 RC PASS, activation OFF;
+- configurable confirmation policy — P5-C1 RC PASS, activation OFF;
 - slot locking;
 - booking/reschedule/cancel;
 - appointment lifecycle;
