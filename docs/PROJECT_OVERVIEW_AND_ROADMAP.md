@@ -843,10 +843,10 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 3 — Tests for `apps/web`
 
-- [ ] Add a Vitest-compatible web `test` script.
-- [ ] Unit-test `api-client.ts`, `patient-record-v2-client.ts`, `portal-client.ts`, `runtime-client.ts`, and `admin-auth.ts`, focusing on pure behavior and failures.
-- [ ] Add Playwright coverage for admin login, ranked Type 2 submission, Care Team patient-handoff save, and patient-portal record viewing.
-- [ ] Diagnose and fix implementation-queue item 4's Care Team save failure with a regression test.
+- [x] Add a Vitest-compatible web `test` script.
+- [x] Unit-test `api-client.ts`, `patient-record-v2-client.ts`, `portal-client.ts`, `runtime-client.ts`, and `admin-auth.ts`, focusing on pure behavior and failures.
+- [x] Add Playwright coverage for admin login, ranked Type 2 submission, Care Team patient-handoff save, and patient-portal record viewing.
+- [x] Diagnose and fix implementation-queue item 4's Care Team save failure with a regression test.
 
 #### Task 4 — Runtime-of-record documentation
 
@@ -1059,16 +1059,16 @@ An improvement should not be marked complete until all relevant items below are 
 
 The recommended first task is:
 
-> **Phase 0 / Task 3 — add unit and Playwright coverage for `apps/web`, diagnose the Care Team patient-handoff save failure, and ship its fix with a regression test.**
+> **Phase 0 / Task 4 — document the authoritative runtime for catalogue operations, clinical evaluation, and patient/encounter data without changing runtime behavior.**
 
-The task must keep test scope focused while covering the four required user journeys:
+The task is documentation-only and must:
 
-- unit-test pure behavior and error paths in the five named `apps/web/lib` clients;
-- add Playwright coverage for admin login, a ranked Type 2 result, Care Team handoff save, and portal record viewing;
-- trace implementation-queue item 4 to its root cause instead of masking the failure;
-- preserve clinical decision behavior and prove the fix through the full monorepo suite.
+- add `docs/architecture/RUNTIME_OF_RECORD.md`;
+- explicitly identify the read/write authority for catalogue data, clinical evaluation, and patient/encounter data;
+- classify `apps/api` as active, legacy, or local-development-only and update its README;
+- leave runtime behavior unchanged.
 
-Phase 0 / Tasks 1–2 established linting and universal pull-request validation. The previously identified rebranding work remains in Phase 1.
+Phase 0 / Tasks 1–3 established linting, universal pull-request validation, and web unit/E2E coverage. The previously identified rebranding work remains in Phase 1.
 
 ---
 
@@ -1082,7 +1082,8 @@ Phase 0 / Tasks 1–2 established linting and universal pull-request validation.
 - Recorded one-PR-per-task, full-suite, clinical-source, and sequencing constraints.
 - Completed Phase 0 / Task 1 with a pinned root Biome configuration, Turborepo package lint tasks, and lint gates in existing CI workflows.
 - Completed Phase 0 / Task 2 with an additive `pull_request` workflow for frozen install, typecheck, lint, and tests.
-- Set Phase 0 / Task 3 as the immediate next task.
+- Completed Phase 0 / Task 3 with ten web unit tests, four critical-flow Playwright tests, and explicit Care Team Runtime error mapping.
+- Set Phase 0 / Task 4 as the immediate next task.
 
 ### 2026-07-31
 

@@ -43,3 +43,9 @@ jobs:
 
       - name: Test monorepo
         run: pnpm test
+
+      - name: Install Playwright browser
+        run: pnpm --filter @glymize/web exec playwright install --with-deps chromium
+
+      - name: Test web critical flows
+        run: pnpm --filter @glymize/web test:e2e
