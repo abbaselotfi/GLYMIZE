@@ -1,7 +1,0 @@
-/* Accessible focus/disabled states for redesigned Type 2 controls. */
-.glymize-internal-shell[data-route="type-2"] .page-content button:disabled,
-.glymize-internal-shell[data-route="type-2"] .page-content input:disabled,
-.glymize-internal-shell[data-route="type-2"] .page-content select:disabled { opacity:.58; cursor:not-allowed; }
-.glymize-internal-shell[data-route="type-2"] .page-content button:focus-visible,
-.glymize-internal-shell[data-route="type-2"] .page-content input:focus-visible,
-.glymize-internal-shell[data-route="type-2"] .page-content select:focus-visible { outline:3px solid var(--glymize-focus)!important; outline-offset:3px!important; }
