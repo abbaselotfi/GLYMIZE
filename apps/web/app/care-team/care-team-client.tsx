@@ -1231,6 +1231,30 @@ async function save(): Promise<boolean> {
                 ? "API محلی handoff اجرا نشده است. برنامه را با start-local.ps1 اجرا کنید."
                 : "The local handoff API is not running. Start GLYMIZE with start-local.ps1."
             )
+          : code === "HANDOFF_API_UNREACHABLE"
+            ? (
+                fa
+                  ? "ارتباط با API پرونده برقرار نشد؛ اتصال شبکه و آدرس Runtime API را بررسی کنید."
+                  : "The patient-record API could not be reached. Check the network connection and Runtime API URL."
+              )
+            : code === "HANDOFF_RUNTIME_MISCONFIGURED"
+              ? (
+                  fa
+                    ? "سرویس پرونده آماده نیست؛ اتصال پایگاه‌داده یا کلید رمزنگاری Runtime تنظیم نشده است."
+                    : "The patient-record service is not ready. Its database binding or encryption key is not configured."
+                )
+              : code === "HANDOFF_API_INCOMPATIBLE"
+                ? (
+                    fa
+                      ? "نسخه Runtime API از مسیر ذخیره پرونده پشتیبانی نمی‌کند؛ Worker باید به نسخه سازگار ارتقا یابد."
+                      : "This Runtime API version does not support the patient-record save route. Upgrade the Worker to a compatible version."
+                  )
+                : code === "HANDOFF_RUNTIME_FAILED"
+                  ? (
+                      fa
+                        ? "Runtime هنگام ذخیره پرونده با خطای داخلی مواجه شد؛ هیچ تأیید ذخیره‌ای دریافت نشد."
+                        : "The Runtime failed while saving the record; no save confirmation was received."
+                    )
           : code === "FILE_NUMBER_ALLOCATOR_UNINITIALIZED"
             ? (
                 fa

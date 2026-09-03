@@ -7,6 +7,8 @@
                     "dev":  "node scripts/next.cjs dev --webpack",
                     "lint":  "biome lint --diagnostic-level=error .",
                     "start":  "next start --port 3000",
+                    "test":  "vitest run",
+                    "test:e2e":  "playwright test",
                     "typecheck":  "node scripts/next.cjs typegen \u0026\u0026 tsc -p tsconfig.json --noEmit"
                 },
     "dependencies":  {
@@ -20,7 +22,9 @@
                          "tesseract.js":  "7.0.0"
                      },
     "devDependencies":  {
+                            "@playwright/test":  "1.62.1",
                             "@types/react":  "19.2.17",
-                            "@types/react-dom":  "19.2.3"
+                            "@types/react-dom":  "19.2.3",
+                            "vitest":  "4.1.10"
                         }
 }

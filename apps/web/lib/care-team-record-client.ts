@@ -437,6 +437,24 @@ export async function checkCareTeamPatientCode(
 
 function translatePatientRecordError(error: unknown): never {
   const code = error instanceof Error ? error.message : "PATIENT_RECORD_FAILED";
+  if (code === "RUNTIME_API_NOT_CONFIGURED") {
+    throw new Error("HANDOFF_API_NOT_CONFIGURED");
+  }
+  if (error instanceof TypeError) {
+    throw new Error("HANDOFF_API_UNREACHABLE");
+  }
+  if (
+    code === "GLYMIZE_DB_NOT_CONFIGURED" ||
+    code === "CLINICAL_DATA_MASTER_KEY_NOT_CONFIGURED"
+  ) {
+    throw new Error("HANDOFF_RUNTIME_MISCONFIGURED");
+  }
+  if (code === "not_found") {
+    throw new Error("HANDOFF_API_INCOMPATIBLE");
+  }
+  if (code === "runtime_platform_failed") {
+    throw new Error("HANDOFF_RUNTIME_FAILED");
+  }
   if (code === "ENCOUNTER_REVISION_CONFLICT") {
     throw new Error("HANDOFF_REVISION_CONFLICT");
   }
