@@ -63,10 +63,16 @@ export async function credentialLogin(request:Request,env:V3Env){
     return reply(request,env,{error:"invalid_credentials"},401);
   }
 
-  const key=await sha256Hex(
-    `credential:${code}:${request.headers.get("cf-connecting-ip")??"unknown"}`,
-  );
-  if(!(await rate(env,key))) {
+  const clientIp=request.headers.get("cf-connecting-ip")??"unknown";
+  const [accountKey,ipKey]=await Promise.all([
+    sha256Hex(`credential-account:${code}`),
+    sha256Hex(`credential-ip:${clientIp}`),
+  ]);
+  const [accountAllowed,ipAllowed]=await Promise.all([
+    rate(env,accountKey),
+    rate(env,ipKey),
+  ]);
+  if(!accountAllowed||!ipAllowed) {
     return reply(request,env,{error:"rate_limited"},429);
   }
 
@@ -81,7 +87,7 @@ export async function credentialLogin(request:Request,env:V3Env){
     return reply(request,env,{error:"invalid_credentials"},401);
   }
   if(!row.password_hash||!row.password_salt||!row.password_iterations){
-    return reply(request,env,{error:"password_not_set"},409);
+    return reply(request,env,{error:"invalid_credentials"},401);
   }
   if(!(await credentialMatches(value,{
     hash:row.password_hash,
@@ -134,10 +140,16 @@ export async function assistantCredentialLogin(
   }
 
   const normalized=email??mobile!;
-  const key=await sha256Hex(
-    `assistant-credential:${normalized}:${request.headers.get("cf-connecting-ip")??"unknown"}`,
-  );
-  if(!(await rate(env,key))){
+  const clientIp=request.headers.get("cf-connecting-ip")??"unknown";
+  const [accountKey,ipKey]=await Promise.all([
+    sha256Hex(`assistant-credential-account:${normalized}`),
+    sha256Hex(`assistant-credential-ip:${clientIp}`),
+  ]);
+  const [accountAllowed,ipAllowed]=await Promise.all([
+    rate(env,accountKey),
+    rate(env,ipKey),
+  ]);
+  if(!accountAllowed||!ipAllowed){
     return reply(request,env,{error:"rate_limited"},429);
   }
 
@@ -158,7 +170,7 @@ export async function assistantCredentialLogin(
     return reply(request,env,{error:"invalid_credentials"},401);
   }
   if(!row.password_hash||!row.password_salt||!row.password_iterations){
-    return reply(request,env,{error:"password_not_set"},409);
+    return reply(request,env,{error:"invalid_credentials"},401);
   }
   if(!(await credentialMatches(value,{
     hash:row.password_hash,

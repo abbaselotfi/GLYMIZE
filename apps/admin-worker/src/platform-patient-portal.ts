@@ -17,8 +17,10 @@ import {
   hmacHex,
   normalizeEmail,
   normalizeIranMobile,
+  openAuthPayload,
   openPayload,
   randomToken,
+  sealAuthPayload,
   sealPayload,
   sha256Hex,
   type RuntimePermission,
@@ -44,12 +46,15 @@ type PortalUserRow = {
 
 type PortalAccessPayload = {
   kind: "portal_access";
+  authSource: PortalAuthSource;
   portalUserId: string;
   practiceId: string;
   patientId: string;
   sessionId: string;
   expiresAt: number;
 };
+
+type PortalAuthSource = "legacy_portal" | "patient_identity";
 
 type PortalThreadRow = {
   id: string;
@@ -230,17 +235,21 @@ async function issuePortalSession(
   user: PortalUserRow,
   rememberMe: boolean,
   deviceLabel: string,
+  familyId?: string,
+  parentTokenId?: string,
+  authSource: PortalAuthSource = "legacy_portal",
 ) {
   const sessionId = crypto.randomUUID();
   const refreshToken = randomToken(32);
   const refreshHash = await sha256Hex(refreshToken);
   const ttl = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
   const refreshExpiresAt = new Date(Date.now() + ttl).toISOString();
-  await v3db(env)
-    .prepare(
+  const database = v3db(env);
+  const insert = database.prepare(
       `INSERT INTO portal_refresh_tokens
-       (id,portal_user_id,token_hash,persistent,expires_at,revoked_at,created_at,last_used_at,device_label)
-       VALUES(?,?,?,?,?,NULL,?,?,?)`,
+       (id,portal_user_id,token_hash,persistent,expires_at,revoked_at,created_at,
+        last_used_at,device_label,family_id,parent_token_id,auth_source)
+       VALUES(?,?,?,?,?,NULL,?,?,?,?,?,?)`,
     )
     .bind(
       sessionId,
@@ -251,19 +260,36 @@ async function issuePortalSession(
       v3now(),
       v3now(),
       deviceLabel || null,
-    )
-    .run();
+      familyId ?? sessionId,
+      parentTokenId ?? null,
+      authSource,
+  );
+  if (parentTokenId) {
+    const rotatedAt = v3now();
+    const consumed = await database.prepare(
+      `UPDATE portal_refresh_tokens
+       SET revoked_at=?,last_used_at=?,replaced_by_token_id=?
+       WHERE id=? AND revoked_at IS NULL`,
+    ).bind(rotatedAt, rotatedAt, sessionId, parentTokenId).run();
+    if ((consumed.meta.changes ?? 0) !== 1) {
+      throw new Error("refresh_token_rotation_conflict");
+    }
+    await insert.run();
+  } else {
+    await insert.run();
+  }
   const expiresAt = Date.now() + 20 * 60 * 1000;
-  const sealed = await sealPayload(
+  const sealed = await sealAuthPayload(
     {
       kind: "portal_access",
+      authSource,
       portalUserId: user.id,
       practiceId: user.practice_id,
       patientId: user.patient_id,
       sessionId,
       expiresAt,
     } satisfies PortalAccessPayload,
-    env.SESSION_SECRET,
+    env,
     PORTAL_ACCESS_CONTEXT,
   );
   return {
@@ -272,8 +298,48 @@ async function issuePortalSession(
     refreshToken,
     refreshExpiresAt,
     persistent: rememberMe,
-    mustChangePassword: user.must_change_password === 1,
+    mustChangePassword:
+      authSource === "legacy_portal" && user.must_change_password === 1,
   };
+}
+
+export async function issuePortalSessionForVerifiedPatientLink(
+  env: V3Env,
+  patientAccountId: string,
+  portalUserId: string,
+  rememberMe: boolean,
+  deviceLabel: string,
+) {
+  if (!portalEnabled(env)) return null;
+  const user = await v3db(env).prepare(
+    `SELECT u.id,u.practice_id,u.patient_id,u.status,u.password_hash,u.password_salt,
+            u.password_iterations,u.must_change_password
+     FROM portal_users u
+     JOIN portal_user_account_links l ON l.portal_user_id=u.id
+     JOIN patient_accounts a ON a.id=l.patient_account_id
+     WHERE u.id=? AND u.status='active' AND l.patient_account_id=?
+       AND l.link_status='verified' AND l.verified_at IS NOT NULL
+       AND a.status='active' AND a.proofing_status='verified'`,
+  ).bind(portalUserId, patientAccountId).first<PortalUserRow>();
+  if (!user) return null;
+  const session = await issuePortalSession(
+    env,
+    user,
+    rememberMe,
+    deviceLabel.slice(0, 160) || "patient-identity-exchange",
+    undefined,
+    undefined,
+    "patient_identity",
+  );
+  await portalAudit(
+    env,
+    user.practice_id,
+    "portal.login_via_patient_identity",
+    "portal_user",
+    user.id,
+    { patientAccountId },
+  );
+  return session;
 }
 
 async function requirePortalUser(
@@ -286,9 +352,9 @@ async function requirePortalUser(
     : "";
   const [iv, ciphertext, extra] = bearer.split(".");
   if (!iv || !ciphertext || extra) return null;
-  const access = await openPayload<PortalAccessPayload>(
+  const access = await openAuthPayload<PortalAccessPayload>(
     { iv, ciphertext },
-    env.SESSION_SECRET,
+    env,
     PORTAL_ACCESS_CONTEXT,
   );
   if (
@@ -642,9 +708,9 @@ async function portalAccessPayload(request: Request, env: V3Env) {
     : "";
   const [iv, ciphertext, extra] = bearer.split(".");
   if (!iv || !ciphertext || extra) return null;
-  return openPayload<PortalAccessPayload>(
+  return openAuthPayload<PortalAccessPayload>(
     { iv, ciphertext },
-    env.SESSION_SECRET,
+    env,
     PORTAL_ACCESS_CONTEXT,
   );
 }
@@ -717,7 +783,7 @@ async function portalLogin(request: Request, env: V3Env) {
     !user.password_salt ||
     !user.password_iterations
   ) {
-    return reply(request, env, { error: "password_not_set" }, 409);
+    return reply(request, env, { error: "invalid_credentials" }, 401);
   }
   if (
     !(await credentialMatches(password, {
@@ -790,7 +856,8 @@ async function portalRefresh(request: Request, env: V3Env) {
   const refreshHash = await sha256Hex(refreshToken);
   const token = await v3db(env)
     .prepare(
-      `SELECT id,portal_user_id,persistent,expires_at,revoked_at
+      `SELECT id,portal_user_id,persistent,expires_at,revoked_at,
+              family_id,replaced_by_token_id,auth_source
        FROM portal_refresh_tokens WHERE token_hash=?`,
     )
     .bind(refreshHash)
@@ -800,13 +867,29 @@ async function portalRefresh(request: Request, env: V3Env) {
       persistent: 0 | 1;
       expires_at: string;
       revoked_at: string | null;
+      family_id: string | null;
+      replaced_by_token_id: string | null;
+      auth_source: PortalAuthSource;
     }>();
 
   if (
     !token ||
-    token.revoked_at ||
     Date.parse(token.expires_at) <= Date.now()
   ) {
+    return reply(request, env, { error: "auth_required" }, 401);
+  }
+
+  const familyId = token.family_id ?? token.id;
+  if (token.revoked_at) {
+    if (token.replaced_by_token_id) {
+      const compromisedAt = v3now();
+      await v3db(env).prepare(
+        `UPDATE portal_refresh_tokens
+         SET revoked_at=COALESCE(revoked_at,?),compromised_at=?
+         WHERE family_id=?`,
+      ).bind(compromisedAt, compromisedAt, familyId).run();
+      return reply(request, env, { error: "refresh_token_reuse_detected" }, 401);
+    }
     return reply(request, env, { error: "auth_required" }, 401);
   }
 
@@ -825,33 +908,23 @@ async function portalRefresh(request: Request, env: V3Env) {
 
   // Exactly-once refresh rotation. If another request already consumed
   // this token, this request loses the race and must fail closed.
-  const revoked = await v3db(env)
-    .prepare(
-      `UPDATE portal_refresh_tokens SET revoked_at=?,last_used_at=?
-       WHERE id=? AND revoked_at IS NULL`,
-    )
-    .bind(v3now(), v3now(), token.id)
-    .run();
-
-  if ((revoked.meta.changes ?? 0) !== 1) {
+  try {
     return reply(
       request,
       env,
-      { error: "refresh_token_replayed" },
-      401,
+      await issuePortalSession(
+        env,
+        user,
+        token.persistent === 1,
+        "portal-refresh",
+        familyId,
+        token.id,
+        token.auth_source,
+      ),
     );
+  } catch {
+    return reply(request, env, { error: "refresh_token_replayed" }, 401);
   }
-
-  return reply(
-    request,
-    env,
-    await issuePortalSession(
-      env,
-      user,
-      token.persistent === 1,
-      "portal-refresh",
-    ),
-  );
 }
 
 async function portalLogout(request: Request, env: V3Env) {
@@ -879,12 +952,15 @@ async function portalLogout(request: Request, env: V3Env) {
 async function portalSession(request: Request, env: V3Env) {
   const user = await requirePortalUser(request, env);
   if (!user) return reply(request, env, { error: "auth_required" }, 401);
+  const access = await portalAccessPayload(request, env);
+  const authSource = access?.authSource ?? "legacy_portal";
   return reply(request, env, {
     user: {
       portalUserId: user.id,
       practiceId: user.practice_id,
       patientId: user.patient_id,
-      mustChangePassword: user.must_change_password === 1,
+      mustChangePassword:
+        authSource === "legacy_portal" && user.must_change_password === 1,
     },
   });
 }
@@ -977,7 +1053,7 @@ async function portalChangePassword(request: Request, env: V3Env) {
 
   const currentSession = await v3db(env)
     .prepare(
-      `SELECT persistent,device_label
+      `SELECT persistent,device_label,auth_source
        FROM portal_refresh_tokens
        WHERE id=? AND portal_user_id=? AND revoked_at IS NULL`,
     )
@@ -988,6 +1064,7 @@ async function portalChangePassword(request: Request, env: V3Env) {
     .first<{
       persistent: 0 | 1;
       device_label: string | null;
+      auth_source: PortalAuthSource;
     }>();
 
   if (!currentSession) {
@@ -1070,6 +1147,9 @@ async function portalChangePassword(request: Request, env: V3Env) {
     updatedUser,
     currentSession.persistent === 1,
     currentSession.device_label ?? "portal-password-change",
+    undefined,
+    undefined,
+    currentSession.auth_source,
   );
 
   return reply(
@@ -2870,7 +2950,12 @@ export async function patientPortalRoute(
       );
     }
 
-    if (patient.must_change_password === 1) {
+    const access = await portalAccessPayload(request, env);
+    const authSource = access?.authSource ?? "legacy_portal";
+    if (
+      authSource === "legacy_portal" &&
+      patient.must_change_password === 1
+    ) {
       return reply(
         request,
         env,

@@ -15,6 +15,8 @@ export interface RuntimeV3Capabilities{
   assistantPasswordLogin:boolean;
   passwordSetup:boolean;
   adminUsers:boolean;
+  patientPortal:boolean;
+  patientIdentityV2:boolean;
 }
 
 function deviceLabel(){
@@ -36,6 +38,8 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
     assistantPasswordLogin:false,
     passwordSetup:false,
     adminUsers:false,
+    patientPortal:false,
+    patientIdentityV2:false,
   };
 
   if(!runtimeApiUrl)return empty;
@@ -57,6 +61,8 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
         result.capabilities?.assistantPasswordLogin===true,
       passwordSetup:result.capabilities?.passwordSetup===true,
       adminUsers:result.capabilities?.adminUsers===true,
+      patientPortal:result.capabilities?.patientPortal===true,
+      patientIdentityV2:result.capabilities?.patientIdentityV2===true,
     };
   }catch{
     return empty;

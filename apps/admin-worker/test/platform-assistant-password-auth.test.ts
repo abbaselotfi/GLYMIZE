@@ -49,6 +49,15 @@ describe("assistant password invitation and login contracts", () => {
     expect(platformV3).toContain("assistantPasswordLogin: true");
   });
 
+  it("rate limits account and IP independently and does not enumerate unset passwords", () => {
+    expect(login).toContain("credential-account:");
+    expect(login).toContain("credential-ip:");
+    expect(login).toContain("assistant-credential-account:");
+    expect(login).toContain("assistant-credential-ip:");
+    expect(login).toContain("!accountAllowed||!ipAllowed");
+    expect(login).not.toContain('error:"password_not_set"');
+  });
+
   it("propagates password setup and assistant login through the web client", () => {
     expect(runtimeClient).toContain("passwordSetupRequired?: boolean");
     expect(runtimeClient).toContain("newPassword?: string");

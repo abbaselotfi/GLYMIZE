@@ -1,0 +1,158 @@
+.page {
+  min-height: calc(100dvh - 74px);
+  padding: clamp(26px, 5vw, 68px) 18px;
+}
+
+.loading,
+.signInCard,
+.accountCard {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.loading {
+  padding: 70px 20px;
+  color: #587477;
+  text-align: center;
+}
+
+.signInCard,
+.accountCard {
+  border: 1px solid rgba(18, 56, 61, 0.12);
+  border-radius: 22px 22px 22px 7px;
+  padding: clamp(22px, 4vw, 38px);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 65px rgba(18, 56, 61, 0.09);
+}
+
+.eyebrow,
+.accountHeader span {
+  color: #087d75;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.signInCard h1,
+.accountHeader h1 {
+  margin: 7px 0 8px;
+  color: #12383d;
+  font-size: clamp(1.65rem, 4vw, 2.25rem);
+}
+
+.intro,
+.boundaryNote,
+.unlinked p {
+  color: #587477;
+  font-size: 0.84rem;
+  line-height: 1.8;
+}
+
+.modeSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 22px 0 18px;
+  padding: 5px;
+  border-radius: 12px;
+  background: #eef5f4;
+}
+
+.modeSwitch button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  color: #587477;
+  background: transparent;
+  font-weight: 800;
+}
+
+.modeSwitch button[data-active="true"] {
+  color: #075e58;
+  background: #fff;
+  box-shadow: 0 5px 14px rgba(18, 56, 61, 0.08);
+}
+
+.signInCard form { display: grid; gap: 13px; margin-top: 20px; }
+.signInCard label { display: grid; gap: 6px; color: #12383d; font-size: 0.78rem; font-weight: 750; }
+
+.signInCard input {
+  min-height: 48px;
+  border: 1px solid #c9d9d7;
+  border-radius: 11px;
+  padding: 0 12px;
+  color: #12383d;
+  background: #fbfdfd;
+  font-size: 16px;
+}
+
+.remember { display: flex !important; grid-template-columns: auto 1fr; align-items: center; }
+.remember input { min-height: auto; }
+
+.primary,
+.legacy,
+.accountHeader button {
+  min-height: 46px;
+  border-radius: 11px;
+  padding: 9px 15px;
+  font-weight: 850;
+}
+
+.primary {
+  border: 1px solid #087d75;
+  color: #fff;
+  background: #087d75;
+}
+
+.primary:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.legacy {
+  width: 100%;
+  margin-top: 14px;
+  border: 1px solid #c9d9d7;
+  color: #075e58;
+  background: #fff;
+}
+
+.smsState { display: block; margin-top: 12px; color: #73898b; text-align: center; }
+.message,
+.error { margin: 14px 0 0; padding: 11px 12px; border-radius: 10px; font-size: 0.78rem; line-height: 1.65; }
+.message { color: #28765b; background: #edf8f3; }
+.error { color: #a54747; background: #fff1f1; }
+
+.accountHeader { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.accountHeader button { border: 1px solid #c9d9d7; color: #075e58; background: #fff; }
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 22px 0;
+}
+
+.statusGrid div { display: grid; gap: 4px; padding: 13px; border: 1px solid #dbe7e5; border-radius: 12px; background: #f8fbfa; }
+.statusGrid small { color: #73898b; font-size: 0.67rem; }
+.statusGrid strong { color: #12383d; font-size: 0.84rem; }
+
+.practices { display: grid; gap: 8px; }
+.practices h2 { margin: 0 0 4px; font-size: 1rem; }
+.practices article { display: flex; align-items: center; gap: 11px; padding: 13px; border: 1px solid #cfe3df; border-radius: 12px; background: #f4faf8; }
+.practices article > span { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; color: #fff; background: #26956d; }
+.practices article div { display: grid; gap: 2px; }
+.practices article small { color: #587477; font-size: 0.7rem; }
+.practices article button { margin-inline-start: auto; min-height: 38px; border: 1px solid #bcd8d3; border-radius: 9px; padding: 7px 11px; color: #075e58; background: #fff; font-size: 0.72rem; font-weight: 800; }
+.practices article button:disabled { opacity: 0.5; }
+
+.unlinked { padding: 17px; border: 1px solid #e2d6b9; border-radius: 13px; background: #fffaf0; }
+.unlinked strong { color: #775d25; }
+.unlinked p { margin: 6px 0 0; }
+.boundaryNote { margin: 18px 0 0; padding-top: 15px; border-top: 1px solid #dbe7e5; }
+
+@media (max-width: 580px) {
+  .page { padding-inline: 12px; }
+  .statusGrid { grid-template-columns: 1fr; }
+  .accountHeader { align-items: stretch; flex-direction: column; }
+  .accountHeader button { width: 100%; }
+  .practices article { align-items: stretch; flex-wrap: wrap; }
+  .practices article button { width: 100%; margin-inline-start: 0; }
+}

@@ -1,0 +1,132 @@
+.shell {
+  --patient-ink: #12383d;
+  --patient-muted: #587477;
+  --patient-teal: #087d75;
+  min-height: 100dvh;
+  color: var(--patient-ink);
+  background:
+    radial-gradient(circle at 8% 4%, rgba(14, 151, 139, 0.1), transparent 24rem),
+    linear-gradient(180deg, #f8fcfb 0%, #f2f7f6 100%);
+}
+
+.header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  min-height: 74px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 11px clamp(18px, 4vw, 58px);
+  border-bottom: 1px solid rgba(18, 56, 61, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--patient-ink);
+  text-decoration: none;
+}
+
+.brandMark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 13px 13px 13px 4px;
+  color: #fff;
+  background: var(--patient-teal);
+  box-shadow: 0 9px 20px rgba(8, 125, 117, 0.22);
+  font-weight: 900;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand strong {
+  font-size: 0.98rem;
+  letter-spacing: 0.06em;
+}
+
+.brand small {
+  margin-top: 2px;
+  color: var(--patient-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.boundary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--patient-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.boundary > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #20a56c;
+  box-shadow: 0 0 0 4px #e5f6ed;
+}
+
+.homeLink {
+  min-height: 38px;
+  padding: 9px 13px;
+  border: 1px solid rgba(8, 125, 117, 0.22);
+  border-radius: 10px;
+  color: var(--patient-teal);
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.content {
+  min-height: calc(100dvh - 130px);
+}
+
+.footer {
+  padding: 16px 24px 22px;
+  color: var(--patient-muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .boundary {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header {
+    backdrop-filter: none;
+  }
+}

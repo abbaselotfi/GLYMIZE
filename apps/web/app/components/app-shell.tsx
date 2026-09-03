@@ -85,8 +85,10 @@ function routeToken(pathname: string) {
 
 export default function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
+  const isPatientPortalPath = pathname === "/portal" || pathname.startsWith("/portal/");
+  const isStandalonePublicPath = pathname === "/" || isPatientPortalPath;
   const [menuOpen, setMenuOpen] = useState(false);
-  const [user, setUser] = useState<RuntimeUser | null>(getCachedRuntimeUser());
+  const [user, setUser] = useState<RuntimeUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [localQaPreset, setLocalQaPreset] = useState<LocalQaLayoutPreset>("auto");
   const { locale, isRtl } = useGlymizeLocale();
@@ -94,6 +96,15 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
   const localUiBypass = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_LOCAL_UI_BYPASS === "1";
 
   useEffect(() => {
+    // Public and patient surfaces do not initialize or observe the clinician
+    // runtime session. This keeps the actor boundary deeper than navigation.
+    if (isStandalonePublicPath) {
+      setUser(null);
+      setAuthReady(true);
+      return;
+    }
+
+    setAuthReady(false);
     let active = true;
     void initializeRuntimeSession(true).then((next) => {
       if (active) { setUser(next); setAuthReady(true); }
@@ -101,7 +112,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
     const onAuth = () => { setUser(getCachedRuntimeUser()); setAuthReady(true); };
     window.addEventListener(runtimeAuthEventName(), onAuth);
     return () => { active = false; window.removeEventListener(runtimeAuthEventName(), onAuth); };
-  }, []);
+  }, [isStandalonePublicPath]);
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
 
@@ -144,9 +155,8 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
   const requiredPermission = permissionForClinicalPath(pathname);
   const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
   const isPublicRuntimePath = pathname === "/account" || pathname.startsWith("/account/");
-  // WS-2: the patient portal is a standalone guest surface. It must never be
-  // wrapped in the clinician shell nor blocked by the runtime sign-in gate.
-  const isPatientPortalPath = pathname === "/portal" || pathname.startsWith("/portal/");
+  // WS-2/P5-A: the patient portal is a standalone patient surface. It must
+  // never be wrapped in the clinician shell or clinician runtime auth gate.
   const permissionDenied = Boolean(user && requiredPermission && !user.permissions.includes(requiredPermission));
 
   if (pathname === "/" || isPatientPortalPath) return <>{children}</>;

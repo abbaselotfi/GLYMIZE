@@ -1,5 +1,5 @@
-import PortalClient from "./portal-client";
+import PatientPortalEntry from "./patient-portal-entry";
 
 export default function PortalPage() {
-  return <PortalClient />;
+  return <PatientPortalEntry />;
 }

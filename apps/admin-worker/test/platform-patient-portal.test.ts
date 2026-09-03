@@ -21,6 +21,10 @@ const migration = fs.readFileSync(
   new URL("../migrations/0005_patient_portal_v1.sql", import.meta.url),
   "utf8",
 );
+const refreshFamilyMigration = fs.readFileSync(
+  new URL("../migrations/0006_refresh_token_families.sql", import.meta.url),
+  "utf8",
+);
 const contracts = fs.readFileSync(
   new URL("../../../packages/contracts/src/patient-portal.ts", import.meta.url),
   "utf8",
@@ -68,6 +72,14 @@ function prepareTemplatesUseStaticSql(source: string) {
 }
 
 describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
+  it("adds refresh-token families without rewriting the frozen patient schema", () => {
+    expect(refreshFamilyMigration).toContain("ALTER TABLE refresh_tokens ADD COLUMN family_id");
+    expect(refreshFamilyMigration).toContain("ALTER TABLE portal_refresh_tokens ADD COLUMN family_id");
+    expect(refreshFamilyMigration).toContain("replaced_by_token_id");
+    expect(refreshFamilyMigration).toContain("compromised_at");
+    expect(refreshFamilyMigration).not.toContain("ALTER TABLE patient_registry");
+    expect(refreshFamilyMigration).not.toContain("DROP TABLE");
+  });
   it("stores patient intake in additive tables with no plaintext login handle", () => {
     expect(migration).toContain("CREATE TABLE IF NOT EXISTS portal_users");
     expect(migration).toContain("login_hash TEXT NOT NULL UNIQUE");
@@ -153,17 +165,29 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       "refreshToken.length > 200",
     );
     expect(refresh).toContain(
-      "(revoked.meta.changes ?? 0) !== 1",
+      '"refresh_token_reuse_detected"',
     );
     expect(refresh).toContain(
       '"refresh_token_replayed"',
     );
+    expect(refresh).toContain("family_id,replaced_by_token_id");
+    expect(refresh).toContain("compromised_at=?");
     expect(refresh).toContain(
       "token.persistent === 1",
     );
     expect(refresh).not.toContain(
       'issuePortalSession(env, user, true, "portal-refresh")',
     );
+
+    const issueStart = runtime.indexOf("async function issuePortalSession(");
+    const issueEnd = runtime.indexOf(
+      "export async function issuePortalSessionForVerifiedPatientLink(",
+      issueStart,
+    );
+    const issue = runtime.slice(issueStart, issueEnd);
+    expect(issue.indexOf("SET revoked_at=?,last_used_at=?,replaced_by_token_id=?"))
+      .toBeLessThan(issue.indexOf("await insert.run();"));
+    expect(issue).toContain("consumed.meta.changes");
 
     expect(runtime).toContain(
       "user.practice_id !== access.practiceId",
@@ -507,7 +531,7 @@ describe("Patient Portal v1 vertical slice (WS-2 / WS-3)", () => {
       "const refreshHash = await sha256Hex(refreshToken);",
     );
     expect(refreshHandler).toContain(
-      "(revoked.meta.changes ?? 0) !== 1",
+      '"refresh_token_reuse_detected"',
     );
 
     expect(runtime).toContain(
