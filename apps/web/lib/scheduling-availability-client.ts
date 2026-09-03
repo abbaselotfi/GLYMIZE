@@ -5,15 +5,20 @@ import type {
   AvailabilityRuleInput,
   AppointmentSlotHold,
   AppointmentSlotHoldInput,
+  AppointmentTransitionInput,
+  BookAppointmentInput,
   CandidateAppointmentSlotResult,
   ManagedAvailabilityException,
   ManagedAvailabilityRule,
   ManagedSchedulingConfiguration,
   ManagedSchedulingPolicy,
+  ManagedAppointment,
+  RescheduleAppointmentInput,
   SchedulingCapabilities,
   SchedulingPolicyInput,
 } from "@glymize/contracts";
 import { runtimeFetch } from "./runtime-client";
+import { patientIdentityFetch } from "./patient-identity-client";
 import { runtimeApiUrl } from "./runtime-api-url";
 
 async function errorOf(response: Response, fallback: string) {
@@ -28,6 +33,13 @@ async function schedulingFetch(path: string, init?: RequestInit) {
       ...(init?.body ? { "content-type": "application/json" } : {}),
       ...init?.headers,
     },
+    cache: "no-store",
+  });
+}
+
+async function patientSchedulingFetch(path: string, init?: RequestInit) {
+  return patientIdentityFetch(`/v1/scheduling${path}`, {
+    ...init,
     cache: "no-store",
   });
 }
@@ -127,7 +139,7 @@ export async function listCandidateAppointmentSlots(input: {
 export async function acquireAppointmentSlotHold(
   input: Omit<AppointmentSlotHoldInput, "confirmed">,
 ) {
-  const response = await schedulingFetch("/slot-holds", {
+  const response = await patientSchedulingFetch("/slot-holds", {
     method: "POST",
     body: JSON.stringify({ ...input, confirmed: true }),
   });
@@ -136,16 +148,89 @@ export async function acquireAppointmentSlotHold(
 }
 
 export async function listAppointmentSlotHolds() {
-  const response = await schedulingFetch("/slot-holds");
+  const response = await patientSchedulingFetch("/slot-holds");
   if (!response.ok) throw new Error(await errorOf(response, "SLOT_HOLD_LIST_FAILED"));
   return (await response.json() as { holds: AppointmentSlotHold[] }).holds;
 }
 
 export async function releaseAppointmentSlotHold(holdId: string) {
-  const response = await schedulingFetch(`/slot-holds/${encodeURIComponent(holdId)}/release`, {
+  const response = await patientSchedulingFetch(`/slot-holds/${encodeURIComponent(holdId)}/release`, {
     method: "POST",
     body: JSON.stringify({ confirmed: true }),
   });
   if (!response.ok) throw new Error(await errorOf(response, "SLOT_HOLD_RELEASE_FAILED"));
   return response.json() as Promise<{ released: true; holdId: string }>;
+}
+
+export async function bookAppointment(
+  input: Omit<BookAppointmentInput, "confirmed">,
+) {
+  const response = await patientSchedulingFetch("/appointments", {
+    method: "POST",
+    body: JSON.stringify({ ...input, confirmed: true }),
+  });
+  if (!response.ok) throw new Error(await errorOf(response, "APPOINTMENT_BOOKING_FAILED"));
+  return (await response.json() as { appointment: ManagedAppointment }).appointment;
+}
+
+export async function listPatientAppointments() {
+  const response = await patientSchedulingFetch("/appointments");
+  if (!response.ok) throw new Error(await errorOf(response, "APPOINTMENT_LIST_FAILED"));
+  return (await response.json() as { appointments: ManagedAppointment[] }).appointments;
+}
+
+export async function patientAppointmentAction(
+  appointmentId: string,
+  action: "cancel" | "check-in",
+  input: Omit<AppointmentTransitionInput, "confirmed"> = {},
+) {
+  const response = await patientSchedulingFetch(
+    `/appointments/${encodeURIComponent(appointmentId)}/${action}`,
+    { method: "POST", body: JSON.stringify({ ...input, confirmed: true }) },
+  );
+  if (!response.ok) throw new Error(await errorOf(response, "APPOINTMENT_UPDATE_FAILED"));
+  return (await response.json() as { appointment: ManagedAppointment }).appointment;
+}
+
+export async function reschedulePatientAppointment(
+  appointmentId: string,
+  input: Omit<RescheduleAppointmentInput, "confirmed">,
+) {
+  const response = await patientSchedulingFetch(
+    `/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
+    { method: "POST", body: JSON.stringify({ ...input, confirmed: true }) },
+  );
+  if (!response.ok) throw new Error(await errorOf(response, "APPOINTMENT_RESCHEDULE_FAILED"));
+  return (await response.json() as { appointment: ManagedAppointment }).appointment;
+}
+
+export async function listManagedAppointments() {
+  const response = await schedulingFetch("/manage/appointments");
+  if (!response.ok) throw new Error(await errorOf(response, "APPOINTMENT_LIST_FAILED"));
+  return (await response.json() as { appointments: ManagedAppointment[] }).appointments;
+}
+
+export async function managedAppointmentAction(
+  appointmentId: string,
+  action: "confirm" | "start" | "complete" | "no-show" | "cancel",
+  input: Omit<AppointmentTransitionInput, "confirmed"> = {},
+) {
+  const response = await schedulingFetch(
+    `/manage/appointments/${encodeURIComponent(appointmentId)}/${action}`,
+    { method: "POST", body: JSON.stringify({ ...input, confirmed: true }) },
+  );
+  if (!response.ok) throw new Error(await errorOf(response, "APPOINTMENT_UPDATE_FAILED"));
+  return (await response.json() as { appointment: ManagedAppointment }).appointment;
+}
+
+export async function rescheduleManagedAppointment(
+  appointmentId: string,
+  input: Omit<RescheduleAppointmentInput, "confirmed">,
+) {
+  const response = await schedulingFetch(
+    `/manage/appointments/${encodeURIComponent(appointmentId)}/reschedule`,
+    { method: "POST", body: JSON.stringify({ ...input, confirmed: true }) },
+  );
+  if (!response.ok) throw new Error(await errorOf(response, "APPOINTMENT_RESCHEDULE_FAILED"));
+  return (await response.json() as { appointment: ManagedAppointment }).appointment;
 }

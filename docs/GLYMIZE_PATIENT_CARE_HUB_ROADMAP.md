@@ -767,13 +767,19 @@ still OFF. See
 [`P5_C2_RC_ACCEPTANCE_20260903.md`](./P5_C2_RC_ACCEPTANCE_20260903.md). PR #24
 is intentionally stacked on the P5-C1 branch from PR #23.
 
+Implementation checkpoint (2026-09-03): P5-C3 Appointment Booking and
+Lifecycle RC PASS with booking, all scheduling activation and payment still
+OFF. Booking-time confirmation/notice/financial terms are snapshotted, and
+appointment history is database-enforced append-only. See
+[`P5_C3_RC_ACCEPTANCE_20260903.md`](./P5_C3_RC_ACCEPTANCE_20260903.md).
+
 - clinician availability — P5-C1 RC PASS, activation OFF;
 - exceptions/leave — P5-C1 RC PASS, activation OFF;
 - configurable confirmation policy — P5-C1 RC PASS, activation OFF;
 - slot locking — P5-C2 RC PASS, activation OFF;
-- booking/reschedule/cancel;
-- appointment lifecycle;
-- payment-ready financial snapshot without gateway activation.
+- booking/reschedule/cancel — P5-C3 RC PASS, activation OFF;
+- appointment lifecycle — P5-C3 RC PASS, activation OFF;
+- payment-ready financial snapshot without gateway activation — P5-C3 RC PASS.
 
 ### P5-D â€” Notifications
 

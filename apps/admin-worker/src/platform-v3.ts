@@ -10,9 +10,11 @@ import { patientPracticeContextRoute } from "./platform-patient-practice-context
 import { schedulingAvailabilityRoute } from "./platform-scheduling-availability";
 import {
   schedulingSlotsRoute,
+  appointmentBookingEnabled,
   slotDiscoveryEnabled,
   slotLockingEnabled,
 } from "./platform-scheduling-slots";
+import { schedulingAppointmentsRoute } from "./platform-scheduling-appointments";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -105,6 +107,7 @@ export default {
               .toLowerCase() === "true",
           schedulingSlotDiscovery: slotDiscoveryEnabled(env),
           schedulingSlotLocking: slotLockingEnabled(env),
+          schedulingBooking: appointmentBookingEnabled(env),
         },
       });
     }
@@ -123,6 +126,9 @@ export default {
 
     const patientPracticeContexts = await patientPracticeContextRoute(request, env);
     if (patientPracticeContexts) return patientPracticeContexts;
+
+    const schedulingAppointments = await schedulingAppointmentsRoute(request, env);
+    if (schedulingAppointments) return schedulingAppointments;
 
     const schedulingSlots = await schedulingSlotsRoute(request, env);
     if (schedulingSlots) return schedulingSlots;

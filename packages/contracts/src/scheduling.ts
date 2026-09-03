@@ -18,8 +18,81 @@ export interface SchedulingCapabilities {
   availabilityManagement: boolean;
   patientSlotDiscovery: boolean;
   slotLocking: boolean;
-  booking: false;
+  booking: boolean;
   paymentGateway: false;
+}
+
+export const appointmentStatuses = [
+  "requested",
+  "confirmed",
+  "cancelled",
+  "rescheduled",
+  "checked_in",
+  "in_progress",
+  "completed",
+  "no_show",
+] as const;
+export type AppointmentStatus = (typeof appointmentStatuses)[number];
+
+export const appointmentPaymentStates = [
+  "not_required",
+  "pending",
+  "authorized",
+  "paid",
+  "failed",
+  "cancelled",
+  "refunded",
+  "partially_refunded",
+] as const;
+export type AppointmentPaymentState = (typeof appointmentPaymentStates)[number];
+
+export interface AppointmentFinancialSnapshot {
+  feeAmountMinor?: number;
+  currency?: string;
+  pricingPolicyVersion?: string;
+  paymentRequired: boolean;
+  paymentState: AppointmentPaymentState;
+  capturedAt: string;
+}
+
+export interface ManagedAppointment {
+  id: string;
+  providerProfileId: string;
+  practiceId: string;
+  physicianUserId: string;
+  patientAccountId: string;
+  careRelationshipId: string;
+  rescheduledFromAppointmentId?: string;
+  replacementAppointmentId?: string;
+  startsAt: string;
+  endsAt: string;
+  visitMode: SchedulingVisitMode;
+  confirmationPolicy: SchedulingConfirmationPolicy;
+  policyRevision: number;
+  cancellationNoticeMinutes: number;
+  rescheduleNoticeMinutes: number;
+  status: AppointmentStatus;
+  version: number;
+  financialSnapshot: AppointmentFinancialSnapshot;
+  grantsClinicalAccess: false;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookAppointmentInput {
+  slotHoldId: string;
+  confirmed: true;
+}
+
+export interface RescheduleAppointmentInput {
+  slotHoldId: string;
+  reasonCode?: string;
+  confirmed: true;
+}
+
+export interface AppointmentTransitionInput {
+  reasonCode?: string;
+  confirmed: true;
 }
 
 export interface CandidateAppointmentSlot {
@@ -37,7 +110,7 @@ export interface CandidateAppointmentSlot {
 export interface CandidateAppointmentSlotResult {
   slots: CandidateAppointmentSlot[];
   serverTime: string;
-  bookingEnabled: false;
+  bookingEnabled: boolean;
 }
 
 export interface AppointmentSlotHoldInput {

@@ -24,6 +24,7 @@ export interface RuntimeV3Capabilities{
   schedulingAvailability:boolean;
   schedulingSlotDiscovery:boolean;
   schedulingSlotLocking:boolean;
+  schedulingBooking:boolean;
 }
 
 function deviceLabel(){
@@ -54,6 +55,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
     schedulingAvailability:false,
     schedulingSlotDiscovery:false,
     schedulingSlotLocking:false,
+    schedulingBooking:false,
   };
 
   if(!runtimeApiUrl)return empty;
@@ -84,6 +86,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
       schedulingAvailability:result.capabilities?.schedulingAvailability===true,
       schedulingSlotDiscovery:result.capabilities?.schedulingSlotDiscovery===true,
       schedulingSlotLocking:result.capabilities?.schedulingSlotLocking===true,
+      schedulingBooking:result.capabilities?.schedulingBooking===true,
     };
   }catch{
     return empty;
