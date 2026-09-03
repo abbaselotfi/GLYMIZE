@@ -13,7 +13,15 @@ REPO_ROOT = ROOT.parent.parent
 RUNS_DIR = ROOT / "runs"
 SOURCE_NAME = "glymize-drug-bundle-fixed.json"
 OUTPUT_NAME = "glymize-drug-bundle-ready.json"
-REFERENCE_CATALOG_PATH = REPO_ROOT / "apps" / "api" / "src" / "catalog" / "global-reference-catalog.ts"
+REFERENCE_CATALOG_PATH = (
+    REPO_ROOT
+    / "apps"
+    / "api"
+    / "src"
+    / "catalog"
+    / "global-reference-catalog"
+    / "presentations.ts"
+)
 
 DIGIT_TRANSLATION = str.maketrans({
     "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
@@ -43,11 +51,15 @@ def _reference_generic_label(value: Any) -> str:
 def _load_reference_catalogue() -> list[dict[str, Any]]:
     text = REFERENCE_CATALOG_PATH.read_text(encoding="utf-8")
     start_marker = "export const globalReferenceCatalogue: readonly ReferenceMedicationPresentation[] = "
-    end_marker = ";\n\nexport const globalReferenceCatalogueSources"
-    if start_marker not in text or end_marker not in text:
-        raise ValueError("ساختار فایل global-reference-catalog.ts شناخته نشد.")
-    payload = text.split(start_marker, 1)[1].split(end_marker, 1)[0]
-    parsed = json.loads(payload)
+    if start_marker not in text:
+        raise ValueError("ساختار فایل presentations.ts شناخته نشد.")
+    payload = text.split(start_marker, 1)[1]
+    try:
+        parsed, end_index = json.JSONDecoder().raw_decode(payload)
+    except json.JSONDecodeError as error:
+        raise ValueError("ساختار فایل presentations.ts شناخته نشد.") from error
+    if payload[end_index:].strip() != ";":
+        raise ValueError("ساختار فایل presentations.ts شناخته نشد.")
     if not isinstance(parsed, list):
         raise ValueError("فهرست مرجع دارویی معتبر نیست.")
     return parsed
