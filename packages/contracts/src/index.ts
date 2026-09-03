@@ -751,4 +751,5 @@ export * from "./provider-directory.js";
 export * from "./referrals.js";
 export * from "./care-relationships.js";
 export * from "./patient-practice-contexts.js";
+export * from "./scheduling.js";
 export * from "./physician-orders.js";
