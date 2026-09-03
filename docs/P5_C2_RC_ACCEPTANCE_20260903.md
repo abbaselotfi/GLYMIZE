@@ -74,7 +74,8 @@ flag-off response after normal Worker-version propagation.
 - Acquired/released hold and patient security events: PASS
 - Appointment table deliberately absent: PASS
 - Diff and TODO checks: PASS
-- GitHub Actions runtime validation: pending final documentation commit
+- GitHub Actions runtime validation: PASS
+  ([run `33701667351`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/33701667351))
 
 ## Isolation and remaining release gates
 
