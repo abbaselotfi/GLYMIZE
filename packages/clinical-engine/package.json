@@ -28,6 +28,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "lint": "biome lint --diagnostic-level=error .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --exclude test/evidence-casebase-uci-v1.test.ts",
     "test:evidence": "vitest run test/evidence-casebase-uci-v1.test.ts"

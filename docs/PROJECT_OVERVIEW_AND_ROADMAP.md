@@ -830,10 +830,10 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 1 — Linting and formatting
 
-- [ ] Configure Biome once at the repository root for `apps/*` and `packages/*`.
-- [ ] Add root and Turborepo `lint` tasks.
-- [ ] Fix only violations required for a clean baseline.
-- [ ] Make CI fail on lint errors without changing clinical behavior.
+- [x] Configure Biome once at the repository root for `apps/*` and `packages/*`.
+- [x] Add root and Turborepo `lint` tasks.
+- [x] Fix only violations required for a clean baseline.
+- [x] Make CI fail on lint errors without changing clinical behavior.
 
 #### Task 2 — CI on every pull request
 
@@ -1059,17 +1059,17 @@ An improvement should not be marked complete until all relevant items below are 
 
 The recommended first task is:
 
-> **Phase 0 / Task 1 — establish repository-wide Biome linting and formatting, wire the root and Turborepo lint tasks, and make lint an enforced CI gate without changing clinical behavior.**
+> **Phase 0 / Task 2 — add an additive GitHub Actions workflow for every pull request targeting `main`, running install, typecheck, lint, and tests while retaining the specialized workflows.**
 
-The task must remain a baseline-only engineering change:
+The task must remain an additive CI change:
 
-- use one root configuration for `apps/*` and `packages/*`;
-- avoid unrelated formatting or refactors;
-- do not touch clinical meaning, published rule content, or activation behavior;
-- run `pnpm lint`, `pnpm typecheck`, and `pnpm test` across the monorepo;
-- deliver the work in its own PR with test evidence and any deferred decision stated explicitly.
+- trigger on `pull_request` events targeting `main`;
+- use the repository-pinned pnpm and Node versions;
+- run a frozen install followed by `pnpm typecheck`, `pnpm lint`, and `pnpm test`;
+- keep branch-specific and deployment workflows intact;
+- make no runtime, clinical-rule, migration, or Cloudflare change.
 
-The previously identified rebranding work remains in Phase 1 and is not part of this task.
+Phase 0 / Task 1 established the root Biome baseline and is complete. The previously identified rebranding work remains in Phase 1.
 
 ---
 
@@ -1081,7 +1081,8 @@ The previously identified rebranding work remains in Phase 1 and is not part of 
 - Added engineering weaknesses §8.19–§8.26 and clinical convergence weaknesses §8.27–§8.33.
 - Added the ordered Phase 0 engineering-hygiene program, Phase 3 clinical-engine convergence program, and Phase 4 multi-domain scenario program.
 - Recorded one-PR-per-task, full-suite, clinical-source, and sequencing constraints.
-- Set Phase 0 / Task 1 as the immediate next task.
+- Completed Phase 0 / Task 1 with a pinned root Biome configuration, Turborepo package lint tasks, and lint gates in existing CI workflows.
+- Set Phase 0 / Task 2 as the immediate next task.
 
 ### 2026-07-31
 
