@@ -7,6 +7,10 @@ import {
 } from "./platform-team-invitation-policy";
 
 import { patientRecordV2Route } from "./platform-patient-record-v2";
+import {
+  authorizePatientRoute,
+  type PatientRouteId,
+} from "./patient-access-rbac";
 import { createCredential, validCredentialValue } from "./platform-v3-credential";
 import {
   defaultAssistantPermissions,
@@ -307,6 +311,20 @@ async function isAdminSession(request: Request, env: Env) {
 
 function hasPermission(user: RuntimeUser, permission: AssistantPermission) {
   return user.permissions.includes(permission);
+}
+
+async function runtimeUserCanAccessPatientRoute(
+  env: Env,
+  auth: AuthContext,
+  route: PatientRouteId,
+) {
+  const decision = await authorizePatientRoute(
+    db(env),
+    auth.user.id,
+    auth.user.practiceId,
+    route,
+  );
+  return decision.allowed;
 }
 
 async function issueSession(env: Env, user: RuntimeUser, rememberMe: boolean, deviceLabel?: string, familyId?: string, parentTokenId?: string) {
@@ -1524,6 +1542,7 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
       database:db(env),
       clinicalSecret:clinicalSecret(env),
       user:auth.user,
+      authorize:(route)=>runtimeUserCanAccessPatientRoute(env,auth,route),
       respond:(body,status=200)=>json(request,env,body,status),
       audit:(action,targetType,targetId,meta)=>
         audit(env,auth.user.id,auth.user.practiceId,action,targetType,targetId,meta),
@@ -1548,9 +1567,17 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
       410,
     );
   }
-  if (url.pathname==="/v1/patient-handoff/lookup" && request.method==="POST") return lookupHandoff(request,env,auth);
+  if (url.pathname==="/v1/patient-handoff/lookup" && request.method==="POST") {
+    if (!(await runtimeUserCanAccessPatientRoute(env,auth,"patient_handoff.legacy.read"))) {
+      return json(request,env,{error:"patient_role_required",requiredRole:"editor"},403);
+    }
+    return lookupHandoff(request,env,auth);
+  }
   const handoffRecordMatch=url.pathname.match(/^\/v1\/patient-handoff\/records\/([^/]+)$/);
   if (handoffRecordMatch && request.method==="GET") {
+    if (!(await runtimeUserCanAccessPatientRoute(env,auth,"patient_handoff.legacy.read"))) {
+      return json(request,env,{error:"patient_role_required",requiredRole:"editor"},403);
+    }
     return getHandoffById(
       request,
       env,
@@ -1558,7 +1585,12 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
       decodeURIComponent(handoffRecordMatch[1]!),
     );
   }
-  if (url.pathname==="/v1/patient-handoff/list" && request.method==="GET") return listHandoffs(request,env,auth);
+  if (url.pathname==="/v1/patient-handoff/list" && request.method==="GET") {
+    if (!(await runtimeUserCanAccessPatientRoute(env,auth,"patient_handoff.legacy.read"))) {
+      return json(request,env,{error:"patient_role_required",requiredRole:"editor"},403);
+    }
+    return listHandoffs(request,env,auth);
+  }
 
   return json(request,env,{error:"not_found"},404);
 }

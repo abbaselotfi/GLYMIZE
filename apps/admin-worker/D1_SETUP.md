@@ -119,3 +119,17 @@ Portal sessions.
 Migration `0010` does not enable SMS delivery or login. It stores only keyed
 destination lookup and hashed code material, has bounded attempts/expiry, and
 must be deployed while `PATIENT_SMS_OTP_ENABLED=false`.
+
+## Phase 0 / Task 6 patient-access RBAC rollout
+
+Migration `0018_patient_access_rbac.sql` adds practice-scoped `editor` and
+`approver` assignments for patient-adjacent routes. Apply it before deploying
+the matching Worker code. The migration seeds active physicians as approvers
+and active assistants as editors, then keeps future membership changes in sync
+with database triggers. A missing or inactive assignment fails closed.
+
+Validate migration and role behavior against a local or RC/staging D1 first.
+Do not apply this migration remotely as part of ordinary development or CI;
+remote migration and Worker deployment remain separate release gates. The full
+authorization boundary and temporary catalogue exception are documented in
+[`docs/architecture/PATIENT_ACCESS_RBAC.md`](../../docs/architecture/PATIENT_ACCESS_RBAC.md).

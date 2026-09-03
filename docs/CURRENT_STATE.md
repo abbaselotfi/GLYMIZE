@@ -14,8 +14,8 @@ Run `node scripts/generate-current-state.mjs` from the repository root to reprod
 | Repository fact | Count |
 | --- | ---: |
 | Web App Router entries | 27 (27 pages, 0 route handlers) |
-| Automated test files | 62 (57 JS/TS, 5 Python) |
-| SQL migration files | 22 (17 Worker/D1, 5 PostgreSQL foundation) |
+| Automated test files | 63 (58 JS/TS, 5 Python) |
+| SQL migration files | 23 (18 Worker/D1, 5 PostgreSQL foundation) |
 <!-- current-state:generated:end -->
 
 The counts are file inventory, not a claim that every route or migration is active in production. JS/TS test files include Vitest and Playwright files; Python tests cover the Iran drug-data tooling.
@@ -39,8 +39,9 @@ The counts are file inventory, not a claim that every route or migration is acti
 ### Patient and practice runtime
 
 - A Cloudflare Worker entry point that combines admin publishing with runtime authentication, profile/team management, Evidence Assistant, Patient Record v2, portal, provider, referral, relationship, practice-context, and scheduling route modules.
-- D1 migrations through `0017`, including runtime accounts, longitudinal patients and encounters, immutable snapshot revisions, patient portal sessions, additive global patient identity, provider/referral/relationship foundations, practice contexts, availability, slot holds, appointments, and appointment policy snapshots.
+- D1 migrations through `0018`, including runtime accounts, longitudinal patients and encounters, immutable snapshot revisions, patient portal sessions, additive global patient identity, provider/referral/relationship foundations, practice contexts, availability, slot holds, appointments, appointment policy snapshots, and practice-scoped patient-access roles.
 - Patient Record v2 practice-scoped resolve/create, identifier attachment, monotonic file-number allocation, Care Team atomic intake, encounters, snapshot revisions, observations, archive, and workspace reads.
+- Request-time `editor`/`approver` authorization on patient-adjacent Worker routes, with existing fine-grained permissions retained as a second gate and self-approval denied for encounter and reviewed legacy-link changes.
 - Care Team OCR/manual intake and reviewed handoff creation, explicit create/update intent, duplicate-code guard, optimistic revision conflict handling, and actionable Runtime failure messages.
 - A practice-local patient registry remains the clinical record. Global patient identity and verified legacy links are additive and do not replace or silently merge practice-local records.
 - Legacy `patient_handoffs` reads and explicit promotion remain for compatibility; its create/update routes are retired.
@@ -63,7 +64,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Planned in the canonical execution order
 
-- Phase 0 Tasks 6–9: route-level Worker RBAC and separation of duties, decomposition of five oversized modules, CSS consolidation, and the catalogue-persistence ADR.
+- Phase 0 Tasks 7–9: decomposition of five oversized modules, CSS consolidation, and the catalogue-persistence ADR.
 - Phase 3 Tasks 1–5: trace the live Type 2 call path, converge on decision-graph-v2, remove independent threshold duplication, make hard contraindications structural exclusions, and improve product/dose evidence indexing.
 - Phase 4 Tasks 6–10: verified multi-domain inventory, sourced blood-pressure/lipid objectives and product-dose rules, scenario-diversity acceptance, and extended stress validation.
 - Patient Care Hub work after the completed P5-C scheduling checkpoint remains subject to its own feature gates, security review, and release acceptance.
