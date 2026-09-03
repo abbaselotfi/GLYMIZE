@@ -75,7 +75,8 @@ The protected management endpoint fails closed with
 - Other-practice rule non-disclosure: PASS
 - Appointment table deliberately absent: PASS
 - Diff and TODO checks: PASS
-- GitHub Actions runtime validation: pending final documentation commit
+- GitHub Actions runtime validation: PASS
+  ([run `33700198393`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/33700198393))
 
 ## Isolation and remaining release gates
 
