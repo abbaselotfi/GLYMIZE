@@ -862,10 +862,10 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 6 — RBAC in `apps/admin-worker`
 
-- [ ] Replace login-only authorization on patient-adjacent routes with server-side `editor` and `approver` roles or a stronger equivalent.
-- [ ] Add the next numbered migration and per-route authorization tests.
-- [ ] Prove an editor cannot approve their own change and unauthorized requests fail.
-- [ ] Document any temporary catalogue-publication exception explicitly.
+- [x] Replace login-only authorization on patient-adjacent routes with server-side `editor` and `approver` roles or a stronger equivalent.
+- [x] Add the next numbered migration and per-route authorization tests.
+- [x] Prove an editor cannot approve their own change and unauthorized requests fail.
+- [x] Document any temporary catalogue-publication exception explicitly.
 
 #### Task 7 — God-file decomposition
 
@@ -1057,18 +1057,18 @@ An improvement should not be marked complete until all relevant items below are 
 
 ## 11. Immediate next task
 
-The recommended first task is:
+The immediate next task is:
 
-> **Phase 0 / Task 6 — add server-enforced editor/approver RBAC to patient-adjacent Worker routes, with separation-of-duties tests and the next numbered migration.**
+> **Phase 0 / Task 7 — decompose the five oversized modules named in §8.24 without changing behavior or public APIs.**
 
 The task must:
 
-- replace login-only checks with persisted server-side roles enforced per route;
-- reject unauthenticated and unauthorized access at the affected route, not only at login;
-- prevent an editor from approving their own change and prove it with tests;
-- state explicitly if the existing GitHub-owner catalogue publish path remains a temporary exception.
+- use `packages/clinical-engine/src/decision-graph-v2` as the modular reference pattern;
+- split each named file into cohesive submodules while preserving its public API;
+- add or retain equivalence tests before and after each extraction;
+- avoid clinical, product, or presentation behavior changes.
 
-Phase 0 / Tasks 1–5 established linting, universal pull-request validation, web unit/E2E coverage, explicit runtime authority, and a reproducible factual current-state snapshot. The previously identified rebranding work remains in Phase 1.
+Phase 0 / Tasks 1–6 established linting, universal pull-request validation, web unit/E2E coverage, explicit runtime authority, a reproducible factual current-state snapshot, and persisted request-time RBAC for patient-adjacent Worker routes. The previously identified rebranding work remains in Phase 1.
 
 ---
 
@@ -1085,7 +1085,8 @@ Phase 0 / Tasks 1–5 established linting, universal pull-request validation, we
 - Completed Phase 0 / Task 3 with ten web unit tests, four critical-flow Playwright tests, and explicit Care Team Runtime error mapping.
 - Completed Phase 0 / Task 4 with an accepted runtime-of-record ADR and an explicit local-development-only classification for `apps/api`.
 - Completed Phase 0 / Task 5 with a generated repository inventory, a factual implemented/partial/planned snapshot, and an accurate multi-surface README introduction.
-- Set Phase 0 / Task 6 as the immediate next task.
+- Completed Phase 0 / Task 6 with migration `0018`, request-time patient-route roles, self-approval guards, authorization tests, and an explicit catalogue-publisher exception.
+- Set Phase 0 / Task 7 as the immediate next task.
 
 ### 2026-07-31
 

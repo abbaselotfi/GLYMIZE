@@ -19,6 +19,11 @@ import {
   sha256Hex,
   validateIranianNationalId,
 } from "./runtime-security";
+import {
+  authorizePatientRoute,
+  isSelfApproval,
+  type PatientRouteId,
+} from "./patient-access-rbac";
 
 const IDENTITY_ACCESS_CONTEXT = "PATIENT-IDENTITY-ACCESS-V1";
 const RATE_WINDOW_MS = 15 * 60 * 1000;
@@ -489,9 +494,29 @@ async function exchangeLinkedPortalSession(
   return reply(request, env, portalSession);
 }
 
-async function requireLinkReviewer(request: Request, env: V3Env) {
+async function requireLinkReviewer(
+  request: Request,
+  env: V3Env,
+  route: PatientRouteId,
+) {
   const auth = await v3RequireRuntime(request, env);
   if (!auth) return { error: reply(request, env, { error: "auth_required" }, 401) } as const;
+  const decision = await authorizePatientRoute(
+    v3db(env),
+    auth.user.id,
+    auth.user.practiceId,
+    route,
+  );
+  if (!decision.allowed) {
+    return {
+      error: reply(
+        request,
+        env,
+        { error: "patient_role_required", requiredRole: decision.requiredRole },
+        403,
+      ),
+    } as const;
+  }
   if (!auth.user.permissions.includes("admin.users")) {
     return { error: reply(request, env, { error: "permission_denied" }, 403) } as const;
   }
@@ -499,7 +524,11 @@ async function requireLinkReviewer(request: Request, env: V3Env) {
 }
 
 async function adminLegacyLinks(request: Request, env: V3Env) {
-  const reviewer = await requireLinkReviewer(request, env);
+  const reviewer = await requireLinkReviewer(
+    request,
+    env,
+    "patient_identity.legacy_link.read",
+  );
   if ("error" in reviewer) return reviewer.error!;
   const status = new URL(request.url).searchParams.get("status");
   if (status && !["pending", "verified", "rejected", "revoked"].includes(status)) {
@@ -528,6 +557,20 @@ async function requestLegacyLink(request: Request, env: V3Env) {
   }
   const runtime = await v3RequireRuntime(request, env);
   if (!runtime) return reply(request, env, { error: "auth_required" }, 401);
+  const decision = await authorizePatientRoute(
+    v3db(env),
+    runtime.user.id,
+    runtime.user.practiceId,
+    "patient_identity.legacy_link.request",
+  );
+  if (!decision.allowed) {
+    return reply(
+      request,
+      env,
+      { error: "patient_role_required", requiredRole: decision.requiredRole },
+      403,
+    );
+  }
   if (!runtime.user.permissions.includes("handoff.read")) {
     return reply(request, env, { error: "permission_denied" }, 403);
   }
@@ -614,7 +657,11 @@ async function decideLegacyLink(
   if (!recordLinkingEnabled(env)) {
     return reply(request, env, { error: "record_linking_disabled" }, 403);
   }
-  const reviewer = await requireLinkReviewer(request, env);
+  const reviewer = await requireLinkReviewer(
+    request,
+    env,
+    "patient_identity.legacy_link.approve",
+  );
   if ("error" in reviewer) return reviewer.error!;
   if (reviewer.auth.user.role !== "physician") {
     return reply(request, env, { error: "physician_review_required" }, 403);
@@ -627,6 +674,15 @@ async function decideLegacyLink(
   }
   const link = await readLegacyLink(env, portalUserId, reviewer.auth.user.practiceId);
   if (!link) return reply(request, env, { error: "link_not_found" }, 404);
+  if (
+    decision !== "revoke" &&
+    isSelfApproval(
+      reviewer.auth.user.id,
+      link.requested_by_runtime_user_id,
+    )
+  ) {
+    return reply(request, env, { error: "self_approval_forbidden" }, 409);
+  }
   const expected = decision === "revoke" ? "verified" : "pending";
   if (link.link_status !== expected) {
     return reply(request, env, { error: "invalid_link_transition" }, 409);

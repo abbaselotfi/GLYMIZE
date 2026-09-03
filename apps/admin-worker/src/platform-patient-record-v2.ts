@@ -18,6 +18,10 @@ import {
   resolveSmartPatientIdentifierKind,
   type PatientIdentifierKind,
 } from "./patient-record-v2-policy";
+import {
+  isSelfApproval,
+  type PatientRouteId,
+} from "./patient-access-rbac";
 
 type PatientRecordUser = {
   id: string;
@@ -31,6 +35,7 @@ export type PatientRecordV2RouteContext = {
   database: D1Database;
   clinicalSecret: string;
   user: PatientRecordUser;
+  authorize: (route: PatientRouteId) => Promise<boolean>;
   respond: (body: unknown, status?: number) => Response;
   audit: (
     action: string,
@@ -39,6 +44,24 @@ export type PatientRecordV2RouteContext = {
     meta?: unknown,
   ) => Promise<void>;
 };
+
+async function requirePatientRoute(
+  context: PatientRecordV2RouteContext,
+  route: PatientRouteId,
+) {
+  return (await context.authorize(route))
+    ? null
+    : context.respond(
+        {
+          error: "patient_role_required",
+          requiredRole: route.endsWith(".approve") ||
+            route === "patient_record.allocator.initialize"
+            ? "approver"
+            : "editor",
+        },
+        403,
+      );
+}
 
 type AllocatorRow = {
   allocation_status: "uninitialized" | "ready";
@@ -2606,6 +2629,17 @@ async function createEncounter(
       422,
     );
   }
+  if (status === "reviewed" || status === "completed") {
+    if (!(await context.authorize("patient_record.encounter.approve"))) {
+      return context.respond(
+        { error: "patient_role_required", requiredRole: "approver" },
+        403,
+      );
+    }
+    // This request is necessarily both authoring and approving the new
+    // encounter. Require a later approval request from another approver.
+    return context.respond({ error: "self_approval_forbidden" }, 409);
+  }
 
   const source =
     context.user.role === "assistant"
@@ -2810,6 +2844,7 @@ type EncounterStateRow = {
     | "reviewed"
     | "completed"
     | "archived";
+  created_by: string;
   current_revision: number | null;
   latest_signed_plan_id: string | null;
 };
@@ -2821,6 +2856,7 @@ async function readEncounterState(
 ) {
   return context.database.prepare(
     `SELECT e.id,e.patient_id,e.encounter_at,e.encounter_kind,e.source,e.status,
+            e.created_by,
             (
               SELECT MAX(s.revision)
               FROM patient_encounter_snapshots s
@@ -3116,6 +3152,18 @@ async function reviseEncounter(
       { error: "invalid_encounter_status_transition" },
       422,
     );
+  }
+
+  if (targetStatus === "reviewed" || targetStatus === "completed") {
+    if (!(await context.authorize("patient_record.encounter.approve"))) {
+      return context.respond(
+        { error: "patient_role_required", requiredRole: "approver" },
+        403,
+      );
+    }
+    if (isSelfApproval(context.user.id, encounter.created_by)) {
+      return context.respond({ error: "self_approval_forbidden" }, 409);
+    }
   }
 
   const nextRevision = currentRevision + 1;
@@ -3688,6 +3736,11 @@ export async function patientRecordV2Route(
     url.pathname === "/v1/patients/file-number-allocator" &&
     request.method === "GET"
   ) {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.allocator.read",
+    );
+    if (denied) return denied;
     return getAllocator(context);
   }
   if (
@@ -3695,36 +3748,66 @@ export async function patientRecordV2Route(
       "/v1/patients/file-number-allocator/initialize" &&
     request.method === "POST"
   ) {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.allocator.initialize",
+    );
+    if (denied) return denied;
     return initializeAllocator(request, context);
   }
   if (
     url.pathname === "/v1/patients/archive" &&
     request.method === "GET"
   ) {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.archive.read",
+    );
+    if (denied) return denied;
     return listPatientArchive(request, context);
   }
   if (
     url.pathname === "/v1/patients/resolve" &&
     request.method === "POST"
   ) {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.resolve",
+    );
+    if (denied) return denied;
     return resolvePatient(request, context);
   }
   if (
     url.pathname === "/v1/patients/promote-legacy-handoff" &&
     request.method === "POST"
   ) {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.legacy.promote",
+    );
+    if (denied) return denied;
     return promoteLegacyHandoff(request, context);
   }
   if (
     url.pathname === "/v1/patients/care-team-intake" &&
     request.method === "POST"
   ) {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.intake.create",
+    );
+    if (denied) return denied;
     return createCareTeamPatientIntake(request, context);
   }
   if (
     url.pathname === "/v1/patients" &&
     request.method === "POST"
   ) {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.patient.create",
+    );
+    if (denied) return denied;
     return createPatient(request, context);
   }
 
@@ -3732,6 +3815,11 @@ export async function patientRecordV2Route(
     /^\/v1\/patients\/([^/]+)\/identifiers$/,
   );
   if (identifierMatch && request.method === "POST") {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.identifier.create",
+    );
+    if (denied) return denied;
     return attachPatientIdentifier(
       request,
       context,
@@ -3743,6 +3831,11 @@ export async function patientRecordV2Route(
     /^\/v1\/patients\/([^/]+)\/encounters$/,
   );
   if (encounterMatch && request.method === "POST") {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.encounter.create",
+    );
+    if (denied) return denied;
     return createEncounter(
       request,
       context,
@@ -3754,6 +3847,11 @@ export async function patientRecordV2Route(
     /^\/v1\/patients\/([^/]+)\/encounters\/([^/]+)$/,
   );
   if (encounterDetailMatch && request.method === "GET") {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.encounter.read",
+    );
+    if (denied) return denied;
     return getEncounter(
       context,
       decodeURIComponent(encounterDetailMatch[1]!),
@@ -3761,6 +3859,11 @@ export async function patientRecordV2Route(
     );
   }
   if (encounterDetailMatch && request.method === "PATCH") {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.encounter.revise",
+    );
+    if (denied) return denied;
     return reviseEncounter(
       request,
       context,
@@ -3773,6 +3876,11 @@ export async function patientRecordV2Route(
     /^\/v1\/patients\/([^/]+)\/workspace$/,
   );
   if (workspaceMatch && request.method === "GET") {
+    const denied = await requirePatientRoute(
+      context,
+      "patient_record.workspace.read",
+    );
+    if (denied) return denied;
     return workspace(
       context,
       decodeURIComponent(workspaceMatch[1]!),

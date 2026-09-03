@@ -1,9 +1,16 @@
 # GLYMIZE Admin API
 
-This Cloudflare Worker provides the only write path for the public GitHub Pages
-application. It authenticates the administrator with GitHub OAuth, accepts only
-the configured GitHub login, validates the catalogue payload, and updates only
-`apps/web/public/data/admin-catalog.json`.
+This Cloudflare Worker is the runtime and write authority for catalogue,
+runtime-account, and patient/encounter operations described in the
+[runtime-of-record ADR](../../docs/architecture/RUNTIME_OF_RECORD.md). Patient
+access uses request-time D1 RBAC as documented in
+[the patient-access RBAC note](../../docs/architecture/PATIENT_ACCESS_RBAC.md).
+
+Catalogue publication is the explicit temporary exception: it authenticates
+with GitHub OAuth, accepts only the configured GitHub login, validates the
+catalogue payload, and updates only
+`apps/web/public/data/admin-catalog.json`. That GitHub principal cannot be used
+as a patient, portal-clinician, or encounter authorization role.
 
 Required Worker secrets:
 

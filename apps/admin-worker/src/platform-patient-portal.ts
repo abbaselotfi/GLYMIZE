@@ -32,6 +32,10 @@ import {
 } from "./platform-v3-credential";
 import { v3db, v3now, type V3Env, type V3User } from "./platform-v3-base";
 import { v3RequireRuntime } from "./platform-v3-session";
+import {
+  authorizePatientRoute,
+  type PatientRouteId,
+} from "./patient-access-rbac";
 
 type PortalUserRow = {
   id: string;
@@ -1777,6 +1781,13 @@ async function adminThreadMessages(
   clinician: V3User,
   threadId: string,
 ) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.thread.read",
+  );
+  if (roleDenied) return roleDenied;
   if (clinician.role !== "physician") {
     return reply(
       request,
@@ -2166,6 +2177,31 @@ function clinicianCan(clinician: V3User, permission: RuntimePermission) {
   return clinician.permissions.includes(permission);
 }
 
+async function requireClinicianPatientRoute(
+  request: Request,
+  env: V3Env,
+  clinician: V3User,
+  route: PatientRouteId,
+) {
+  const decision = await authorizePatientRoute(
+    v3db(env),
+    clinician.id,
+    clinician.practiceId,
+    route,
+  );
+  return decision.allowed
+    ? null
+    : reply(
+        request,
+        env,
+        {
+          error: "patient_role_required",
+          requiredRole: decision.requiredRole,
+        },
+        403,
+      );
+}
+
 type PortalSubmissionStatus =
   | "submitted"
   | "acknowledged"
@@ -2203,6 +2239,13 @@ async function adminSubmissionsList(
   env: V3Env,
   clinician: V3User,
 ) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.submission.read",
+  );
+  if (roleDenied) return roleDenied;
   if (!clinicianCan(clinician, "handoff.read")) {
     return reply(request, env, { error: "permission_denied" }, 403);
   }
@@ -2274,6 +2317,13 @@ async function adminSubmissionStatus(
   clinician: V3User,
   submissionId: string,
 ) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.submission.manage",
+  );
+  if (roleDenied) return roleDenied;
   if (clinician.role !== "physician") {
     return reply(
       request,
@@ -2321,6 +2371,16 @@ async function adminSubmissionStatus(
       { error: "invalid_submission_status" },
       422,
     );
+  }
+
+  if (targetStatus === "reviewed") {
+    const approvalDenied = await requireClinicianPatientRoute(
+      request,
+      env,
+      clinician,
+      "portal_clinician.submission.approve",
+    );
+    if (approvalDenied) return approvalDenied;
   }
 
   const submission = await v3db(env)
@@ -2509,6 +2569,13 @@ async function adminThreadsList(
   env: V3Env,
   clinician: V3User,
 ) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.thread.read",
+  );
+  if (roleDenied) return roleDenied;
   if (clinician.role !== "physician") {
     return reply(
       request,
@@ -2566,6 +2633,13 @@ async function adminThreadsList(
   });
 }
 async function adminThreadCreate(request: Request, env: V3Env, clinician: V3User) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.thread.write",
+  );
+  if (roleDenied) return roleDenied;
   if (clinician.role !== "physician") {
     return reply(request, env, { error: "physician_authority_required" }, 403);
   }
@@ -2662,6 +2736,13 @@ async function adminThreadSendMessage(
   clinician: V3User,
   threadId: string,
 ) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.thread.write",
+  );
+  if (roleDenied) return roleDenied;
   if (clinician.role !== "physician") {
     return reply(request, env, { error: "physician_authority_required" }, 403);
   }
@@ -2712,6 +2793,13 @@ async function adminDownloadAttachment(
   clinician: V3User,
   attachmentId: string,
 ) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.attachment.read",
+  );
+  if (roleDenied) return roleDenied;
   if (clinician.role !== "physician") {
     return reply(
       request,
@@ -2773,6 +2861,13 @@ async function adminDownloadAttachment(
   );
 }
 async function adminAccountCreate(request: Request, env: V3Env, clinician: V3User) {
+  const roleDenied = await requireClinicianPatientRoute(
+    request,
+    env,
+    clinician,
+    "portal_clinician.account.create",
+  );
+  if (roleDenied) return roleDenied;
   // Physician authority only: creating a patient's portal identity is a
   // clinical-registry action with PHI implications.
   if (clinician.role !== "physician") {
