@@ -850,9 +850,9 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 4 — Runtime-of-record documentation
 
-- [ ] Add `docs/architecture/RUNTIME_OF_RECORD.md` covering catalogue read/write, clinical evaluation, and patient/encounter authorities.
-- [ ] State whether `apps/api` is active, legacy, or local-development-only and update its README.
-- [ ] Keep this task documentation-only.
+- [x] Add `docs/architecture/RUNTIME_OF_RECORD.md` covering catalogue read/write, clinical evaluation, and patient/encounter authorities.
+- [x] State whether `apps/api` is active, legacy, or local-development-only and update its README.
+- [x] Keep this task documentation-only.
 
 #### Task 5 — Current-state documentation
 
@@ -1059,16 +1059,16 @@ An improvement should not be marked complete until all relevant items below are 
 
 The recommended first task is:
 
-> **Phase 0 / Task 4 — document the authoritative runtime for catalogue operations, clinical evaluation, and patient/encounter data without changing runtime behavior.**
+> **Phase 0 / Task 5 — generate a factual `CURRENT_STATE.md` from the repository and link it from the root README without changing existing safety disclaimers.**
 
-The task is documentation-only and must:
+The task must:
 
-- add `docs/architecture/RUNTIME_OF_RECORD.md`;
-- explicitly identify the read/write authority for catalogue data, clinical evaluation, and patient/encounter data;
-- classify `apps/api` as active, legacy, or local-development-only and update its README;
-- leave runtime behavior unchanged.
+- report only code, migrations, tests, workflows, and runtime paths verifiable in the repository;
+- separate current implementation facts from roadmap intent;
+- link the snapshot from the root README while preserving every existing safety disclaimer verbatim;
+- avoid runtime behavior changes.
 
-Phase 0 / Tasks 1–3 established linting, universal pull-request validation, and web unit/E2E coverage. The previously identified rebranding work remains in Phase 1.
+Phase 0 / Tasks 1–4 established linting, universal pull-request validation, web unit/E2E coverage, and explicit runtime authority. The previously identified rebranding work remains in Phase 1.
 
 ---
 
@@ -1083,7 +1083,8 @@ Phase 0 / Tasks 1–3 established linting, universal pull-request validation, an
 - Completed Phase 0 / Task 1 with a pinned root Biome configuration, Turborepo package lint tasks, and lint gates in existing CI workflows.
 - Completed Phase 0 / Task 2 with an additive `pull_request` workflow for frozen install, typecheck, lint, and tests.
 - Completed Phase 0 / Task 3 with ten web unit tests, four critical-flow Playwright tests, and explicit Care Team Runtime error mapping.
-- Set Phase 0 / Task 4 as the immediate next task.
+- Completed Phase 0 / Task 4 with an accepted runtime-of-record ADR and an explicit local-development-only classification for `apps/api`.
+- Set Phase 0 / Task 5 as the immediate next task.
 
 ### 2026-07-31
 
