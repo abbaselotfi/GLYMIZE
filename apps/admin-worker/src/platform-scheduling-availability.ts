@@ -12,7 +12,11 @@ import {
 import { isRuntimeOriginAllowed } from "./platform-cors";
 import { v3db, v3now, type V3Env } from "./platform-v3-base";
 import { v3RequireRuntime } from "./platform-v3-session";
-import { slotDiscoveryEnabled, slotLockingEnabled } from "./platform-scheduling-slots";
+import {
+  appointmentBookingEnabled,
+  slotDiscoveryEnabled,
+  slotLockingEnabled,
+} from "./platform-scheduling-slots";
 
 type PolicyRow = {
   id: string;
@@ -644,7 +648,7 @@ export async function schedulingAvailabilityRoute(
       availabilityManagement: enabled(env.SCHEDULING_AVAILABILITY_ENABLED),
       patientSlotDiscovery: slotDiscoveryEnabled(env),
       slotLocking: slotLockingEnabled(env),
-      booking: false,
+      booking: appointmentBookingEnabled(env),
       paymentGateway: false,
     });
   }

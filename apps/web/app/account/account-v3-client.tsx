@@ -38,6 +38,7 @@ const EMPTY_CAPS:RuntimeV3Capabilities={
  schedulingAvailability:false,
  schedulingSlotDiscovery:false,
  schedulingSlotLocking:false,
+ schedulingBooking:false,
 };
 
 export default function AccountV3Client(){

@@ -41,7 +41,7 @@ type SlotExceptionRow = {
   visit_mode: SchedulingVisitMode | null;
 };
 
-type ActiveHoldRow = {
+type ActiveReservationRow = {
   starts_at: string;
   ends_at: string;
   lock_starts_at: string;
@@ -84,6 +84,10 @@ export function slotLockingEnabled(env: V3Env) {
     enabled(env.SCHEDULING_SLOT_LOCKING_ENABLED) &&
     enabled(env.PATIENT_IDENTITY_V2_ENABLED) &&
     enabled(env.CARE_RELATIONSHIPS_ENABLED);
+}
+
+export function appointmentBookingEnabled(env: V3Env) {
+  return slotLockingEnabled(env) && enabled(env.SCHEDULING_BOOKING_ENABLED);
 }
 
 function reply(request: Request, env: V3Env, body: unknown, status = 200) {
@@ -258,11 +262,18 @@ async function calculateSlots(
       `SELECT starts_at,ends_at,lock_starts_at,lock_ends_at
        FROM appointment_slot_holds
        WHERE physician_user_id=? AND status='held' AND expires_at>?
+         AND starts_at<? AND ends_at>?
+       UNION ALL
+       SELECT starts_at,ends_at,lock_starts_at,lock_ends_at
+       FROM appointments
+       WHERE physician_user_id=?
+         AND status IN ('requested','confirmed','checked_in','in_progress')
          AND starts_at<? AND ends_at>?`,
     ).bind(
       policy.physician_user_id, now.toISOString(),
       holdRangeEnd, holdRangeStart,
-    ).all<ActiveHoldRow>(),
+      policy.physician_user_id, holdRangeEnd, holdRangeStart,
+    ).all<ActiveReservationRow>(),
   ]);
   const rules = rulesResult.results;
   const exceptions = exceptionsResult.results;
@@ -339,7 +350,7 @@ async function listSlots(request: Request, env: V3Env, providerProfileId: string
   return reply(request, env, {
     slots: slots.map(({ lockStartsAt: _lockStartsAt, lockEndsAt: _lockEndsAt, ...slot }) => slot),
     serverTime: now.toISOString(),
-    bookingEnabled: false,
+    bookingEnabled: appointmentBookingEnabled(env),
   });
 }
 
@@ -485,7 +496,7 @@ async function listHolds(request: Request, env: V3Env) {
   ).bind(now, patient.patientAccountId).all<HoldRow>();
   return reply(request, env, {
     holds: rows.results.map((row) => managedHold(row, row.provider_profile_id!)),
-    bookingEnabled: false,
+    bookingEnabled: appointmentBookingEnabled(env),
   });
 }
 

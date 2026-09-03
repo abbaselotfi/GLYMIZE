@@ -79,7 +79,7 @@ describe("P5-C2 server-authoritative candidate slots and locks", () => {
   it("never turns a candidate or hold into booking/clinical authorization", () => {
     expect(contract).toContain("bookingCreated: false");
     expect(contract).toContain("grantsClinicalAccess: false");
-    expect(runtime).toContain("bookingEnabled: false");
+    expect(runtime).toContain("bookingEnabled: appointmentBookingEnabled(env)");
     expect(runtime).toContain("bookingCreated: false");
     expect(runtime).toContain("grantsClinicalAccess: false");
     expect(runtime).not.toContain("INSERT INTO appointments");
