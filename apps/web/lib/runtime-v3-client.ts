@@ -20,6 +20,7 @@ export interface RuntimeV3Capabilities{
   providerDirectory:boolean;
   referralService:boolean;
   careRelationships:boolean;
+  multiPracticePatient:boolean;
 }
 
 function deviceLabel(){
@@ -46,6 +47,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
     providerDirectory:false,
     referralService:false,
     careRelationships:false,
+    multiPracticePatient:false,
   };
 
   if(!runtimeApiUrl)return empty;
@@ -72,6 +74,7 @@ export async function getRuntimeV3Capabilities():Promise<RuntimeV3Capabilities>{
       providerDirectory:result.capabilities?.providerDirectory===true,
       referralService:result.capabilities?.referralService===true,
       careRelationships:result.capabilities?.careRelationships===true,
+      multiPracticePatient:result.capabilities?.multiPracticePatient===true,
     };
   }catch{
     return empty;

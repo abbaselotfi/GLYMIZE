@@ -34,6 +34,7 @@ const EMPTY_CAPS:RuntimeV3Capabilities={
  providerDirectory:false,
  referralService:false,
  careRelationships:false,
+ multiPracticePatient:false,
 };
 
 export default function AccountV3Client(){

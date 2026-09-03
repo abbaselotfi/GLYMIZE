@@ -6,6 +6,7 @@ import { patientIdentityRoute } from "./platform-patient-identity";
 import { providerDirectoryRoute } from "./platform-provider-directory";
 import { referralServiceRoute } from "./platform-referral-service";
 import { careRelationshipRoute } from "./platform-care-relationships";
+import { patientPracticeContextRoute } from "./platform-patient-practice-contexts";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -78,6 +79,19 @@ export default {
           careRelationships:
             String(env.CARE_RELATIONSHIPS_ENABLED ?? "")
               .trim()
+              .toLowerCase() === "true" &&
+            String(env.PATIENT_IDENTITY_V2_ENABLED ?? "")
+              .trim()
+              .toLowerCase() === "true",
+          multiPracticePatient:
+            String(env.MULTI_PRACTICE_PATIENT_ENABLED ?? "")
+              .trim()
+              .toLowerCase() === "true" &&
+            String(env.CARE_RELATIONSHIPS_ENABLED ?? "")
+              .trim()
+              .toLowerCase() === "true" &&
+            String(env.PATIENT_IDENTITY_V2_ENABLED ?? "")
+              .trim()
               .toLowerCase() === "true",
         },
       });
@@ -94,6 +108,9 @@ export default {
 
     const careRelationships = await careRelationshipRoute(request, env);
     if (careRelationships) return careRelationships;
+
+    const patientPracticeContexts = await patientPracticeContextRoute(request, env);
+    if (patientPracticeContexts) return patientPracticeContexts;
 
     // WS-2/WS-3: patient portal + clinician portal review namespace.
     // Fails closed unless PATIENT_PORTAL_V1_ENABLED === "true".
