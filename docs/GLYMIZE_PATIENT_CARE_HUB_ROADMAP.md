@@ -735,10 +735,16 @@ PASS with activation still OFF. See
 is intentionally stacked on the P5-B1 branch from PR #19; dependency review,
 CI validation and a separate activation decision remain merge/release gates.
 
+Implementation checkpoint (2026-09-02): P5-B3 CareRelationshipService RC PASS
+with lifecycle activation, local-record linking and clinical authorization all
+still OFF. See
+[`P5_B3_RC_ACCEPTANCE_20260902.md`](./P5_B3_RC_ACCEPTANCE_20260902.md). PR #21
+is intentionally stacked on the P5-B2 branch from PR #20.
+
 - provider profile/directory — P5-B1 RC PASS, activation OFF;
 - name / medical council code / specialty search — P5-B1 RC PASS, activation OFF;
 - referral code/QR — P5-B2 RC PASS, activation OFF;
-- care relationship lifecycle;
+- care relationship lifecycle — P5-B3 RC PASS, activation/authorization OFF;
 - multi-practice patient account.
 
 ### P5-C â€” Scheduling core

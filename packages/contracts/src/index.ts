@@ -749,4 +749,5 @@ export * from "./patient-portal.js";
 export * from "./patient-identity.js";
 export * from "./provider-directory.js";
 export * from "./referrals.js";
+export * from "./care-relationships.js";
 export * from "./physician-orders.js";
