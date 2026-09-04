@@ -907,9 +907,9 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 1 — Determine and document the authoritative engine
 
-- [ ] Trace `/type-2` through the web runtime to the exact clinical-engine entry point used today.
-- [ ] Add `docs/architecture/CLINICAL_ENGINE_AUTHORITY.md` identifying both the live engine and the engine validated by the 275,000-case suite.
-- [ ] Make no runtime change in this task.
+- [x] Trace `/type-2` through the web runtime to the exact clinical-engine entry point used today.
+- [x] Add `docs/architecture/CLINICAL_ENGINE_AUTHORITY.md` identifying both the live engine and the engine validated by the 275,000-case suite.
+- [x] Make no runtime change in this task.
 
 #### Task 2 — Converge on `decision-graph-v2`
 
