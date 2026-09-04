@@ -874,15 +874,15 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 #### Task 8 — CSS consolidation
 
-- [ ] Inventory versioned, legacy, final, hotfix, and smoke-fix stylesheets.
-- [ ] Consolidate tokens and overlapping rules into maintained sources of truth.
-- [ ] Screenshot-compare the five key surfaces and delete superseded files.
+- [x] Inventory versioned, legacy, final, hotfix, and smoke-fix stylesheets.
+- [x] Consolidate tokens and overlapping rules into maintained sources of truth.
+- [x] Screenshot-compare the five key surfaces and delete superseded files.
 
 #### Task 9 — Production persistence decision for the catalogue
 
-- [ ] Add `docs/architecture/CATALOGUE_PERSISTENCE_DECISION.md` comparing PostgreSQL, D1, and permanent Git-JSON operation.
-- [ ] Recommend one option against actual scale and growth constraints.
-- [ ] Do not implement the migration until the owner confirms the decision.
+- [x] Add `docs/architecture/CATALOGUE_PERSISTENCE_DECISION.md` comparing PostgreSQL, D1, and permanent Git-JSON operation.
+- [x] Recommend one option against actual scale and growth constraints.
+- [x] Do not implement the migration until the owner confirms the decision.
 
 ### Phase 1 — Identity and scope stabilization
 
