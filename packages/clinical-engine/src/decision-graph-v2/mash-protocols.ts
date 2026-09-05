@@ -16,7 +16,7 @@ export const resmetirom2026LabelEvidenceV2: EvidenceReferenceV2 = {
 };
 
 export const aasldResmetirom2024EvidenceV2: EvidenceReferenceV2 = {
-  sourceId: "AASLD-RESMETIROM-2024",
+  sourceId: "aasld-resmetirom-2024",
   title: "AASLD MASLD Practice Guidance — Resmetirom Therapy update",
   version: "October 2024 update",
   url: "https://www.aasld.org/practice-guidelines/clinical-assessment-and-management-metabolic-dysfunction-associated-steatotic",
