@@ -1,5 +1,6 @@
 import { paretoPruneV2 } from "./pareto.js";
 import { selectLexicographicallyV2 } from "./selector.js";
+import { phaseAwareTitrationCostV2 } from "./wegovy-titration-cost.js";
 import type {
   ClinicalObjectiveIdV2,
   ClinicalObjectiveV2,
@@ -60,6 +61,13 @@ function actionForComponent(request: DecisionGraphRequestV2, component: RegimenC
 }
 
 function patientCostForComponent(request: DecisionGraphRequestV2, component: RegimenComponentV2) {
+  const phasePlan = phaseAwareTitrationCostV2(component);
+  if (phasePlan) {
+    // A phase-aware cash/consumption plan is authoritative for non-insured cost.
+    // Insured-only remains unknown until per-phase claim timing is implemented.
+    if (request.preferences.costPreference === "insured_only") return undefined;
+    return phasePlan.normalizedTreatmentValueToman;
+  }
   const cost = component.selectedProductCost;
   if (cost) {
     const selectedProviders = request.preferences.insuranceProviders ?? [];
