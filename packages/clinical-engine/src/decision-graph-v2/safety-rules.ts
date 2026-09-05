@@ -1,3 +1,4 @@
+import { getActiveClinicalRulePack } from "../rule-pack.js";
 import type {
   EvidenceReferenceV2,
   KnowledgeMedicationV2,
@@ -25,29 +26,35 @@ function metforminIds(knowledge: readonly KnowledgeMedicationV2[]) {
 
 /**
  * Core hard rules from current structured guideline statements.
- * These are categorical constraints, never penalty points.
+ * These are categorical constraints, never penalty points. Shared Type 2
+ * thresholds resolve from the active approved rule pack instead of being
+ * independently authored in this module.
  */
 export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMedicationV2[]): CoreDecisionRulesV2 {
   const medicationGateRules: MedicationGateRuleV2[] = [];
+  const {
+    metforminContraindicatedBelowEgfr,
+    metforminReviewBelowEgfr,
+  } = getActiveClinicalRulePack().type2;
 
   for (const masterDrugId of metforminIds(knowledge)) {
     medicationGateRules.push({
       id: `ADA2026-METFORMIN-EGFR30:${masterDrugId}`,
       masterDrugId,
-      when: { fact: "kidney.eGfr", op: "lt", value: 30 },
+      when: { fact: "kidney.eGfr", op: "lt", value: metforminContraindicatedBelowEgfr },
       effect: "exclude",
-      reason: "Metformin is contraindicated when eGFR is below 30 mL/min/1.73 m²; the candidate is removed by a hard safety gate.",
+      reason: `Metformin is contraindicated when eGFR is below ${metforminContraindicatedBelowEgfr} mL/min/1.73 m²; the candidate is removed by a hard safety gate.`,
       evidence: [ada2026PharmacologicEvidenceV2, kdigoDmCkd2022],
     });
     medicationGateRules.push({
       id: `METFORMIN-EGFR30-44-REVIEW:${masterDrugId}`,
       masterDrugId,
       when: { all: [
-        { fact: "kidney.eGfr", op: "gte", value: 30 },
-        { fact: "kidney.eGfr", op: "lt", value: 45 },
+        { fact: "kidney.eGfr", op: "gte", value: metforminContraindicatedBelowEgfr },
+        { fact: "kidney.eGfr", op: "lt", value: metforminReviewBelowEgfr },
       ] },
       effect: "conditional",
-      reason: "Metformin initiation is not recommended at eGFR 30–44 mL/min/1.73 m²; continuation requires individualized benefit-risk review and dose reassessment.",
+      reason: `Metformin initiation is not recommended from eGFR ${metforminContraindicatedBelowEgfr} up to but below ${metforminReviewBelowEgfr} mL/min/1.73 m²; continuation requires individualized benefit-risk review and dose reassessment.`,
       evidence: [ada2026PharmacologicEvidenceV2, kdigoDmCkd2022],
     });
   }

@@ -1,3 +1,8 @@
+import {
+  bundledClinicalRulePack,
+  getActiveClinicalRulePack,
+  type Type2RuleParameters,
+} from "../rule-pack.js";
 import type { DecisionGraphPolicyV2, EvidenceReferenceV2 } from "./types.js";
 
 const pharmacologic: EvidenceReferenceV2 = {
@@ -24,20 +29,42 @@ const technology: EvidenceReferenceV2 = {
   strength: "guideline_grade_a",
 };
 
+const evidence = { pharmacologic, glycemicGoals, technology } as const;
+
 /**
- * Policy contains thresholds and ordering knobs only — never medication scores.
- * Any change is versionable and regression-testable.
+ * Builds Decision Graph policy from the reviewed Type 2 rule-pack parameters.
+ * Shared pathway thresholds are therefore not independently authored here.
  */
-export const defaultDecisionGraphPolicyV2: DecisionGraphPolicyV2 = {
-  engineName: "GLYMIZE Decision Graph",
-  engineVersion: "2.7.0-alpha.1",
-  severeHyperglycemiaA1cExclusiveAbove: 10,
-  severeHyperglycemiaGlucoseAtOrAboveMgDl: 300,
-  combinationTherapyA1cGapAtOrAbove: 1.5,
-  fastingTargetLowMgDl: 80,
-  fastingTargetHighMgDl: 130,
-  postprandialTargetUpperMgDl: 180,
-  overbasalizationBedtimeMorningDeltaMgDl: 50,
-  topAlternativeCount: 2,
-  evidence: { pharmacologic, glycemicGoals, technology },
-};
+export function buildDecisionGraphPolicyV2FromRuleParameters(
+  type2: Type2RuleParameters,
+): DecisionGraphPolicyV2 {
+  return {
+    engineName: "GLYMIZE Decision Graph",
+    engineVersion: "2.7.0-alpha.1",
+    severeHyperglycemiaA1cExclusiveAbove: type2.severeHyperglycemiaA1cThreshold,
+    severeHyperglycemiaGlucoseAtOrAboveMgDl: 300,
+    combinationTherapyA1cGapAtOrAbove: type2.combinationTherapyGap,
+    fastingTargetLowMgDl: 80,
+    fastingTargetHighMgDl: 130,
+    postprandialTargetUpperMgDl: 180,
+    overbasalizationBedtimeMorningDeltaMgDl: 50,
+    topAlternativeCount: 2,
+    evidence,
+  };
+}
+
+/**
+ * Runtime policy resolves shared Type 2 thresholds from the currently active,
+ * approved rule pack on every graph invocation.
+ */
+export function buildDecisionGraphPolicyV2FromActiveRulePack(): DecisionGraphPolicyV2 {
+  return buildDecisionGraphPolicyV2FromRuleParameters(getActiveClinicalRulePack().type2);
+}
+
+/**
+ * Stable bundled-policy snapshot for tests, documentation, and callers that
+ * intentionally need the shipped approved defaults rather than active runtime
+ * configuration.
+ */
+export const defaultDecisionGraphPolicyV2: DecisionGraphPolicyV2 =
+  buildDecisionGraphPolicyV2FromRuleParameters(bundledClinicalRulePack.type2);

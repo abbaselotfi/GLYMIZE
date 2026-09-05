@@ -6,7 +6,7 @@ import { toRecommendationV2 } from "./explain.js";
 import { applyHardGatesV2 } from "./gates.js";
 import { resolveClinicalObjectivesV2 } from "./objectives.js";
 import { paretoPruneV2 } from "./pareto.js";
-import { defaultDecisionGraphPolicyV2 } from "./policy.js";
+import { buildDecisionGraphPolicyV2FromActiveRulePack } from "./policy.js";
 import { generateRegimenCandidatesV2 } from "./regimens.js";
 import { diversityKeyV2, selectLexicographicallyV2 } from "./selector.js";
 import { runInsulinDecisionSubgraphV2 } from "./insulin-subgraph.js";
@@ -50,7 +50,7 @@ function chooseDiverseAlternatives(primary: RegimenCandidateV2, ordered: readonl
 
 export function runDecisionGraphV2(
   request: DecisionGraphRequestV2,
-  policy: DecisionGraphPolicyV2 = defaultDecisionGraphPolicyV2,
+  policy: DecisionGraphPolicyV2 = buildDecisionGraphPolicyV2FromActiveRulePack(),
 ): DecisionGraphResultV2 {
   const trace: DecisionTraceEntryV2[] = [];
   const clinicalState = classifyClinicalStateV2(request.patient, policy);
