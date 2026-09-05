@@ -18,6 +18,7 @@ import {
   RUNTIME_RULE_IDS,
   RUNTIME_RULE_PACK_VERSION,
   RUNTIME_SOURCE_IDS,
+  evidenceForQuestion,
 } from "../../../apps/admin-worker/src/runtime-evidence.js";
 
 function validNationalId(prefix9: string) {
@@ -84,5 +85,12 @@ describe("online Evidence Assistant snapshot safety", () => {
     expect(RUNTIME_RULE_PACK_VERSION).toBe(bundledClinicalRulePack.version);
     expect([...RUNTIME_RULE_IDS].sort()).toEqual(bundledClinicalRulePack.rules.map((rule) => rule.id).sort());
     expect([...RUNTIME_SOURCE_IDS].sort()).toEqual(activeGuidelineSources.map((source) => source.id).sort());
+  });
+
+  it("cites the current REZDIFFRA label for online resmetirom MASH evidence", () => {
+    const evidence = evidenceForQuestion("دوز resmetirom در MASH F2 F3 چیست؟");
+    const hit = evidence.find((item) => item.ruleId === "T2-LIVER-002");
+    expect(hit).toBeDefined();
+    expect(hit?.citations.map((citation) => citation.sourceId)).toContain("US-LABEL-REZDIFFRA-2026-07");
   });
 });
