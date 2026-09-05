@@ -144,7 +144,7 @@ export const multidomainGuidelineSources = [
     engineRoleEn: "Practical patient selection and monitoring for resmetirom in MASLD/MASH alongside EASL and regulatory evidence",
   },
   {
-    id: "us-label-rezdiffra-2026-07",
+    id: "US-LABEL-REZDIFFRA-2026-07",
     shortCode: "REZDIFFRA PI 2026-07",
     publisher: "DailyMed / FDA label",
     title: "REZDIFFRA (resmetirom) tablets — U.S. prescribing information",
