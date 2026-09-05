@@ -1,5 +1,5 @@
-import PatientPortalEntry from "./patient-portal-entry";
+import PatientCareHubShell from "../patient/patient-care-hub-shell";
 
 export default function PortalPage() {
-  return <PatientPortalEntry />;
+  return <PatientCareHubShell />;
 }
