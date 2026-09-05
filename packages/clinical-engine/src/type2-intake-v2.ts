@@ -106,7 +106,10 @@ export function type2StructuredIntakeToDecisionGraphV2(
       cardiovascular: context?.cardiovascular,
       liver: context?.liver
         ? {
-            chronicLiverDisease: context.liver.cirrhosis === true || context.liver.decompensatedCirrhosis === true,
+            chronicLiverDisease:
+              context.liver.cirrhosis === true || context.liver.decompensatedCirrhosis === true
+                ? true
+                : undefined,
             masldMash: context.liver.masldMash,
             fibrosisStage: context.liver.fibrosisStage,
             cirrhosis: context.liver.cirrhosis,
