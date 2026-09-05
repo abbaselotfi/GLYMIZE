@@ -17,6 +17,7 @@ export * from "./explain.js";
 export * from "./engine.js";
 export * from "./engine-with-specialist-escalations.js";
 export * from "./retinopathy-escalation.js";
+export * from "./diabetic-foot-escalation.js";
 export * from "./inventory-adapter.js";
 export * from "./clinical-normalization.js";
 export * from "./safety-rules.js";
