@@ -32,6 +32,7 @@ export type DecisionLaneV2 =
   | "hypertension"
   | "lipids"
   | "liver"
+  | "neuropathy"
   | "diabetic_foot"
   | "other";
 
@@ -47,6 +48,7 @@ export type ClinicalObjectiveIdV2 =
   | "liver_directed_therapy"
   | "blood_pressure_control"
   | "lipid_risk_reduction"
+  | "painful_dpn_symptom_control"
   | "diabetic_foot_parallel_pathway";
 
 export type ObjectiveLevelV2 = "mandatory" | "strong_preference" | "preference";
@@ -251,6 +253,7 @@ export interface LipidContextV2 {
 }
 
 export interface LiverContextV2 {
+  chronicLiverDisease?: boolean;
   masldMash?: boolean;
   fibrosisStage?: "F0" | "F1" | "F2" | "F3" | "F4" | "unknown";
   cirrhosis?: boolean;
@@ -259,6 +262,22 @@ export interface LiverContextV2 {
   altUL?: number;
   plateletCount10e9L?: number;
   liverStiffnessKpa?: number;
+}
+
+export interface NeuropathyContextV2 {
+  /** Clinician-confirmed diabetic peripheral neuropathy after considering non-diabetic causes. */
+  diabeticPeripheralNeuropathyConfirmed?: boolean;
+  /** Pain/burning/dysesthesia attributable to the confirmed DPN phenotype. */
+  painfulSymptoms?: boolean;
+  /** Acute/subacute, asymmetric, non-length-dependent or motor-predominant features requiring diagnostic review. */
+  atypicalFeaturesPresent?: boolean;
+}
+
+export interface MedicationSafetyContextV2 {
+  /** Current/recent MAOI exposure relevant to duloxetine, including linezolid or IV methylene blue. */
+  maoiUseOrRecentExposure?: boolean;
+  substantialAlcoholUse?: boolean;
+  knownPregabalinHypersensitivity?: boolean;
 }
 
 export interface CurrentMedicationV2 {
@@ -291,6 +310,8 @@ export interface PatientContextV2 {
   cardiovascular?: CardiovascularContextV2;
   lipids?: LipidContextV2;
   liver?: LiverContextV2;
+  neuropathy?: NeuropathyContextV2;
+  medicationSafety?: MedicationSafetyContextV2;
   hypoglycemiaRisk?: "standard" | "high";
   currentMedications?: CurrentMedicationV2[];
   insulinPractical?: InsulinPracticalContextV2;
@@ -313,6 +334,7 @@ export interface ClinicianContextV2 {
 }
 
 export type FactKeyV2 =
+  | "ageYears"
   | "pregnancy"
   | "glycemia.severeHyperglycemia"
   | "glycemia.fastingPlasmaGlucoseMgDl"
@@ -326,9 +348,16 @@ export type FactKeyV2 =
   | "cardiovascular.ascvd"
   | "cardiovascular.heartFailure"
   | "cardiovascular.lvefPercent"
+  | "liver.chronicLiverDisease"
   | "liver.masldMash"
   | "liver.fibrosisStage"
   | "liver.cirrhosis"
+  | "neuropathy.dpnConfirmed"
+  | "neuropathy.painfulSymptoms"
+  | "neuropathy.atypicalFeaturesPresent"
+  | "medicationSafety.maoiUseOrRecentExposure"
+  | "medicationSafety.substantialAlcoholUse"
+  | "medicationSafety.knownPregabalinHypersensitivity"
   | "hypoglycemia.highRisk";
 
 export type ScalarV2 = string | number | boolean;
