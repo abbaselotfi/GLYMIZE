@@ -165,7 +165,6 @@ describe("Phase 4 WorldDrug multidomain recommendation coverage", () => {
     const review = result.medications.filter((item) => item.outputStatus === "requires_approved_protocol");
     const names = new Set(review.map((item) => item.genericName));
 
-    expect(names).toEqual(expect.objectContaining ? names : names);
     expect(names.has("Losartan")).toBe(true);
     expect(names.has("Carvedilol")).toBe(true);
     expect(names.has("Resmetirom")).toBe(true);
