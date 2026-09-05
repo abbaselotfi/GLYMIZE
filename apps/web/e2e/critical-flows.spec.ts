@@ -59,7 +59,7 @@ test("Type 2 assessment produces ranked scenarios", async ({ page }) => {
   await page.getByRole("button", { name: "Build treatment scenarios" }).click();
 
   await expect(page.getByRole("heading", {
-    name: /\d+ suitable scenarios for this patient/,
+    name: /\d+ treatment scenarios(?: \+ WorldDrug review)?/,
   })).toBeVisible();
   await expect(page.getByText("A1C gap")).toBeVisible();
 });
