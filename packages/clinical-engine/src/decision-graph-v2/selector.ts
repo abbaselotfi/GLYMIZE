@@ -87,6 +87,38 @@ export function selectLexicographicallyV2(
   return [...candidates].sort((a, b) => compareLexicographicallyV2(a, b, request, objectives));
 }
 
+/**
+ * Stable scenario axes used only to avoid presenting clinically redundant cards.
+ * Price is intentionally excluded: volatile market price can reorder otherwise
+ * acceptable regimens, but a price-only difference must not manufacture a new
+ * clinical scenario. Generic composition, regimen structure, objective coverage,
+ * route and administration complexity are meaningful treatment differences.
+ */
+export function scenarioDiversityAxesV2(candidate: RegimenCandidateV2) {
+  const therapyGroups = [...new Set(candidate.components.map((item) => item.therapyGroup))].sort();
+  const masterDrugIds = [...new Set(candidate.components.map((item) => item.masterDrugId))].sort();
+  const objectiveCoverage = [...new Set(candidate.objectiveCoverage)].sort();
+  const routes = [...new Set(candidate.components.map((item) => item.selectedProduct?.route ?? "unknown"))].sort();
+  return {
+    kind: candidate.kind,
+    therapyGroups,
+    masterDrugIds,
+    objectiveCoverage,
+    routes,
+    dailyAdministrationBurden: candidate.dailyAdministrationBurden ?? null,
+    distinctProducts: candidate.distinctProducts,
+  } as const;
+}
+
 export function diversityKeyV2(candidate: RegimenCandidateV2) {
-  return `${candidate.kind}|${[...new Set(candidate.components.map((item) => item.therapyGroup))].sort().join("+")}`;
+  const axes = scenarioDiversityAxesV2(candidate);
+  return [
+    `kind:${axes.kind}`,
+    `therapy:${axes.therapyGroups.join("+")}`,
+    `drugs:${axes.masterDrugIds.join("+")}`,
+    `objectives:${axes.objectiveCoverage.join("+")}`,
+    `routes:${axes.routes.join("+")}`,
+    `burden:${axes.dailyAdministrationBurden ?? "unknown"}`,
+    `products:${axes.distinctProducts}`,
+  ].join("|");
 }
