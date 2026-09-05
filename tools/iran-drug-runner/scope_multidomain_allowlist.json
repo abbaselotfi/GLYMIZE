@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "description": "Phase 4 multi-domain extension for the GLYMIZE Iranian three-source consensus pipeline. Entries are limited to approved Master Registry medicines; market brand, price, and insurance values must still come from source evidence.",
+  "entries": [
+    {
+      "canonicalName": "Captopril",
+      "aliases": ["Captopril", "کاپتوپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Enalapril",
+      "aliases": ["Enalapril", "انالاپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Lisinopril",
+      "aliases": ["Lisinopril", "لیزینوپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Ramipril",
+      "aliases": ["Ramipril", "رامیپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Perindopril",
+      "aliases": ["Perindopril", "پریندوپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Benazepril",
+      "aliases": ["Benazepril", "بنازپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Fosinopril",
+      "aliases": ["Fosinopril", "فوزینوپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Quinapril",
+      "aliases": ["Quinapril", "کوییناپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Trandolapril",
+      "aliases": ["Trandolapril", "تراندولاپریل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "ace_inhibitor"
+    },
+    {
+      "canonicalName": "Losartan",
+      "aliases": ["Losartan", "لوزارتان"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "arb"
+    },
+    {
+      "canonicalName": "Valsartan",
+      "aliases": ["Valsartan", "والسارتان"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "arb"
+    },
+    {
+      "canonicalName": "Irbesartan",
+      "aliases": ["Irbesartan", "ایربسارتان"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "arb"
+    },
+    {
+      "canonicalName": "Candesartan",
+      "aliases": ["Candesartan", "کاندسارتان"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "arb"
+    },
+    {
+      "canonicalName": "Telmisartan",
+      "aliases": ["Telmisartan", "تلمیسارتان"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "arb"
+    },
+    {
+      "canonicalName": "Olmesartan",
+      "aliases": ["Olmesartan", "اولمسارتان"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "arb"
+    },
+    {
+      "canonicalName": "Azilsartan medoxomil",
+      "aliases": ["Azilsartan medoxomil", "آزیلسارتان مدوکسومیل"],
+      "clinicalDomains": ["hypertension", "ckd", "cardiovascular"],
+      "catalogueClass": "arb"
+    },
+    {
+      "canonicalName": "Atorvastatin",
+      "aliases": ["Atorvastatin", "آتورواستاتین"],
+      "clinicalDomains": ["lipids", "cardiovascular"],
+      "catalogueClass": "statin"
+    },
+    {
+      "canonicalName": "Rosuvastatin",
+      "aliases": ["Rosuvastatin", "روزوواستاتین"],
+      "clinicalDomains": ["lipids", "cardiovascular"],
+      "catalogueClass": "statin"
+    },
+    {
+      "canonicalName": "Simvastatin",
+      "aliases": ["Simvastatin", "سیمواستاتین"],
+      "clinicalDomains": ["lipids", "cardiovascular"],
+      "catalogueClass": "statin"
+    },
+    {
+      "canonicalName": "Pravastatin",
+      "aliases": ["Pravastatin", "پراواستاتین"],
+      "clinicalDomains": ["lipids", "cardiovascular"],
+      "catalogueClass": "statin"
+    },
+    {
+      "canonicalName": "Lovastatin",
+      "aliases": ["Lovastatin", "لوواستاتین"],
+      "clinicalDomains": ["lipids", "cardiovascular"],
+      "catalogueClass": "statin"
+    },
+    {
+      "canonicalName": "Fluvastatin",
+      "aliases": ["Fluvastatin", "فلوواستاتین"],
+      "clinicalDomains": ["lipids", "cardiovascular"],
+      "catalogueClass": "statin"
+    },
+    {
+      "canonicalName": "Pitavastatin",
+      "aliases": ["Pitavastatin", "پیتاواستاتین"],
+      "clinicalDomains": ["lipids", "cardiovascular"],
+      "catalogueClass": "statin"
+    },
+    {
+      "canonicalName": "Spironolactone",
+      "aliases": ["Spironolactone", "اسپیرونولاکتون"],
+      "clinicalDomains": ["heart_failure", "hypertension", "cardiovascular"],
+      "catalogueClass": "mra"
+    },
+    {
+      "canonicalName": "Finerenone",
+      "aliases": ["Finerenone", "فینرنون"],
+      "clinicalDomains": ["ckd", "cardiovascular"],
+      "catalogueClass": "mra"
+    }
+  ]
+}

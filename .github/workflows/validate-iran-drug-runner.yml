@@ -1,0 +1,38 @@
+name: Validate Iran drug runner
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/iran-drug-runner/**"
+      - ".github/workflows/validate-iran-drug-runner.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iran-drug-runner-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install scope-test dependency
+        run: python -m pip install "openpyxl>=3.1.5,<4"
+
+      - name: Compile consensus pipeline
+        run: python -m py_compile tools/iran-drug-runner/consensus_pipeline.py
+
+      - name: Test Phase 4 multidomain scope merge
+        run: python tools/iran-drug-runner/test_multidomain_scope.py
