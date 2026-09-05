@@ -7,6 +7,10 @@ import type {
   PatientWorkspaceSnapshot,
 } from "@glymize/contracts";
 import { openPatientRecordArchiveItem } from "./patient-record-archive-client";
+import {
+  buildPatientVisitChangeSummary,
+  type PatientVisitChangeSummary,
+} from "./patient-visit-change-summary";
 import { getPatientWorkspace } from "./patient-record-v2-client";
 
 function handoffStatus(
@@ -71,4 +75,40 @@ export async function openPatientTrendSourceEncounter(input: {
   };
 
   return openPatientRecordArchiveItem(archiveItem);
+}
+
+export async function loadLatestPatientVisitChangeSummary(input: {
+  workspace: PatientWorkspaceSnapshot;
+  patientCodeKind: PatientHandoffRecord["patientCodeKind"];
+  patientCodeDisplay: string;
+}): Promise<PatientVisitChangeSummary | null> {
+  const encounters = [...input.workspace.encounters]
+    .sort((left, right) =>
+      right.encounterAt.localeCompare(left.encounterAt),
+    )
+    .slice(0, 2);
+  const currentEncounter = encounters[0];
+  const previousEncounter = encounters[1];
+  if (!currentEncounter || !previousEncounter) return null;
+
+  const [current, previous] = await Promise.all([
+    openPatientTrendSourceEncounter({
+      workspace: input.workspace,
+      encounterId: currentEncounter.encounterId,
+      patientCodeKind: input.patientCodeKind,
+      patientCodeDisplay: input.patientCodeDisplay,
+    }),
+    openPatientTrendSourceEncounter({
+      workspace: input.workspace,
+      encounterId: previousEncounter.encounterId,
+      patientCodeKind: input.patientCodeKind,
+      patientCodeDisplay: input.patientCodeDisplay,
+    }),
+  ]);
+
+  return {
+    ...buildPatientVisitChangeSummary(current, previous),
+    currentAt: currentEncounter.encounterAt,
+    previousAt: previousEncounter.encounterAt,
+  };
 }
