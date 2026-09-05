@@ -24,6 +24,10 @@
     "./patient-document-parser": {
       "types": "./dist/patient-document-parser.d.ts",
       "default": "./dist/patient-document-parser.js"
+    },
+    "./type2-intake-v2": {
+      "types": "./dist/type2-intake-v2.d.ts",
+      "default": "./dist/type2-intake-v2.js"
     }
   },
   "scripts": {
