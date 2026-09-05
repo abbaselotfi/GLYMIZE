@@ -6,7 +6,8 @@
 .loading,
 .signInCard,
 .accountCard,
-.discovery {
+.discovery,
+.referral {
   width: min(720px, 100%);
   margin: 0 auto;
 }
@@ -19,7 +20,8 @@
 
 .signInCard,
 .accountCard,
-.discovery {
+.discovery,
+.referral {
   border: 1px solid rgba(18, 56, 61, 0.12);
   border-radius: 22px 22px 22px 7px;
   padding: clamp(22px, 4vw, 38px);
@@ -27,32 +29,37 @@
   box-shadow: 0 24px 65px rgba(18, 56, 61, 0.09);
 }
 
-.discovery {
+.discovery,
+.referral {
   margin-top: 18px;
   margin-bottom: clamp(26px, 5vw, 68px);
 }
 
-.discovery h2 {
+.discovery h2,
+.referral h2 {
   margin: 0 0 6px;
   color: #12383d;
   font-size: 1.05rem;
 }
 
-.discovery > div > p {
+.discovery > div > p,
+.referral > div > p {
   margin: 0;
   color: #587477;
   font-size: 0.82rem;
   line-height: 1.75;
 }
 
-.discovery form {
+.discovery form,
+.referral form {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
   margin: 16px 0;
 }
 
-.discovery input {
+.discovery input,
+.referral input {
   min-width: 0;
   min-height: 46px;
   border: 1px solid #c9d9d7;
@@ -63,7 +70,9 @@
   font-size: 16px;
 }
 
-.discovery form button {
+.discovery form button,
+.referral form button,
+.referralPreview button {
   min-height: 46px;
   border: 1px solid #087d75;
   border-radius: 11px;
@@ -73,7 +82,25 @@
   font-weight: 850;
 }
 
-.discovery form button:disabled { opacity: 0.5; }
+.discovery form button:disabled,
+.referral form button:disabled,
+.referralPreview button:disabled { opacity: 0.5; }
+
+.referralPreview {
+  display: grid;
+  gap: 6px;
+  padding: 15px;
+  border: 1px solid #cfe3df;
+  border-radius: 13px;
+  background: #f4faf8;
+}
+
+.referralPreview strong { color: #12383d; }
+.referralPreview span,
+.referralPreview small,
+.referralPreview p { color: #587477; font-size: 0.76rem; line-height: 1.65; }
+.referralPreview p { margin: 4px 0 0; }
+.referralPreview button { margin-top: 6px; }
 
 .eyebrow,
 .accountHeader span {
@@ -205,6 +232,8 @@
   .accountHeader button { width: 100%; }
   .practices article { align-items: stretch; flex-wrap: wrap; }
   .practices article button { width: 100%; margin-inline-start: 0; }
-  .discovery { width: calc(100% - 24px); }
-  .discovery form { grid-template-columns: 1fr; }
+  .discovery,
+  .referral { width: calc(100% - 24px); }
+  .discovery form,
+  .referral form { grid-template-columns: 1fr; }
 }
