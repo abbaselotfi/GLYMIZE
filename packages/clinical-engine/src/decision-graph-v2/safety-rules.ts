@@ -54,7 +54,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
         { fact: "kidney.eGfr", op: "lt", value: metforminReviewBelowEgfr },
       ] },
       effect: "conditional",
-      reason: `Metformin initiation is not recommended at eGFR ${metforminContraindicatedBelowEgfr}–${metforminReviewBelowEgfr - 1} mL/min/1.73 m²; continuation requires individualized benefit-risk review and dose reassessment.`,
+      reason: `Metformin initiation is not recommended from eGFR ${metforminContraindicatedBelowEgfr} up to but below ${metforminReviewBelowEgfr} mL/min/1.73 m²; continuation requires individualized benefit-risk review and dose reassessment.`,
       evidence: [ada2026PharmacologicEvidenceV2, kdigoDmCkd2022],
     });
   }
