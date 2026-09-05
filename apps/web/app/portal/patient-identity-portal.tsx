@@ -3,6 +3,7 @@
 import type {
   GlobalPatientAccountSummary,
   PatientIdentityCapabilities,
+  PatientPracticeContext,
   PatientVerifiedLegacyLinkSummary,
 } from "@glymize/contracts";
 import { FormEvent, useEffect, useState } from "react";
@@ -15,6 +16,12 @@ import {
   logoutPatientIdentity,
   registerPatientIdentity,
 } from "../../lib/patient-identity-client";
+import {
+  clearSelectedPatientPracticeContext,
+  listPatientPracticeContexts,
+  resolveSelectedPatientPracticeContext,
+  selectPatientPracticeContext,
+} from "../../lib/patient-practice-context-client";
 import { adoptPortalSession } from "../../lib/portal-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import PatientCareHub from "./patient-care-hub";
@@ -23,12 +30,14 @@ import styles from "./patient-identity-portal.module.css";
 type Props = {
   capabilities: PatientIdentityCapabilities;
   legacyPortalEnabled: boolean;
+  multiPracticePatientEnabled: boolean;
   onUseLegacy: () => void;
 };
 
 export default function PatientIdentityPortal({
   capabilities,
   legacyPortalEnabled,
+  multiPracticePatientEnabled,
   onUseLegacy,
 }: Props) {
   const { locale } = useGlymizeLocale();
@@ -39,18 +48,44 @@ export default function PatientIdentityPortal({
   const [rememberMe, setRememberMe] = useState(false);
   const [account, setAccount] = useState<GlobalPatientAccountSummary | null>(null);
   const [links, setLinks] = useState<PatientVerifiedLegacyLinkSummary[]>([]);
+  const [practiceContexts, setPracticeContexts] = useState<PatientPracticeContext[]>([]);
+  const [selectedPracticeContextId, setSelectedPracticeContextId] = useState<string | null>(null);
+  const [careContextError, setCareContextError] = useState("");
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function loadLinkedPractices(nextAccount: GlobalPatientAccountSummary) {
+  async function loadPatientHome(nextAccount: GlobalPatientAccountSummary) {
     setAccount(nextAccount);
-    if (!nextAccount.linkedClinicalRecord) {
+
+    if (nextAccount.linkedClinicalRecord) {
+      setLinks(await listVerifiedPatientLegacyLinks());
+    } else {
       setLinks([]);
+    }
+
+    if (!multiPracticePatientEnabled) {
+      setPracticeContexts([]);
+      setSelectedPracticeContextId(null);
+      setCareContextError("");
       return;
     }
-    setLinks(await listVerifiedPatientLegacyLinks());
+
+    try {
+      const contexts = await listPatientPracticeContexts();
+      setPracticeContexts(contexts);
+      setSelectedPracticeContextId(resolveSelectedPatientPracticeContext(contexts)?.id ?? null);
+      setCareContextError("");
+    } catch {
+      setPracticeContexts([]);
+      setSelectedPracticeContextId(null);
+      setCareContextError(
+        fa
+          ? "زمینه‌های مراقبتی فعلاً قابل بازیابی نیستند؛ این خطا هیچ دسترسی درمانی ایجاد نمی‌کند."
+          : "Care contexts are temporarily unavailable; this failure does not grant any clinical access.",
+      );
+    }
   }
 
   useEffect(() => {
@@ -58,19 +93,13 @@ export default function PatientIdentityPortal({
     void getPatientIdentitySession()
       .then(async (session) => {
         if (!active || !session) return;
-        const nextLinks = session.account.linkedClinicalRecord
-          ? await listVerifiedPatientLegacyLinks()
-          : [];
-        if (active) {
-          setAccount(session.account);
-          setLinks(nextLinks);
-        }
+        await loadPatientHome(session.account);
       })
       .finally(() => {
         if (active) setReady(true);
       });
     return () => { active = false; };
-  }, []);
+  }, [multiPracticePatientEnabled]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -89,7 +118,7 @@ export default function PatientIdentityPortal({
         );
       } else {
         const session = await loginPatientIdentity({ nationalId, password, rememberMe });
-        await loadLinkedPractices(session.account);
+        await loadPatientHome(session.account);
         setPassword("");
       }
     } catch (reason) {
@@ -112,8 +141,33 @@ export default function PatientIdentityPortal({
     setBusy(true);
     try {
       await logoutPatientIdentity();
+      clearSelectedPatientPracticeContext();
       setAccount(null);
       setLinks([]);
+      setPracticeContexts([]);
+      setSelectedPracticeContextId(null);
+      setCareContextError("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function choosePracticeContext(context: PatientPracticeContext) {
+    if (!context.selectable || !multiPracticePatientEnabled) return;
+    setBusy(true);
+    setCareContextError("");
+    try {
+      const selection = await selectPatientPracticeContext(context.id);
+      if (selection.grantsClinicalAccess || selection.grantsCrossPracticeAccess) {
+        throw new Error("PATIENT_CONTEXT_ACCESS_INVARIANT_FAILED");
+      }
+      setSelectedPracticeContextId(selection.context.id);
+    } catch {
+      setCareContextError(
+        fa
+          ? "انتخاب زمینه مراقبت انجام نشد. هیچ دسترسی درمانی یا بین‌مطب ایجاد نشده است."
+          : "Care-context selection failed. No clinical or cross-practice access was granted.",
+      );
     } finally {
       setBusy(false);
     }
@@ -150,9 +204,13 @@ export default function PatientIdentityPortal({
       <PatientCareHub
         account={account}
         links={links}
+        practiceContexts={practiceContexts}
+        selectedPracticeContextId={selectedPracticeContextId}
+        careContextError={careContextError}
         legacyPortalEnabled={legacyPortalEnabled}
         busy={busy}
         onLogout={() => void logout()}
+        onSelectPracticeContext={(context) => void choosePracticeContext(context)}
         onOpenPractice={(link) => void openPracticePortal(link)}
       />
     );
