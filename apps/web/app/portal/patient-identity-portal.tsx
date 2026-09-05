@@ -17,6 +17,7 @@ import {
 } from "../../lib/patient-identity-client";
 import { adoptPortalSession } from "../../lib/portal-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
+import PatientCareHub from "./patient-care-hub";
 import styles from "./patient-identity-portal.module.css";
 
 type Props = {
@@ -146,56 +147,19 @@ export default function PatientIdentityPortal({
 
   if (account) {
     return (
-      <main className={styles.page}>
-        <section className={styles.accountCard}>
-          <div className={styles.accountHeader}>
-            <div>
-              <span>GLOBAL PATIENT ACCOUNT</span>
-              <h1>{fa ? "حساب بیمار" : "Patient account"}</h1>
-            </div>
-            <button type="button" disabled={busy} onClick={() => void logout()}>
-              {fa ? "خروج" : "Sign out"}
-            </button>
-          </div>
-
-          <div className={styles.statusGrid}>
-            <div><small>{fa ? "وضعیت حساب" : "Account"}</small><strong>{account.status}</strong></div>
-            <div><small>{fa ? "احراز هویت" : "Proofing"}</small><strong>{account.proofingStatus}</strong></div>
-            <div><small>{fa ? "پروندهٔ متصل" : "Linked record"}</small><strong>{account.linkedClinicalRecord ? (fa ? "دارد" : "Yes") : (fa ? "ندارد" : "No")}</strong></div>
-          </div>
-
-          {links.length > 0 ? (
-            <div className={styles.practices}>
-              <h2>{fa ? "مطب‌های تأییدشده" : "Verified practices"}</h2>
-              {links.map((link) => (
-                <article key={link.portalUserId}>
-                  <span aria-hidden="true">✓</span>
-                  <div><strong>{link.practiceName}</strong><small>{fa ? "لینک پرونده تأیید شده" : "Record link verified"}</small></div>
-                  {legacyPortalEnabled ? (
-                    <button type="button" disabled={busy} onClick={() => void openPracticePortal(link)}>
-                      {fa ? "باز کردن پرتال مطب" : "Open practice portal"}
-                    </button>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className={styles.unlinked}>
-              <strong>{fa ? "حساب شما هنوز به پرونده‌ای متصل نیست" : "Your account is not linked to a record yet"}</strong>
-              <p>{fa ? "دانستن کد ملی به‌تنهایی دسترسی درمانی ایجاد نمی‌کند. اتصال باید توسط مطب و در یک جریان تأییدشده انجام شود." : "Knowing a national ID never grants clinical access. A practice must complete a verified linking flow."}</p>
-            </div>
-          )}
-
-          <p className={styles.boundaryNote}>
-            {fa ? "هر پرونده همچنان متعلق به همان مطب است؛ این حساب پرونده‌ها را ادغام نمی‌کند." : "Each clinical record remains owned by its practice; this account never merges records."}
-          </p>
-        </section>
-      </main>
+      <PatientCareHub
+        account={account}
+        links={links}
+        legacyPortalEnabled={legacyPortalEnabled}
+        busy={busy}
+        onLogout={() => void logout()}
+        onOpenPractice={(link) => void openPracticePortal(link)}
+      />
     );
   }
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-patient-surface="identity-entry">
       <section className={styles.signInCard}>
         <div className={styles.eyebrow}>PATIENT IDENTITY v2</div>
         <h1>{mode === "login" ? (fa ? "ورود بیمار" : "Patient sign in") : (fa ? "ساخت حساب سراسری" : "Create global account")}</h1>
