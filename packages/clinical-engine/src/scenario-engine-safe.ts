@@ -74,6 +74,10 @@ function accessConstrainedScenario(
   base: BaseTreatmentScenario | Type2TreatmentScenario,
 ): Type2TreatmentScenario {
   const insuranceOnly = input.request.costPreference === "insured_only";
+  const graphAuthority = input.assessment.recommendation.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY);
+  const authorityRationale = graphAuthority
+    ? [`${TYPE2_DECISION_GRAPH_V2_AUTHORITY}: access wrapper preserved Decision Graph authority; no scenario-layer clinical scoring was executed.`]
+    : [];
   return {
     ...base,
     id: "access-constrained",
@@ -91,9 +95,12 @@ function accessConstrainedScenario(
     rationaleFa: insuranceOnly
       ? ["نبود پوشش بیمه به معنی نبود اندیکاسیون بالینی نیست؛ فیلتر دسترسی باید جدا از ضرورت درمان نمایش داده شود."]
       : ["نبود گزینهٔ واجد شرایط در محدودیت‌های فعلی به معنی نبود نیاز بالینی نیست؛ محدودیت‌ها و مسیر درمان باید بازبینی شوند."],
-    rationaleEn: insuranceOnly
-      ? ["Lack of insurance coverage does not remove clinical indication; access constraints must remain separate from treatment need."]
-      : ["No eligible option under the current constraints does not remove clinical need; review the route/access constraints and care pathway."],
+    rationaleEn: [
+      insuranceOnly
+        ? "Lack of insurance coverage does not remove clinical indication; access constraints must remain separate from treatment need."
+        : "No eligible option under the current constraints does not remove clinical need; review the route/access constraints and care pathway.",
+      ...authorityRationale,
+    ],
     tradeoffsFa: [insuranceOnly
       ? "پوشش بیمه/فرآورده یا تغییر فیلتر هزینه باید توسط پزشک بازبینی شود؛ سیستم داروی بدون پوشش را خودکار جایگزین نمی‌کند."
       : "مسیر تجویز، منع مصرف‌ها و محدودیت‌های انتخاب‌شده باید توسط پزشک بازبینی شوند؛ سیستم محدودیت کاربر را خودکار دور نمی‌زند."],
