@@ -47,6 +47,12 @@ function currentFormFor(request: DecisionGraphRequestV2, masterDrugId: string) {
   )?.dosageFormGroup;
 }
 
+function hasActiveCurrentMedication(request: DecisionGraphRequestV2, masterDrugId: string) {
+  return (request.patient.currentMedications ?? []).some((item) =>
+    (item.status ?? "active") === "active" && item.masterDrugId === masterDrugId,
+  );
+}
+
 function selectedCostForOption(
   request: DecisionGraphRequestV2,
   masterDrugId: string,
@@ -189,6 +195,22 @@ export function enrichCandidateWithDoseMarketCostV2(
     component.genericCostBenchmark = selected.benchmark;
     component.selectedProductCost = selected.selectedCost;
     component.selectedProduct = selected.selectedProduct;
+
+    const isWegovyMashRule = selected.plan.ruleId.startsWith("LABEL-WEGOVY-MASH-");
+    if (isWegovyMashRule && hasActiveCurrentMedication(request, component.masterDrugId)) {
+      // The current dose may be part-way through a 28-day stage, so a 30-day
+      // projection must start from daysOnCurrentDose rather than pretending the
+      // selected strength applies for the whole window. Task 5 adds that exact
+      // continuation-window calculation; until then hide the misleading single-
+      // strength cost while preserving the clinical continuation dose plan.
+      component.selectedProductCost = undefined;
+      component.genericCostBenchmark = undefined;
+      insuranceFits.push("unknown");
+      hasKnownCost = false;
+      dailyBurden += selected.plan.administrationsPerDay;
+      result.cautions.push("هزینه ۳۰روزه continuation WEGOVY تا محاسبه phase-aware بر اساس daysOnCurrentDose نمایش داده نمی‌شود؛ cost تک-strength جایگزین آن نشده است.");
+      continue;
+    }
 
     const needsWegovyPhaseCost = selected.plan.ruleId.startsWith("LABEL-WEGOVY-MASH-INIT-0_25:");
     if (needsWegovyPhaseCost) {
