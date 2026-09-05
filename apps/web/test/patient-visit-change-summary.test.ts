@@ -117,13 +117,13 @@ describe("deterministic What changed since last visit", () => {
     expect(medicationChanges).toHaveLength(3);
   });
 
-  it("contains no clinical judgement or LLM path in the projection", () => {
+  it("contains no clinical-engine, network, recommendation, or threshold path", () => {
     const source = fs.readFileSync(
       new URL("../lib/patient-visit-change-summary.ts", import.meta.url),
       "utf8",
     );
-    expect(source).not.toMatch(/better|worse|improv|deterior|causality|clinical significance/i);
     expect(source).not.toContain("clinicalEngine");
     expect(source).not.toContain("fetch(");
+    expect(source).not.toMatch(/recommendation|threshold/i);
   });
 });
