@@ -7,6 +7,7 @@ import {
   configureType2DecisionGraphRuntimeCatalog,
 } from "../src/index-runtime.js";
 import { buildType2TreatmentScenarios } from "../src/scenario-engine-safe.js";
+import { WORLD_DRUG_CONTEXT_REVIEW_V1 } from "../src/type2-worlddrug-recommendation-compat.js";
 
 const master: MasterDrugRegistryEntry = {
   id: "WD-LIVE-1",
@@ -61,7 +62,7 @@ const marketProduct: IranMarketDrugProduct = {
 afterEach(() => clearType2DecisionGraphRuntimeCatalogForTests());
 
 describe("live Type 2 authority", () => {
-  it("uses Decision Graph v2 when the browser runtime catalogue is configured", () => {
+  it("keeps Decision Graph as executable authority while allowing unranked WorldDrug review options", () => {
     configureType2DecisionGraphRuntimeCatalog({ masterRegistry: [master], marketProducts: [marketProduct] });
     const result = buildType2Assessment([medication], {
       currentHba1c: 8.4,
@@ -73,7 +74,13 @@ describe("live Type 2 authority", () => {
 
     expect(result.recommendation.sourceReference).toContain(TYPE2_DECISION_GRAPH_V2_AUTHORITY);
     expect(result.medications.every((item) => item.priorityScore === 0)).toBe(true);
-    expect(result.medications.every((item) => item.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY))).toBe(true);
+
+    const executable = result.medications.filter((item) => item.outputStatus !== "requires_approved_protocol");
+    const reviewOnly = result.medications.filter((item) => item.outputStatus === "requires_approved_protocol");
+    expect(executable.every((item) => item.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY))).toBe(true);
+    expect(reviewOnly.length).toBeGreaterThan(0);
+    expect(reviewOnly.every((item) => item.sourceReference.includes(WORLD_DRUG_CONTEXT_REVIEW_V1))).toBe(true);
+    expect(reviewOnly.every((item) => (item as { decisionGraphRank?: number }).decisionGraphRank === undefined)).toBe(true);
   });
 
   it("preserves graph rank in the scenario adapter instead of invoking legacy aggregate-score ordering", () => {
