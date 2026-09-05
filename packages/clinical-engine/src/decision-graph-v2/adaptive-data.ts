@@ -4,6 +4,11 @@ import {
   hasEstablishedHypertensionTreatmentContextV2,
   hasTask6RaasIndicationV2,
 } from "./cardiovascular-objectives.js";
+import {
+  finiteNonNegativeClinicalNumberV2,
+  finitePercentClinicalNumberV2,
+  finitePositiveClinicalNumberV2,
+} from "./predicates.js";
 import type {
   ClinicalStateV2,
   DecisionGraphPolicyV2,
@@ -13,7 +18,9 @@ import type {
 
 function hasPatternData(request: DecisionGraphRequestV2) {
   const glycemia = request.patient.glycemia;
-  if (glycemia.twoHourPostprandialGlucoseMgDl !== undefined) return true;
+  if (finiteNonNegativeClinicalNumberV2(glycemia.twoHourPostprandialGlucoseMgDl) !== undefined) {
+    return true;
+  }
   if ((glycemia.smbg?.twoHourPostmealMgDl?.length ?? 0) > 0) return true;
   if (glycemia.cgm?.timeAbove180Percent !== undefined || glycemia.cgm?.timeInRange70To180Percent !== undefined) return true;
   return false;
@@ -51,22 +58,28 @@ export function resolveAdaptiveDataRequirementsV2(
     });
   }
 
-  if ((state.insulinAction === "evaluate_start_basal" || state.insulinAction === "titrate_basal") && request.patient.anthropometrics?.weightKg === undefined) {
+  if (
+    (state.insulinAction === "evaluate_start_basal" || state.insulinAction === "titrate_basal") &&
+    finitePositiveClinicalNumberV2(request.patient.anthropometrics?.weightKg) === undefined
+  ) {
     add({
       key: "anthropometrics.weightKg",
       priority: "required",
       blocksFinalDecision: state.insulinAction === "evaluate_start_basal",
-      reason: "برای پیشنهاد دوز شروع انسولین پایه به وزن نیاز است.",
+      reason: "برای پیشنهاد دوز شروع انسولین پایه به وزن معتبر نیاز است.",
       evidence: [policy.evidence.pharmacologic],
     });
   }
 
-  if (state.pathway === "insulin_centered" && request.patient.glycemia.fastingPlasmaGlucoseMgDl === undefined) {
+  if (
+    state.pathway === "insulin_centered" &&
+    finiteNonNegativeClinicalNumberV2(request.patient.glycemia.fastingPlasmaGlucoseMgDl) === undefined
+  ) {
     add({
       key: "glycemia.fastingPlasmaGlucoseMgDl",
       priority: "recommended",
       blocksFinalDecision: false,
-      reason: "FPG برای تعیین سهم basal و تیتراسیون بعدی انسولین بسیار مهم است.",
+      reason: "FPG معتبر برای تعیین سهم basal و تیتراسیون بعدی انسولین بسیار مهم است.",
       evidence: [policy.evidence.pharmacologic, policy.evidence.glycemicGoals],
     });
   }
@@ -82,32 +95,35 @@ export function resolveAdaptiveDataRequirementsV2(
   }
 
   if (request.patient.kidney?.ckd) {
-    if (request.patient.kidney.eGfr === undefined) {
+    if (finiteNonNegativeClinicalNumberV2(request.patient.kidney.eGfr) === undefined) {
       add({
         key: "kidney.eGfr",
         priority: "required",
         blocksFinalDecision: true,
-        reason: "eGFR برای eligibility و ایمنی بسیاری از درمان‌های دیابت/کلیه لازم است.",
+        reason: "eGFR معتبر برای eligibility و ایمنی بسیاری از درمان‌های دیابت/کلیه لازم است.",
         evidence: [],
       });
     }
-    if (request.patient.kidney.uacrMgG === undefined) {
+    if (finiteNonNegativeClinicalNumberV2(request.patient.kidney.uacrMgG) === undefined) {
       add({
         key: "kidney.uacrMgG",
         priority: "recommended",
         blocksFinalDecision: false,
-        reason: "UACR شدت فنوتیپ کلیوی و نیاز به درمان محافظتی را دقیق‌تر می‌کند.",
+        reason: "UACR معتبر شدت فنوتیپ کلیوی و نیاز به درمان محافظتی را دقیق‌تر می‌کند.",
         evidence: [],
       });
     }
   }
 
-  if (request.patient.cardiovascular?.heartFailure && request.patient.cardiovascular.lvefPercent === undefined) {
+  if (
+    request.patient.cardiovascular?.heartFailure &&
+    finitePercentClinicalNumberV2(request.patient.cardiovascular.lvefPercent) === undefined
+  ) {
     add({
       key: "cardiovascular.lvefPercent",
       priority: "recommended",
       blocksFinalDecision: false,
-      reason: "LVEF برای phenotype نارسایی قلبی و انتخاب درمان‌های اختصاصی مفید است.",
+      reason: "LVEF معتبر برای phenotype نارسایی قلبی و انتخاب درمان‌های اختصاصی مفید است.",
       evidence: [],
     });
   }
