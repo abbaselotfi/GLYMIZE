@@ -28,7 +28,16 @@ function isTopEligible(candidate: RegimenCandidateV2) {
   return candidate.gate.status === "pass";
 }
 
-function chooseDiverseAlternatives(primary: RegimenCandidateV2, ordered: readonly RegimenCandidateV2[], limit: number) {
+/**
+ * Returns at most `limit` alternatives, but never pads the list with a scenario
+ * that is identical to an already-selected scenario on the meaningful diversity
+ * axes. Fewer honest alternatives are preferable to duplicated cards.
+ */
+export function chooseDiverseAlternatives(
+  primary: RegimenCandidateV2,
+  ordered: readonly RegimenCandidateV2[],
+  limit: number,
+) {
   const chosen: RegimenCandidateV2[] = [];
   const keys = new Set<string>([diversityKeyV2(primary)]);
   for (const candidate of ordered) {
@@ -38,11 +47,6 @@ function chooseDiverseAlternatives(primary: RegimenCandidateV2, ordered: readonl
       chosen.push(candidate);
       keys.add(key);
     }
-    if (chosen.length >= limit) return chosen;
-  }
-  for (const candidate of ordered) {
-    if (candidate.regimenId === primary.regimenId || chosen.some((item) => item.regimenId === candidate.regimenId)) continue;
-    chosen.push(candidate);
     if (chosen.length >= limit) break;
   }
   return chosen;
