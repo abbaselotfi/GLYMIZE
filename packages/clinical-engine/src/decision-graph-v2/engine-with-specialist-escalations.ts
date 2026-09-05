@@ -5,6 +5,10 @@ import {
   type NutritionSupportContextV2,
 } from "./nutrition-support-boundary.js";
 import {
+  resolvePregnancyDiabetesPathwayV2,
+  type PregnancyDiabetesContextV2,
+} from "./pregnancy-diabetes-pathway.js";
+import {
   resolveRetinopathySpecialistEscalationV2,
   type RetinopathyContextV2,
   type SpecialistEscalationV2,
@@ -16,6 +20,7 @@ export type DecisionGraphRequestWithSpecialistContextsV2 = Omit<DecisionGraphReq
     retinopathy?: RetinopathyContextV2;
     diabeticFoot?: DiabeticFootContextV2;
     nutritionSupport?: NutritionSupportContextV2;
+    pregnancyCare?: PregnancyDiabetesContextV2;
   };
 };
 
@@ -23,6 +28,7 @@ export type DecisionGraphResultWithSpecialistPathwaysV2 = DecisionGraphResultV2 
   specialistEscalations: SpecialistEscalationV2[];
   diabeticFootPathway: ReturnType<typeof resolveDiabeticFootPathwayV2>;
   nutritionSupportPathway: ReturnType<typeof resolveNutritionSupportBoundaryV2>;
+  pregnancyDiabetesPathway: ReturnType<typeof resolvePregnancyDiabetesPathwayV2>;
 };
 
 /**
@@ -30,9 +36,9 @@ export type DecisionGraphResultWithSpecialistPathwaysV2 = DecisionGraphResultV2 
  * never become medication-ranking authority in the general Decision Graph.
  *
  * The core treatment result is preserved; parallel pathways are appended as
- * separate channels. Ophthalmology, diabetic-foot triage and generic nutrition
- * support therefore cannot manufacture medication candidates, doses, or a
- * second ranking authority.
+ * separate channels. Ophthalmology, diabetic-foot triage, generic nutrition
+ * support and pregnancy diabetes care therefore cannot silently manufacture a
+ * second medication-ranking or dose-execution authority.
  */
 export function runDecisionGraphV2WithSpecialistEscalations(
   request: DecisionGraphRequestWithSpecialistContextsV2,
@@ -42,12 +48,14 @@ export function runDecisionGraphV2WithSpecialistEscalations(
   const retinopathy = resolveRetinopathySpecialistEscalationV2(request);
   const diabeticFootPathway = resolveDiabeticFootPathwayV2(request);
   const nutritionSupportPathway = resolveNutritionSupportBoundaryV2(request);
+  const pregnancyDiabetesPathway = resolvePregnancyDiabetesPathwayV2(request);
 
   const missingData = [...core.missingData];
   for (const item of [
     ...retinopathy.missingData,
     ...diabeticFootPathway.missingData,
     ...nutritionSupportPathway.missingData,
+    ...pregnancyDiabetesPathway.missingData,
   ]) {
     if (!missingData.some((existing) => existing.key === item.key)) missingData.push(item);
   }
@@ -58,6 +66,7 @@ export function runDecisionGraphV2WithSpecialistEscalations(
     specialistEscalations: retinopathy.escalations,
     diabeticFootPathway,
     nutritionSupportPathway,
+    pregnancyDiabetesPathway,
     trace: [
       ...core.trace,
       {
@@ -90,6 +99,16 @@ export function runDecisionGraphV2WithSpecialistEscalations(
         summary: `Nutrition-support pathway=${nutritionSupportPathway.state}; prescriptionExecution=false.`,
         details: nutritionSupportPathway.actions,
         evidence: nutritionSupportPathway.evidence,
+      },
+      {
+        nodeId: "pregnancy-diabetes-safety-pathway",
+        status: pregnancyDiabetesPathway.missingData.length ? "needs_data" : "passed",
+        summary: `Pregnancy-diabetes pathway=${pregnancyDiabetesPathway.state}; autonomousInsulinDoseExecution=false; medicationReviews=${pregnancyDiabetesPathway.medicationReviews.length}.`,
+        details: [
+          ...pregnancyDiabetesPathway.actions,
+          ...pregnancyDiabetesPathway.medicationReviews.map((item) => `${item.medication}: ${item.action}`),
+        ],
+        evidence: pregnancyDiabetesPathway.evidence,
       },
     ],
   };

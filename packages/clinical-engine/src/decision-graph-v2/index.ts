@@ -19,6 +19,7 @@ export * from "./engine-with-specialist-escalations.js";
 export * from "./retinopathy-escalation.js";
 export * from "./diabetic-foot-escalation.js";
 export * from "./nutrition-support-boundary.js";
+export * from "./pregnancy-diabetes-pathway.js";
 export * from "./inventory-adapter.js";
 export * from "./clinical-normalization.js";
 export * from "./safety-rules.js";
