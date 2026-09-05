@@ -1,3 +1,9 @@
+import {
+  ada2026CardiovascularRiskEvidenceV2,
+  bloodPressureInAda2026TreatmentRangeV2,
+  hasEstablishedHypertensionTreatmentContextV2,
+  hasTask6RaasIndicationV2,
+} from "./cardiovascular-objectives.js";
 import type {
   ClinicalStateV2,
   DecisionGraphPolicyV2,
@@ -103,6 +109,21 @@ export function resolveAdaptiveDataRequirementsV2(
       blocksFinalDecision: false,
       reason: "LVEF برای phenotype نارسایی قلبی و انتخاب درمان‌های اختصاصی مفید است.",
       evidence: [],
+    });
+  }
+
+  if (
+    !request.patient.pregnancy &&
+    bloodPressureInAda2026TreatmentRangeV2(request) &&
+    hasTask6RaasIndicationV2(request) &&
+    !hasEstablishedHypertensionTreatmentContextV2(request)
+  ) {
+    add({
+      key: "cardiovascular.hypertensionConfirmation",
+      priority: "recommended",
+      blocksFinalDecision: false,
+      reason: "فشارخون در محدوده درمان و indication برای ACEi/ARB دیده می‌شود، اما context فعلی hypertension تأییدشده را ثابت نمی‌کند؛ پیش از ساخت support دارویی جدید، تشخیص/اندازه‌گیری‌های تأییدی ثبت شود.",
+      evidence: [ada2026CardiovascularRiskEvidenceV2],
     });
   }
 
