@@ -4,6 +4,7 @@ import json
 import re
 from collections import defaultdict
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 import normalize_bundle as _raw
@@ -12,6 +13,7 @@ from source_consensus import apply_identity_consensus, normalize_generic_code, r
 
 
 _UNKNOWN_VALUES = {"", "?", "-", "--", "un", "unknown", "n/a", "na", "none", "null"}
+_MULTIDOMAIN_SCOPE_PATH = Path(__file__).resolve().with_name("scope_multidomain_allowlist.json")
 
 
 def _usable(value: Any) -> str | None:
@@ -173,6 +175,72 @@ def _recompute(bundle: dict[str, Any]) -> None:
     )
 
 
+def _multidomain_scope_payload(scope_path: Path) -> tuple[dict[str, Any] | None, int]:
+    """Merge the Phase 4 scope only into the canonical default catalogue run.
+
+    Custom scope files used for audits/tests remain untouched. The extension is
+    an admission allowlist only: it never supplies brand, price, insurance, or
+    availability values, which continue to require source evidence.
+    """
+    if scope_path.resolve() != _raw.DEFAULT_SCOPE_PATH.resolve():
+        return None, 0
+    if not _MULTIDOMAIN_SCOPE_PATH.exists():
+        raise FileNotFoundError(f"Phase 4 multidomain scope not found: {_MULTIDOMAIN_SCOPE_PATH}")
+
+    base = json.loads(scope_path.read_text(encoding="utf-8"))
+    extension = json.loads(_MULTIDOMAIN_SCOPE_PATH.read_text(encoding="utf-8"))
+    if base.get("schemaVersion") != 1 or extension.get("schemaVersion") != 1:
+        raise ValueError("GLYMIZE scope files must use schemaVersion=1.")
+    base_entries = base.get("entries")
+    extension_entries = extension.get("entries")
+    if not isinstance(base_entries, list) or not isinstance(extension_entries, list) or not extension_entries:
+        raise ValueError("GLYMIZE scope files must contain non-empty entries arrays.")
+
+    seen = {_raw.normalize_text(entry.get("canonicalName")) for entry in base_entries}
+    for entry in extension_entries:
+        canonical = _raw.normalize_text(entry.get("canonicalName"))
+        if not canonical:
+            raise ValueError(f"Invalid multidomain scope entry: {entry}")
+        if canonical in seen:
+            raise ValueError(f"Duplicate canonical scope entry across base/Phase 4: {entry.get('canonicalName')}")
+        seen.add(canonical)
+
+    return {
+        "schemaVersion": 1,
+        "description": f"{base.get('description', '')} + Phase 4 multidomain extension",
+        "entries": [*base_entries, *extension_entries],
+    }, len(extension_entries)
+
+
+def _build_runtime_bundle(
+    nfi_path: Path,
+    insurance_path: Path,
+    default_currency: str | None,
+    scope_path: Path,
+) -> tuple[dict[str, Any], int]:
+    merged_scope, extension_count = _multidomain_scope_payload(scope_path)
+    if merged_scope is None:
+        return _runtime.build_bundle(
+            nfi_path,
+            insurance_path,
+            default_currency,
+            scope_path,
+        ), 0
+
+    with TemporaryDirectory(prefix="glymize-phase4-scope-") as temp_dir:
+        effective_scope_path = Path(temp_dir) / "scope_allowlist.json"
+        effective_scope_path.write_text(
+            json.dumps(merged_scope, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return _runtime.build_bundle(
+            nfi_path,
+            insurance_path,
+            default_currency,
+            effective_scope_path,
+        ), extension_count
+
+
 def build_bundle(
     nfi_path: Path,
     insurance_path: Path,
@@ -183,9 +251,15 @@ def build_bundle(
 
     Source values are never deleted. The standardized value is written to the
     canonical record while the reason/supporting sources remain in the audit and
-    sourceReference fields.
+    sourceReference fields. The default catalogue run also merges the reviewed
+    Phase 4 multi-domain allowlist; custom scope runs remain isolated.
     """
-    bundle = _runtime.build_bundle(nfi_path, insurance_path, default_currency, scope_path)
+    bundle, extension_count = _build_runtime_bundle(
+        nfi_path,
+        insurance_path,
+        default_currency,
+        scope_path,
+    )
     enriched = _enrich_insurance_presentations(bundle, insurance_path)
     consensus = apply_identity_consensus(bundle)
     bundle.setdefault("diagnostics", []).append(
@@ -195,6 +269,12 @@ def build_bundle(
         f"identity corrections={consensus['identityCorrections']}; "
         f"confidence upgrades={consensus['identityConfidenceUpgrades']}."
     )
+    if extension_count:
+        bundle["diagnostics"].append(
+            "Phase 4 multidomain catalogue scope: "
+            f"approved entries admitted={extension_count}; "
+            "brand/price/insurance remain source-evidence only."
+        )
     _recompute(bundle)
     return bundle
 
