@@ -7,6 +7,7 @@ import { getPatientIdentityCapabilities } from "../../lib/patient-identity-clien
 import { getRuntimeV3Capabilities } from "../../lib/runtime-v3-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import PatientIdentityPortal from "./patient-identity-portal";
+import PatientProviderDiscovery from "./patient-provider-discovery";
 import PortalClient from "./portal-client";
 import styles from "./patient-portal-entry.module.css";
 
@@ -57,13 +58,15 @@ export default function PatientPortalEntry() {
 
   if (identity?.patientIdentityV2) {
     return (
-      <PatientIdentityPortal
-        capabilities={identity}
-        legacyPortalEnabled={legacyEnabled}
-        multiPracticePatientEnabled={multiPracticePatientEnabled}
-        providerDirectoryEnabled={providerDirectoryEnabled}
-        onUseLegacy={() => setLegacySelected(true)}
-      />
+      <>
+        <PatientIdentityPortal
+          capabilities={identity}
+          legacyPortalEnabled={legacyEnabled}
+          multiPracticePatientEnabled={multiPracticePatientEnabled}
+          onUseLegacy={() => setLegacySelected(true)}
+        />
+        <PatientProviderDiscovery enabled={providerDirectoryEnabled} />
+      </>
     );
   }
 
