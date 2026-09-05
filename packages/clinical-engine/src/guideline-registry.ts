@@ -1,3 +1,5 @@
+import { multidomainGuidelineSources } from "./guideline-sources-multidomain.js";
+
 export type ClinicalEvidenceSourceKind = "guideline" | "consensus" | "regulatory";
 
 export interface ClinicalEvidenceSource {
@@ -159,6 +161,7 @@ export const activeGuidelineSources: ClinicalEvidenceSource[] = [
     engineRoleFa: "قواعد واجدشرایط‌بودن Resmetirom فقط برای MASH غیرسیروتیک با فیبروز F2–F3؛ منبع رگولاتوری است نه guideline",
     engineRoleEn: "Resmetirom eligibility for non-cirrhotic MASH with F2–F3 fibrosis; regulatory source, not a guideline",
   },
+  ...multidomainGuidelineSources,
 ];
 
 export const engineEvidenceSources = activeGuidelineSources.filter((source) => source.engineInfluence);
