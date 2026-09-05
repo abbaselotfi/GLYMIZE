@@ -13,47 +13,55 @@ The machine-readable source of truth for the states below is `packages/clinical-
 | diabetes | executable | Decision Graph v2 glycemic/insulin pathway with reviewed product-dose rules |
 | cardiovascular | partially executable | Executable through represented ASCVD/HF/BP/lipid phenotypes, not from a generic cardiovascular flag |
 | kidney | executable | CKD/eGFR/UACR/K/CrCl-aware cardiorenal pathway |
-| liver | review only | Liver objective/context exists; dedicated liver product execution is pending |
+| liver | partially executable | Reviewed resmetirom and product-bound WEGOVY initiation for explicit adult noncirrhotic F2-F3 MASH; broader liver therapy remains scoped |
 | obesity | partially executable | Weight is a Type 2 preference/objective axis; this is not a standalone obesity engine |
 | hypertension | executable | Confirmed/established treatment context plus guideline trigger and product rules |
 | lipids | executable | Guideline statin objective plus reviewed product rules |
 | heart_failure | executable | HF objective; HFrEF-specific MRA execution requires LVEF/eGFR/K |
 | ascvd | executable | ASCVD organ-protection plus lipid objectives |
-| masld_mash | review only | First completeness gap: current MASH pharmacotherapy protocol |
-| neuropathy | review only | Painful DPN requires a physician-confirmed diagnosis-of-exclusion phenotype before medication execution |
-| retinopathy | specialist/escalation | Ophthalmology referral/treatment pathway; no autonomous intravitreal prescribing |
-| diabetic_foot | specialist/escalation | Infection/severity/source-control workflow first; no antibiotics for an uninfected ulcer |
-| nutrition_support | review only | Requires a specific nutritional diagnosis/deficiency; diabetes alone is not an indication |
-| pregnancy | safety context | Pregnancy currently drives exclusions/safety; complete pregnancy-treatment execution requires a separate audit |
+| masld_mash | partially executable | Reviewed resmetirom and product-bound WEGOVY initiation only; continuation/titration-cost completeness remains bounded |
+| neuropathy | partially executable | Only clinician-confirmed painful DPN without atypical features can enter reviewed pregabalin/duloxetine protocols; routine opioids remain excluded |
+| retinopathy | specialist/escalation | Prompt ophthalmology escalation for any DME, moderate-or-worse NPDR, or PDR; no autonomous intravitreal/laser prescribing |
+| diabetic_foot | specialist/escalation | Structured infection/severity/source-control/referral workflow; no antibiotics for an uninfected ulcer and no generic empiric antibiotic lane |
+| nutrition_support | review only | Explicit indication/deficiency safety pathway exists; diabetes alone cannot create vitamin/mineral/herbal or enteral/parenteral prescription execution |
+| pregnancy | safety context | Dedicated pregnancy diabetes pathway owns pregnancy targets, T1/T2/GDM treatment boundary and medication reconciliation; insulin dose/titration remains clinician/team controlled |
 
-## Priority closure sequence
+## Priority closure sequence — completed through Task 10/30
 
-### 1. MASH pharmacotherapy — next implementation
+### 1. MASH pharmacotherapy — closed for reviewed initiation scope
 
-GLYMIZE already carries MASLD/MASH context (`masldMash`, fibrosis stage, cirrhosis/decompensation, AST/ALT, platelets, liver stiffness) and a `liver_directed_therapy` objective. The missing piece is exact product execution.
+Reviewed resmetirom and product-bound WEGOVY initiation now execute only for the explicitly represented adult noncirrhotic F2-F3 MASH phenotype after product-specific safety and Iran-market gates pass. Broader liver pharmacotherapy remains out of scope. WEGOVY continuation and multi-step titration costing remain explicitly bounded follow-up work rather than silently claimed completeness.
 
-The next clinical PR should add, subject to verified Iranian market availability:
+### 2. Painful diabetic peripheral neuropathy — closed for reviewed first products
 
-- **resmetirom** for adults with noncirrhotic MASH and F2-F3 fibrosis, with weight-tiered label dosing, cirrhosis/decompensation boundaries, CYP2C8 interaction handling, liver monitoring, and exact product evidence;
-- **semaglutide/Wegovy MASH indication** for adults with noncirrhotic MASH and F2-F3 fibrosis, with the current product-label escalation/maintenance schedule and existing GLP-1 safety/duplication guards.
+The engine now requires a clinician-confirmed DPN diagnosis-of-exclusion phenotype, painful symptoms and absence of atypical features before execution. Reviewed pregabalin and duloxetine branches carry their renal/hepatic/MAOI/alcohol/hypersensitivity safety requirements and product-label dose authority. Generic neuropathy activation and routine opioid therapy do not become executable.
 
-A drug with no current verified Iran-market product remains non-executable even if its international indication and dose protocol are valid.
+### 3. Retinopathy — specialist escalation lane implemented
 
-### 2. Painful diabetic peripheral neuropathy
+ADA 2026 referral criteria are represented as a separate specialist channel: any DME, moderate-or-worse NPDR, or PDR produces prompt ophthalmology escalation. Anti-VEGF, laser and other ophthalmic treatment evidence remain specialist-only and outside the general medication-ranking authority.
 
-ADA 2026 recommends gabapentinoids, SNRIs, TCAs, and sodium-channel blockers as initial pharmacologic classes. This is not enough to activate drugs from a generic `neuropathy` checkbox: diabetic neuropathy is a diagnosis of exclusion. Before execution, add an explicit physician-confirmed painful-DPN phenotype and minimum safety inputs. Initial reviewed products should be limited to current-Iran-market agents with exact labels, such as pregabalin/duloxetine where available. Routine opioids must not enter the pathway.
+### 4. Diabetic foot — safety/escalation lane implemented
 
-### 3. Retinopathy
+The engine now requires a clinical infection assessment and, when infection is present, IWGDF/IDSA severity plus represented danger/PAD/osteomyelitis context. Clinically uninfected ulcers cannot execute antibiotics. Severe or dangerous moderate infection can trigger hospital/surgical/vascular escalation and source-control guidance, while antimicrobial product selection remains fail-closed pending pathogen, susceptibility, allergy, renal/interaction and local-protocol inputs.
 
-ADA 2026 recommends prompt ophthalmology referral for DME, moderate-or-worse NPDR, or PDR, and anti-VEGF is specialist eye therapy. The general Type 2 engine should first provide a structured referral/escalation card and evidence, not an autonomous injection regimen. Specialist-only product execution may be a separate later scope.
+### 5. Nutrition support — indication boundary implemented
 
-### 4. Diabetic foot
+Nutrition support remains review-only for prescription execution. The engine now distinguishes glycemic-supplement intent, documented deficiency, malnutrition and special-population review. Diabetes alone is never treated as an indication for vitamin/mineral/herbal or enteral/parenteral therapy, and no generic supplement dose is fabricated.
 
-IWGDF/IDSA requires infection diagnosis/severity, pathogen context, source control, and patient factors before choosing antibiotics; clinically uninfected ulcers should not receive antibiotics. The next safe step is a structured ulcer/infection/severity/referral workflow. A generic `diabetic_foot=true` flag must never create empiric antibiotic prescribing by itself.
+### 6. Pregnancy — dedicated safety/therapy boundary implemented
 
-### 5. Nutrition support and pregnancy
+The pregnancy pathway requires explicit T1D/T2D/GDM classification, uses pregnancy-specific glycemic targets, marks insulin required for T1D and preferred for T2D, supports lifestyle-first GDM with insulin escalation review when represented glucose exceeds target, and performs noninsulin glucose-lowering medication reconciliation. Exact insulin product selection, initiation and frequent gestation/postpartum titration remain non-autonomous until a separate product-level pregnancy protocol is proven.
 
-These require separate indication-specific scope. Nutrition support must be driven by a documented deficiency/nutritional indication. Pregnancy remains a high-priority safety context until a dedicated diabetes-in-pregnancy execution audit proves the full insulin/monitoring pathway.
+## Next closure work
+
+With the five previously prioritized gaps now structurally closed at their stated safe boundaries, the next work should proceed from the machine-readable capability gaps rather than reopen completed scopes. Immediate candidates are:
+
+1. capability/UI input contract generation from `minimumSafeInputs`, so patient-entry and physician workflows collect the exact facts used by the engine;
+2. interval-aware current-medication reconciliation and multi-step titration costing for WEGOVY continuation;
+3. additional reviewed painful-DPN product/renal branches without expanding into routine opioid use;
+4. specialist-only retinopathy execution only as a separately isolated future scope;
+5. pathogen/local-protocol-aware diabetic-foot antimicrobial execution only after the required data model exists;
+6. nutrient-specific treatment protocols and pregnancy insulin product/titration protocols only after dedicated label-level audits.
 
 ## UI dependency
 
@@ -68,4 +76,6 @@ The physician-assistant laboratory trend view should reuse longitudinal Patient 
 - Regulatory label owns exact dose/adjustment; guideline owns treatment indication/goal.
 - CrCl is never inferred from eGFR.
 - Specialist procedures and diagnosis-dependent anti-infective treatment remain fail-closed until their required clinical phenotype is represented.
+- Nutrition-support and pregnancy safety pathways do not become autonomous product/dose authorities merely because their clinical boundary is represented.
+- Parallel specialist/safety trace nodes are identified by stable `nodeId`, not by array position.
 - Decision Graph v2 remains the sole executable/ranking authority; no additive medication score is introduced.
