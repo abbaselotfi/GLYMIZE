@@ -23,6 +23,7 @@ import { useGlymizeLocale } from "../components/use-glymize-locale";
 import { PatientEncounterTimeline } from "./patient-encounter-timeline";
 import { PatientTrendPanel } from "./patient-trend-panel";
 import { PatientVisitChanges } from "./patient-visit-changes";
+import { PatientWorkspaceHeader } from "./patient-workspace-header";
 import styles from "./records.module.css";
 
 const PAGE_SIZE = 50;
@@ -422,23 +423,30 @@ export default function RecordsClient() {
             </div>
           ) : (
             <>
-              <div className={styles.previewTitle}>
-                <span>{selected.patientCodeDisplay}</span>
-                <h2>
-                  {selectedName ||
-                    (
-                      fa
-                        ? "\u0628\u06cc\u0645\u0627\u0631 \u0628\u062f\u0648\u0646 \u0646\u0627\u0645 \u062b\u0628\u062a\u200c\u0634\u062f\u0647"
-                        : "Patient name not recorded"
+              {trendWorkspace ? (
+                <PatientWorkspaceHeader
+                  workspace={trendWorkspace}
+                  locale={fa ? "fa" : "en"}
+                />
+              ) : (
+                <div className={styles.previewTitle}>
+                  <span>{selected.patientCodeDisplay}</span>
+                  <h2>
+                    {selectedName ||
+                      (
+                        fa
+                          ? "\u0628\u06cc\u0645\u0627\u0631 \u0628\u062f\u0648\u0646 \u0646\u0627\u0645 \u062b\u0628\u062a\u200c\u0634\u062f\u0647"
+                          : "Patient name not recorded"
+                      )}
+                  </h2>
+                  <small>
+                    rev {selected.revision} \u00b7{" "}
+                    {new Date(selected.updatedAt).toLocaleString(
+                      fa ? "fa-IR" : "en-US",
                     )}
-                </h2>
-                <small>
-                  rev {selected.revision} \u00b7{" "}
-                  {new Date(selected.updatedAt).toLocaleString(
-                    fa ? "fa-IR" : "en-US",
-                  )}
-                </small>
-              </div>
+                  </small>
+                </div>
+              )}
 
               <div className={styles.metrics}>
                 <div>
