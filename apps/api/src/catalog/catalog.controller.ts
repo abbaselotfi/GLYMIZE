@@ -1,9 +1,6 @@
 import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Query } from "@nestjs/common";
 import type { AdminNotification, CatalogImportRequest, CreateAdminNotificationInput, CreateMedicationBrandInput, GenericMedicationInput, MedicationMarketDataInput, UpdateMedicationBrandInput, UpdateMedicationInsuranceInput, UpdateMedicationVisibilityInput } from "@glymize/contracts";
-import {
-  resolveType2ParallelSafetyProjectionV2,
-  type Type2StructuredConsiderationRequestV2,
-} from "@glymize/clinical-engine/type2-intake-v2";
+import type { Type2StructuredConsiderationRequestV2 } from "@glymize/clinical-engine/type2-intake-v2";
 import { CatalogService } from "./catalog.service.js";
 
 @Controller("v1")
@@ -87,10 +84,7 @@ export class CatalogController {
 
   @Post("catalog/type-2/considerations")
   type2MedicationConsiderations(@Body() request: Type2StructuredConsiderationRequestV2) {
-    return {
-      ...this.catalogService.listType2MedicationConsiderations(request),
-      parallelSafety: resolveType2ParallelSafetyProjectionV2(request),
-    };
+    return this.catalogService.listType2MedicationConsiderations(request);
   }
 
   @Get("admin/preview/type-2-considerations")
