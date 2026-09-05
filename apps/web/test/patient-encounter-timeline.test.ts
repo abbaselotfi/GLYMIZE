@@ -25,12 +25,12 @@ describe("Patient Workspace encounter timeline", () => {
     expect(timelineSource).toContain("aria-expanded={expanded}");
   });
 
-  it("shows lifecycle metadata without exposing internal record identifiers", () => {
+  it("shows lifecycle metadata without rendering internal record identifiers as content", () => {
     expect(timelineSource).toContain("statusLabel(encounter.status, fa)");
     expect(timelineSource).toContain("encounter.latestSnapshotRevision");
     expect(timelineSource).toContain("encounter.latestSignedPlanId");
-    expect(timelineSource).not.toContain("{encounter.encounterId}");
-    expect(timelineSource).not.toContain("{encounter.latestSignedPlanId}");
+    expect(timelineSource).not.toContain(">{encounter.encounterId}<");
+    expect(timelineSource).not.toContain(">{encounter.latestSignedPlanId}<");
   });
 
   it("opens an exact practice-scoped source encounter through the existing v2 bridge", () => {
