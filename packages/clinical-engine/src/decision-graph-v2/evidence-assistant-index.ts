@@ -9,6 +9,11 @@ import {
   buildReviewedWegovyMashDoseRulesV2,
   wegovy2026LabelEvidenceV2,
 } from "./wegovy-mash-protocol.js";
+import {
+  applyReviewedPainfulDpnKnowledgeV2,
+  buildReviewedPainfulDpnDoseRulesV2,
+  buildReviewedPainfulDpnGateRulesV2,
+} from "./painful-dpn-protocol.js";
 import { buildCoreAda2026DecisionRulesV2 } from "./safety-rules.js";
 import type {
   DoseRuleV2,
@@ -85,6 +90,22 @@ const evidenceIndexKnowledgeV2: KnowledgeMedicationV2[] = [
     primaryLanes: ["liver"],
     efficacyBand: "none",
     hypoglycemiaRisk: "minimal",
+  },
+  {
+    ...knowledge("EA-PREGABALIN", "Pregabalin", "other"),
+    therapeuticAreas: ["Neuropathy"],
+    primaryLanes: [],
+    efficacyBand: "none",
+    hypoglycemiaRisk: "minimal",
+    engineState: "review_required",
+  },
+  {
+    ...knowledge("EA-DULOXETINE", "Duloxetine", "other"),
+    therapeuticAreas: ["Neuropathy"],
+    primaryLanes: [],
+    efficacyBand: "none",
+    hypoglycemiaRisk: "minimal",
+    engineState: "review_required",
   },
 ];
 
@@ -194,15 +215,23 @@ export function buildDecisionGraphEvidenceAssistantIndexV2(): DecisionGraphEvide
     doseRules: [],
     insurancePolicies: [],
   });
+  const dpnInventory = applyReviewedPainfulDpnKnowledgeV2({
+    knowledge: evidenceIndexKnowledgeV2,
+    marketProducts: [],
+    doseRules: [],
+    insurancePolicies: [],
+  });
   const doseRules = [
     ...buildReviewedProductDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedCardiometabolicDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedMashDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedWegovyMashDoseRulesV2(wegovyInventory),
+    ...buildReviewedPainfulDpnDoseRulesV2(dpnInventory),
   ];
   const safetyRules = [
     ...buildCoreAda2026DecisionRulesV2(evidenceIndexKnowledgeV2).medicationGateRules,
     ...buildReviewedCardiometabolicGateRulesV2(evidenceIndexKnowledgeV2),
+    ...buildReviewedPainfulDpnGateRulesV2(dpnInventory.knowledge),
   ];
   return [
     ...doseRules.map(doseRecord),
