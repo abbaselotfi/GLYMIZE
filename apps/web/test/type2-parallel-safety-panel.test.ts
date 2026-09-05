@@ -100,4 +100,14 @@ describe("Type 2 parallel safety panel", () => {
     expect(source).not.toContain("buildType2TreatmentScenarios");
     expect(source).toContain('data-parallel-safety="true"');
   });
+
+  it("wires the API projection above the treatment scenario stack", () => {
+    const source = readFileSync(fileURLToPath(new URL("../app/type-2/type2-scenarios-client.tsx", import.meta.url)), "utf8");
+    const panel = source.indexOf("<Type2ParallelSafetyPanel projection={assessment.parallelSafety} locale={locale} />");
+    const stack = source.indexOf("<div className={styles.scenarioStack}>");
+    expect(source).toContain("Type2AssessmentWithParallelSafety");
+    expect(source).toContain("as Type2AssessmentWithParallelSafety");
+    expect(panel).toBeGreaterThan(-1);
+    expect(stack).toBeGreaterThan(panel);
+  });
 });
