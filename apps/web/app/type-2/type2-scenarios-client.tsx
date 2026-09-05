@@ -44,7 +44,9 @@ type MedicationRow = {
 
 type ContextDraft = {
   eGfr: string;
+  creatinineClearanceMlMin: string;
   uacr: string;
+  potassiumMmolL: string;
   dialysis: boolean;
   recentAki: boolean;
   lvef: string;
@@ -58,7 +60,7 @@ type ContextDraft = {
 const FACTORS: Array<{ key: Type2DecisionFactor; fa: string; en: string; hintFa: string; hintEn: string }> = [
   { key: "ascvd", fa: "ASCVD", en: "ASCVD", hintFa: "MI، سکته، PAD یا revascularization", hintEn: "MI, stroke, PAD, or revascularization" },
   { key: "heart_failure", fa: "نارسایی قلبی", en: "Heart failure", hintFa: "HFpEF یا HFrEF", hintEn: "HFpEF or HFrEF" },
-  { key: "ckd", fa: "بیماری مزمن کلیه", en: "Chronic kidney disease", hintFa: "eGFR / UACR / دیالیز", hintEn: "eGFR / UACR / dialysis" },
+  { key: "ckd", fa: "بیماری مزمن کلیه", en: "Chronic kidney disease", hintFa: "eGFR / CrCl / UACR / پتاسیم / دیالیز", hintEn: "eGFR / CrCl / UACR / potassium / dialysis" },
   { key: "weight_priority", fa: "کاهش وزن مهم است", en: "Weight reduction priority", hintFa: "اثر وزن وارد رتبه‌بندی شود", hintEn: "Include weight effect in ranking" },
   { key: "hypoglycemia_risk", fa: "ریسک هیپوگلیسمی", en: "Hypoglycemia risk", hintFa: "داروهای هیپوگلیسمی‌زا پایین‌تر می‌روند", hintEn: "Down-rank hypoglycemia-prone therapies" },
   { key: "masld_mash", fa: "MASLD / MASH", en: "MASLD / MASH", hintFa: "مرحله فیبروز و سیروز لحاظ شود", hintEn: "Include fibrosis and cirrhosis" },
@@ -212,7 +214,7 @@ export default function Type2ScenariosClient() {
   const [factors, setFactors] = useState<Type2DecisionFactor[]>([]);
   const [worldDrugDomains, setWorldDrugDomains] = useState<MedicationClinicalDomain[]>([]);
   const [context, setContext] = useState<ContextDraft>({
-    eGfr: "", uacr: "", dialysis: false, recentAki: false, lvef: "", weight: "", height: "",
+    eGfr: "", creatinineClearanceMlMin: "", uacr: "", potassiumMmolL: "", dialysis: false, recentAki: false, lvef: "", weight: "", height: "",
     fibrosisStage: "", cirrhosis: false, decompensatedCirrhosis: false,
   });
   const [costPreference, setCostPreference] = useState<Type2CostPreference>("moderate");
@@ -342,7 +344,9 @@ export default function Type2ScenariosClient() {
       kidney: {
         ckd: factors.includes("ckd"),
         eGfr: numberOrUndefined(context.eGfr),
+        creatinineClearanceMlMin: numberOrUndefined(context.creatinineClearanceMlMin),
         uacrMgG: numberOrUndefined(context.uacr),
+        potassiumMmolL: numberOrUndefined(context.potassiumMmolL),
         dialysis: context.dialysis,
         recentAki: context.recentAki,
       },
@@ -365,13 +369,17 @@ export default function Type2ScenariosClient() {
     const labValue = (key: string) => confirmedLabs.find((item) => item.canonicalKey === key)?.value;
     const hba1c = labValue("hba1c");
     const eGfr = labValue("egfr");
+    const crCl = labValue("creatinine_clearance") ?? labValue("crcl");
     const uacr = labValue("uacr");
+    const potassium = labValue("potassium");
 
     if (hba1c !== undefined) setCurrentHba1c(String(hba1c));
     setContext((current) => ({
       ...current,
       eGfr: eGfr !== undefined ? String(eGfr) : current.eGfr,
+      creatinineClearanceMlMin: crCl !== undefined ? String(crCl) : current.creatinineClearanceMlMin,
       uacr: uacr !== undefined ? String(uacr) : current.uacr,
+      potassiumMmolL: potassium !== undefined ? String(potassium) : current.potassiumMmolL,
       dialysis: record.clinicalFlags.dialysis ?? current.dialysis,
       weight: record.vitals.weightKg !== undefined ? String(record.vitals.weightKg) : current.weight,
       height: record.vitals.heightCm !== undefined ? String(record.vitals.heightCm) : current.height,
@@ -514,7 +522,9 @@ export default function Type2ScenariosClient() {
             {(factors.includes("ckd") || factors.includes("heart_failure") || factors.includes("weight_priority") || factors.includes("masld_mash")) && <div className={styles.contextBox}>
               {factors.includes("ckd") && <div className={styles.twoCols}>
                 <Field label="eGFR" value={context.eGfr} onChange={(value) => setContext((c) => ({ ...c, eGfr: value }))} unit="mL/min/1.73m²" placeholder="45" />
+                <Field label="CrCl" value={context.creatinineClearanceMlMin} onChange={(value) => setContext((c) => ({ ...c, creatinineClearanceMlMin: value }))} unit="mL/min" placeholder="40" />
                 <Field label="UACR" value={context.uacr} onChange={(value) => setContext((c) => ({ ...c, uacr: value }))} unit="mg/g" placeholder="300" />
+                <Field label={fa ? "پتاسیم" : "Potassium"} value={context.potassiumMmolL} onChange={(value) => setContext((c) => ({ ...c, potassiumMmolL: value }))} unit="mmol/L" placeholder="4.5" />
                 <Check label={fa ? "دیالیز" : "Dialysis"} checked={context.dialysis} onChange={(value) => setContext((c) => ({ ...c, dialysis: value }))} />
                 <Check label={fa ? "AKI اخیر" : "Recent AKI"} checked={context.recentAki} onChange={(value) => setContext((c) => ({ ...c, recentAki: value }))} />
               </div>}
