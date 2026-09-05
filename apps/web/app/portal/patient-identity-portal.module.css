@@ -5,7 +5,8 @@
 
 .loading,
 .signInCard,
-.accountCard {
+.accountCard,
+.discovery {
   width: min(720px, 100%);
   margin: 0 auto;
 }
@@ -17,13 +18,62 @@
 }
 
 .signInCard,
-.accountCard {
+.accountCard,
+.discovery {
   border: 1px solid rgba(18, 56, 61, 0.12);
   border-radius: 22px 22px 22px 7px;
   padding: clamp(22px, 4vw, 38px);
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 24px 65px rgba(18, 56, 61, 0.09);
 }
+
+.discovery {
+  margin-top: 18px;
+  margin-bottom: clamp(26px, 5vw, 68px);
+}
+
+.discovery h2 {
+  margin: 0 0 6px;
+  color: #12383d;
+  font-size: 1.05rem;
+}
+
+.discovery > div > p {
+  margin: 0;
+  color: #587477;
+  font-size: 0.82rem;
+  line-height: 1.75;
+}
+
+.discovery form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.discovery input {
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid #c9d9d7;
+  border-radius: 11px;
+  padding: 0 12px;
+  color: #12383d;
+  background: #fbfdfd;
+  font-size: 16px;
+}
+
+.discovery form button {
+  min-height: 46px;
+  border: 1px solid #087d75;
+  border-radius: 11px;
+  padding: 8px 16px;
+  color: #fff;
+  background: #087d75;
+  font-weight: 850;
+}
+
+.discovery form button:disabled { opacity: 0.5; }
 
 .eyebrow,
 .accountHeader span {
@@ -155,4 +205,6 @@
   .accountHeader button { width: 100%; }
   .practices article { align-items: stretch; flex-wrap: wrap; }
   .practices article button { width: 100%; margin-inline-start: 0; }
+  .discovery { width: calc(100% - 24px); }
+  .discovery form { grid-template-columns: 1fr; }
 }
