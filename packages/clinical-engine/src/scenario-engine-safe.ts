@@ -25,7 +25,6 @@ export type {
 export type Type2ScenarioKind = BaseScenarioKind | "access_constrained";
 export type Type2TreatmentScenario = Omit<BaseTreatmentScenario, "kind"> & { kind: Type2ScenarioKind };
 type Type2CostingInput = Parameters<typeof estimateBase30DayCost>[0];
-
 type DecisionGraphMedication = Type2MedicationConsideration & {
   decisionGraphAuthority?: true;
   decisionGraphRank?: number;
@@ -70,9 +69,11 @@ function stillNeedsClinicalAction(input: Type2ScenarioBuildInput) {
     hasIndependentOutcomeIndication(input.request);
 }
 
-function accessConstrainedScenario(input: Type2ScenarioBuildInput, base: BaseTreatmentScenario): Type2TreatmentScenario {
+function accessConstrainedScenario(
+  input: Type2ScenarioBuildInput,
+  base: BaseTreatmentScenario | Type2TreatmentScenario,
+): Type2TreatmentScenario {
   const insuranceOnly = input.request.costPreference === "insured_only";
-  const urgent = input.assessment.recommendation.urgentReview;
   return {
     ...base,
     id: "access-constrained",
@@ -94,13 +95,13 @@ function accessConstrainedScenario(input: Type2ScenarioBuildInput, base: BaseTre
       ? ["Lack of insurance coverage does not remove clinical indication; access constraints must remain separate from treatment need."]
       : ["No eligible option under the current constraints does not remove clinical need; review the route/access constraints and care pathway."],
     tradeoffsFa: [insuranceOnly
-      ? "پوشش بیمه/فرآورده، امکان مسیر جایگزین یا تغییر فیلتر هزینه باید توسط پزشک بازبینی شود؛ سیستم داروی بدون پوشش را به‌صورت خودکار جایگزین نمی‌کند."
+      ? "پوشش بیمه/فرآورده یا تغییر فیلتر هزینه باید توسط پزشک بازبینی شود؛ سیستم داروی بدون پوشش را خودکار جایگزین نمی‌کند."
       : "مسیر تجویز، منع مصرف‌ها و محدودیت‌های انتخاب‌شده باید توسط پزشک بازبینی شوند؛ سیستم محدودیت کاربر را خودکار دور نمی‌زند."],
     tradeoffsEn: [insuranceOnly
       ? "Review coverage, product availability, alternative access, or the cost filter; the system does not silently substitute an uninsured drug."
       : "Review route, contraindications, and selected constraints; the system does not silently bypass clinician/patient constraints."],
     cost30Days: [],
-    urgentReview: urgent,
+    urgentReview: input.assessment.recommendation.urgentReview,
   };
 }
 
@@ -109,16 +110,14 @@ function boundScenarioCosts(scenario: BaseTreatmentScenario | Type2TreatmentScen
 }
 
 function isDecisionGraphAssessment(input: Type2ScenarioBuildInput) {
-  return input.assessment.medications.some((medication) => {
-    const item = medication as DecisionGraphMedication;
-    return item.decisionGraphAuthority === true || medication.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY);
-  }) || input.assessment.recommendation.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY);
+  return input.assessment.recommendation.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY) ||
+    input.assessment.medications.some((medication) =>
+      (medication as DecisionGraphMedication).decisionGraphAuthority === true ||
+      medication.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY),
+    );
 }
 
-function graphMedicationCost(
-  medication: Type2MedicationConsideration,
-  input: Type2ScenarioBuildInput,
-) {
+function graphMedicationCost(medication: Type2MedicationConsideration, input: Type2ScenarioBuildInput) {
   return estimateType2Medication30DayCost({
     price: medication.price,
     priceRange: medication.priceRange,
@@ -136,18 +135,14 @@ function graphScenario(
   const first = medications[0] as DecisionGraphMedication | undefined;
   const rationale = [...new Set(medications.flatMap((medication) => medication.rankingReasons))];
   const cautions = [...new Set(medications.flatMap((medication) => medication.risks))];
-  const titleFa = rank === 1 ? "پیشنهاد اصلی" : rank === 2 ? "گزینه جایگزین ۱" : "گزینه جایگزین ۲";
-  const titleEn = rank === 1 ? "Primary recommendation" : rank === 2 ? "Alternative 1" : "Alternative 2";
   return {
     id: first?.decisionGraphRegimenId ?? `decision-graph-rank-${rank}`,
     rank,
     kind: rank === 1 ? "clinical_best" : "alternative",
-    titleFa,
-    titleEn,
+    titleFa: rank === 1 ? "پیشنهاد اصلی" : rank === 2 ? "گزینه جایگزین ۱" : "گزینه جایگزین ۲",
+    titleEn: rank === 1 ? "Primary recommendation" : rank === 2 ? "Alternative 1" : "Alternative 2",
     summaryFa: input.assessment.recommendation.title,
-    summaryEn: rank === 1
-      ? "Decision Graph v2 primary regimen."
-      : "Decision Graph v2 alternative regimen.",
+    summaryEn: rank === 1 ? "Decision Graph v2 primary regimen." : "Decision Graph v2 alternative regimen.",
     medicationIds: medications.map((medication) => medication.genericMedicationId),
     medications,
     rationaleFa: rationale,
@@ -162,23 +157,20 @@ function graphScenario(
 }
 
 function buildDecisionGraphScenarios(input: Type2ScenarioBuildInput): Type2TreatmentScenario[] {
-  const graphMedications = input.assessment.medications as DecisionGraphMedication[];
   const grouped = new Map<number, DecisionGraphMedication[]>();
-  for (const medication of graphMedications) {
+  for (const medication of input.assessment.medications as DecisionGraphMedication[]) {
     const rank = medication.decisionGraphRank;
     if (rank !== 1 && rank !== 2 && rank !== 3) continue;
     grouped.set(rank, [...(grouped.get(rank) ?? []), medication]);
   }
 
-  const max = input.maxScenarios ?? 3;
   const scenarios = ([1, 2, 3] as const)
     .flatMap((rank) => {
       const medications = (grouped.get(rank) ?? [])
         .sort((left, right) => (left.decisionGraphComponentOrder ?? 0) - (right.decisionGraphComponentOrder ?? 0));
       return medications.length ? [graphScenario(rank, medications, input)] : [];
     })
-    .slice(0, max);
-
+    .slice(0, input.maxScenarios ?? 3);
   if (scenarios.length) return scenarios;
 
   const maintain: Type2TreatmentScenario = {
@@ -200,15 +192,11 @@ function buildDecisionGraphScenarios(input: Type2ScenarioBuildInput): Type2Treat
     cost30Days: [],
     urgentReview: input.assessment.recommendation.urgentReview,
   };
-  return stillNeedsClinicalAction(input)
-    ? [accessConstrainedScenario(input, maintain)]
-    : [maintain];
+  return stillNeedsClinicalAction(input) ? [accessConstrainedScenario(input, maintain)] : [maintain];
 }
 
 export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Type2TreatmentScenario[] {
-  if (isDecisionGraphAssessment(input)) {
-    return buildDecisionGraphScenarios(input).map(boundScenarioCosts);
-  }
+  if (isDecisionGraphAssessment(input)) return buildDecisionGraphScenarios(input).map(boundScenarioCosts);
 
   const scenarios = buildBaseScenarios(input);
   if (scenarios.length === 1 && scenarios[0]?.kind === "maintain_monitor" && stillNeedsClinicalAction(input)) {
