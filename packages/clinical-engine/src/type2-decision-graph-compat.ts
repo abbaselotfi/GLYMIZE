@@ -11,28 +11,19 @@ import type {
 import { runDecisionGraphV2 } from "./decision-graph-v2/engine.js";
 import { buildDecisionGraphInventoryFromContractsV2 } from "./decision-graph-v2/inventory-adapter.js";
 import type {
-  ComposedTreatmentPlanV2,
   CurrentMedicationV2,
   DecisionGraphRequestV2,
   DecisionGraphResultV2,
-  EvidenceReferenceV2,
   RecommendationV2,
-  RegimenCandidateV2,
 } from "./decision-graph-v2/types.js";
 
-/**
- * Stable marker used by the browser/scenario compatibility layer.
- * Runtime consumers must treat Decision Graph v2 ordering as authoritative and
- * must not feed these results through the retired aggregate-score ranking path.
- */
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
 
 export interface Type2DecisionGraphMedicationProjection extends Type2MedicationConsideration {
   decisionGraphAuthority: true;
-  decisionGraphPlanId?: string;
-  decisionGraphPlanRank?: number;
-  decisionGraphComponentOrder?: number;
-  decisionGraphRegimenId?: string;
+  decisionGraphRank: number;
+  decisionGraphComponentOrder: number;
+  decisionGraphRegimenId: string;
 }
 
 export interface Type2DecisionGraphAssessmentResult extends Type2AssessmentResult {
@@ -61,31 +52,8 @@ function normalized(value: string | undefined) {
     .trim();
 }
 
-function unique<T>(values: readonly T[]) {
-  return [...new Set(values)];
-}
-
-function evidenceFromResult(result: DecisionGraphResultV2) {
-  return unique([
-    ...result.clinicalState.evidence,
-    ...(result.primary?.evidenceSummary ?? []),
-    ...result.objectives.flatMap((objective) => objective.evidence),
-  ].map((item) => item.sourceId))
-    .map((sourceId) => [
-      ...result.clinicalState.evidence,
-      ...(result.primary?.evidenceSummary ?? []),
-      ...result.objectives.flatMap((objective) => objective.evidence),
-    ].find((item) => item.sourceId === sourceId))
-    .filter((item): item is EvidenceReferenceV2 => Boolean(item));
-}
-
-function medicationForMaster(
-  masterDrugId: string,
-  genericName: string,
-  medications: readonly GenericMedication[],
-) {
-  return medications.find((item) => item.masterRegistryId === masterDrugId) ??
-    medications.find((item) => normalized(item.canonicalName) === normalized(genericName));
+function unique(values: readonly string[]) {
+  return [...new Set(values.filter(Boolean))];
 }
 
 function masterIdForCurrentMedication(
@@ -100,14 +68,8 @@ function masterIdForCurrentMedication(
   const name = normalized(current.genericName);
   return masterRegistry.find((entry) =>
     entry.reviewState === "approved" &&
-    [entry.canonicalName, ...(entry.searchSynonyms ?? [])].some((candidate) => normalized(candidate) === name)
+    [entry.canonicalName, ...(entry.searchSynonyms ?? [])].some((candidate) => normalized(candidate) === name),
   )?.id;
-}
-
-function doseUnit(value: string | undefined) {
-  const text = normalized(value);
-  if (["u", "iu", "unit", "units"].includes(text)) return "U";
-  return value?.trim() || undefined;
 }
 
 function currentMedicationsV2(
@@ -116,16 +78,16 @@ function currentMedicationsV2(
   masterRegistry: readonly MasterDrugRegistryEntry[],
 ): CurrentMedicationV2[] {
   return (request.currentMedications ?? []).map((current) => {
-    const masterDrugId = masterIdForCurrentMedication(current, medications, masterRegistry);
     const generic = current.genericMedicationId
       ? medications.find((item) => item.id === current.genericMedicationId)
       : medications.find((item) => normalized(item.canonicalName) === normalized(current.genericName));
-    const unit = doseUnit(current.totalDailyDoseUnit ?? current.doseUnit);
-    const dailyAmount = current.totalDailyDose ?? (
+    const unit = current.totalDailyDoseUnit ?? current.doseUnit;
+    const totalDailyDose = current.totalDailyDose ?? (
       current.doseAmount !== undefined && current.frequencyPerDay !== undefined
         ? current.doseAmount * current.frequencyPerDay
         : undefined
     );
+    const masterDrugId = masterIdForCurrentMedication(current, medications, masterRegistry);
     const insulinLike = [
       "human_insulin",
       "basal_insulin_analog",
@@ -133,6 +95,7 @@ function currentMedicationsV2(
       "premixed_insulin",
       "fixed_ratio_combination",
     ].includes(generic?.therapyGroup ?? "");
+    const normalizedUnit = unit && ["u", "iu", "unit", "units"].includes(normalized(unit)) ? "U" : unit;
 
     return {
       masterDrugId,
@@ -140,11 +103,11 @@ function currentMedicationsV2(
       therapyGroup: generic?.therapyGroup,
       route: current.route ?? generic?.administrationRoute,
       dosageFormGroup: current.dosageForm,
-      dailyDose: dailyAmount !== undefined && unit
-        ? [{ ingredientKey: masterDrugId ?? normalized(current.genericName), amount: dailyAmount, unit }]
+      dailyDose: totalDailyDose !== undefined && normalizedUnit
+        ? [{ ingredientKey: masterDrugId ?? normalized(current.genericName), amount: totalDailyDose, unit: normalizedUnit }]
         : undefined,
       administrationsPerDay: current.frequencyPerDay,
-      basalInsulinUnitsPerDay: insulinLike && unit === "U" ? dailyAmount : undefined,
+      basalInsulinUnitsPerDay: insulinLike && normalizedUnit === "U" ? totalDailyDose : undefined,
       status: current.status,
       adherence: current.adherence,
       tolerance: current.tolerance,
@@ -152,22 +115,19 @@ function currentMedicationsV2(
   });
 }
 
-function insuranceProviders(request: Type2ConsiderationRequest) {
-  return unique(
-    Object.values(request.insuranceCoverageByMedicationId ?? {})
-      .flat()
-      .filter((coverage) => coverage.runtimeEligibleForRanking !== false)
-      .map((coverage) => coverage.provider),
-  );
-}
-
 function graphRequest(
-  request: Type2ConsiderationRequest,
-  medications: readonly GenericMedication[],
-  masterRegistry: readonly MasterDrugRegistryEntry[],
+  input: BuildType2DecisionGraphAssessmentInput,
   inventory: DecisionGraphRequestV2["inventory"],
 ): DecisionGraphRequestV2 {
+  const { request, medications, masterRegistry } = input;
   const context = request.clinicalContext;
+  const providerSet = new Set<string>();
+  for (const coverages of Object.values(request.insuranceCoverageByMedicationId ?? {})) {
+    for (const coverage of coverages) {
+      if (coverage.runtimeEligibleForRanking !== false) providerSet.add(coverage.provider);
+    }
+  }
+
   return {
     patient: {
       ageYears: context?.ageYears,
@@ -212,33 +172,25 @@ function graphRequest(
           : request.costPreference === "moderate"
             ? "moderate"
             : "no_constraint",
-      insuranceProviders: insuranceProviders(request),
+      insuranceProviders: [...providerSet],
     },
     inventory,
   };
 }
 
-function evidenceForRecommendation(result: DecisionGraphResultV2) {
-  const evidence = evidenceFromResult(result);
-  return {
-    sourceUrl: evidence[0]?.url ?? "about:blank",
-    sourceReference: `${TYPE2_DECISION_GRAPH_V2_AUTHORITY}${evidence.length ? ` · ${unique(evidence.map((item) => item.sourceId)).join(" · ")}` : ""}`,
-  };
-}
-
-function recommendationPriority(result: DecisionGraphResultV2): Type2PathwayPriority {
-  if (result.clinicalState.pathway === "maintain_and_monitor") return "maintain_and_monitor";
-  if (result.clinicalState.pathway === "insulin_centered") return "consider_insulin";
-  if (result.clinicalState.pathway === "insufficient_glycemic_data") return "maintain_and_monitor";
-  if (result.clinicalState.pathway === "modest_intensification") return "single_or_stepwise_therapy";
-  const primaryGroups = result.primary?.components.map((component) => component.therapyGroup) ?? [];
-  if (primaryGroups.some((group) => ["glp_1_receptor_agonist", "dual_gip_glp_1_receptor_agonist", "fixed_ratio_combination"].includes(group))) {
-    return "glp1_based_therapy";
+function priorityFor(result: DecisionGraphResultV2): Type2PathwayPriority {
+  if (result.clinicalState.pathway === "maintain_and_monitor" || result.clinicalState.pathway === "insufficient_glycemic_data") {
+    return "maintain_and_monitor";
   }
+  if (result.clinicalState.pathway === "insulin_centered") return "consider_insulin";
+  if (result.clinicalState.pathway === "modest_intensification") return "single_or_stepwise_therapy";
+  if (result.primary?.components.some((component) =>
+    ["glp_1_receptor_agonist", "dual_gip_glp_1_receptor_agonist", "fixed_ratio_combination"].includes(component.therapyGroup),
+  )) return "glp1_based_therapy";
   return "combination_therapy";
 }
 
-function recommendationTitle(result: DecisionGraphResultV2) {
+function titleFor(result: DecisionGraphResultV2) {
   if (result.status === "urgent_clinician_review") return "بازبینی فوری پزشک پیش از تصمیم درمانی";
   if (result.status === "needs_data") return "تکمیل داده‌های لازم پیش از تصمیم نهایی";
   if (result.status === "no_fully_eligible_regimen") return "نیاز بالینی وجود دارد؛ رژیم کاملاً واجد شرایط یافت نشد";
@@ -248,175 +200,101 @@ function recommendationTitle(result: DecisionGraphResultV2) {
   return "تشدید مرحله‌ای درمان بر اساس Decision Graph";
 }
 
-function regimenForPlanRank(result: DecisionGraphResultV2, rank: number): RecommendationV2 | undefined {
-  if (rank === 1) return result.primary;
-  return result.alternatives[rank - 2];
-}
-
-function plansFromResult(result: DecisionGraphResultV2) {
-  const composed = [
-    result.treatmentPlan,
-    ...result.alternativeTreatmentPlans,
-  ].filter((plan): plan is ComposedTreatmentPlanV2 => Boolean(plan));
-  if (composed.length) return composed.slice(0, 3);
-
-  return [result.primary, ...result.alternatives]
-    .filter((regimen): regimen is RecommendationV2 => Boolean(regimen))
-    .slice(0, 3)
-    .map((regimen, index): ComposedTreatmentPlanV2 => ({
-      planId: `compat:${regimen.regimenId}:${index + 1}`,
-      glycemicRegimenId: regimen.regimenId,
-      supportingRegimenIds: [],
-      components: regimen.components.map((component) => ({
-        masterDrugId: component.masterDrugId,
-        genericName: component.genericName,
-        persianName: component.persianName,
-        therapyGroup: component.therapyGroup,
-        tags: component.tags,
-        action: "start",
-        sourceRegimenIds: [regimen.regimenId],
-        sourceLanes: [regimen.lane],
-        servesObjectives: regimen.objectiveCoverage,
-        dosePlan: component.dosePlan,
-        selectedProduct: component.selectedProduct,
-        selectedProductCost: component.selectedProductCost,
-        normalized30DayPatientCostToman: component.selectedProductCost?.normalized30DayTreatmentCostToman,
-        reasons: component.availability.reasons,
-      })),
-      coveredObjectives: regimen.objectiveCoverage,
-      unresolvedObjectives: [],
-      monthlyPatientCostToman: regimen.monthlyPatientCostToman,
-      dailyAdministrationBurden: regimen.dailyAdministrationBurden,
-      currentTherapyReview: [],
-      reasons: regimen.reasons,
-      cautions: regimen.cautions,
-    }));
+function medicationForComponent(
+  masterDrugId: string,
+  genericName: string,
+  medications: readonly GenericMedication[],
+) {
+  return medications.find((item) => item.masterRegistryId === masterDrugId) ??
+    medications.find((item) => normalized(item.canonicalName) === normalized(genericName));
 }
 
 function contractTherapyGroup(value: string, fallback?: MedicationTherapyGroup): MedicationTherapyGroup {
   if (fallback) return fallback;
-  const direct = [
-    "oral_glucose_lowering",
-    "glp_1_receptor_agonist",
-    "dual_gip_glp_1_receptor_agonist",
-    "human_insulin",
-    "basal_insulin_analog",
-    "prandial_insulin_analog",
-    "premixed_insulin",
-    "fixed_ratio_combination",
-    "antihypertensive",
-    "raas_blocker",
-    "mineralocorticoid_receptor_antagonist",
-    "heart_failure_therapy",
-    "lipid_lowering",
-    "antiplatelet",
-    "anticoagulant",
-    "antianginal",
-    "antiarrhythmic",
-    "liver_directed_therapy",
-    "weight_management",
-    "vitamin_or_mineral",
-    "other",
-  ] as const;
-  if ((direct as readonly string[]).includes(value)) return value as MedicationTherapyGroup;
+  if (value === "fixed_ratio_combination") return "fixed_ratio_combination";
+  if (value === "glp_1_receptor_agonist") return "glp_1_receptor_agonist";
+  if (value === "dual_gip_glp_1_receptor_agonist") return "dual_gip_glp_1_receptor_agonist";
+  if (value === "basal_insulin_analog") return "basal_insulin_analog";
+  if (value === "prandial_insulin_analog") return "prandial_insulin_analog";
+  if (value === "premixed_insulin") return "premixed_insulin";
+  if (value === "human_insulin") return "human_insulin";
+  if (value === "lipid_lowering") return "lipid_lowering";
+  if (value === "antiplatelet") return "antiplatelet";
+  if (value === "anticoagulant") return "anticoagulant";
+  if (value === "raas_blocker") return "raas_blocker";
+  if (value === "mineralocorticoid_receptor_antagonist") return "mineralocorticoid_receptor_antagonist";
+  if (value === "heart_failure_therapy") return "heart_failure_therapy";
+  if (value === "antihypertensive") return "antihypertensive";
+  if (value === "liver_directed_therapy") return "liver_directed_therapy";
   return "oral_glucose_lowering";
 }
 
-function regimenEvidence(regimen: RegimenCandidateV2 | undefined, result: DecisionGraphResultV2) {
-  const evidence = regimen?.evidence?.length ? regimen.evidence : evidenceFromResult(result);
-  return {
-    sourceUrl: evidence[0]?.url ?? "about:blank",
-    sourceReference: `${TYPE2_DECISION_GRAPH_V2_AUTHORITY}${evidence.length ? ` · ${unique(evidence.map((item) => item.sourceId)).join(" · ")}` : ""}`,
-  };
-}
-
-function isCurrentMedication(
+function activeCurrentMedication(
   masterDrugId: string,
   genericName: string,
   request: Type2ConsiderationRequest,
   medications: readonly GenericMedication[],
   masterRegistry: readonly MasterDrugRegistryEntry[],
 ) {
-  return (request.currentMedications ?? []).some((current) => {
-    if ((current.status ?? "active") !== "active") return false;
-    const currentMaster = masterIdForCurrentMedication(current, medications, masterRegistry);
-    return currentMaster === masterDrugId || normalized(current.genericName) === normalized(genericName);
-  });
+  return (request.currentMedications ?? []).some((current) =>
+    (current.status ?? "active") === "active" && (
+      masterIdForCurrentMedication(current, medications, masterRegistry) === masterDrugId ||
+      normalized(current.genericName) === normalized(genericName)
+    ),
+  );
 }
 
-function projectPlans(
-  result: DecisionGraphResultV2,
-  request: Type2ConsiderationRequest,
-  medications: readonly GenericMedication[],
-  masterRegistry: readonly MasterDrugRegistryEntry[],
+function projectionForRegimen(
+  regimen: RecommendationV2,
+  rank: number,
+  input: BuildType2DecisionGraphAssessmentInput,
 ): Type2DecisionGraphMedicationProjection[] {
-  const plans = plansFromResult(result);
-  return plans.flatMap((plan, planIndex) => {
-    const rank = planIndex + 1;
-    const regimen = regimenForPlanRank(result, rank);
-    const evidence = regimenEvidence(regimen, result);
-    return plan.components.map((component, componentIndex): Type2DecisionGraphMedicationProjection => {
-      const medication = medicationForMaster(component.masterDrugId, component.genericName, medications);
-      const currentMedication = isCurrentMedication(
-        component.masterDrugId,
-        component.genericName,
-        request,
-        medications,
-        masterRegistry,
-      );
-      const insuranceCoverages = medication
-        ? request.insuranceCoverageByMedicationId?.[medication.id] ?? []
-        : [];
-      const reasons = unique([
-        ...component.reasons,
-        ...plan.reasons,
-        ...(regimen?.whySelected ?? []),
-      ]).filter(Boolean);
-      const cautions = unique([
-        ...plan.cautions,
-        ...(regimen?.cautions ?? []),
-      ]).filter(Boolean);
+  const evidence = regimen.evidenceSummary.length ? regimen.evidenceSummary : regimen.evidence;
+  const sourceUrl = evidence[0]?.url ?? "about:blank";
+  const sourceReference = `${TYPE2_DECISION_GRAPH_V2_AUTHORITY}${evidence.length ? ` · ${unique(evidence.map((item) => item.sourceId)).join(" · ")}` : ""}`;
 
-      return {
-        genericMedicationId: medication?.id ?? `master-${component.masterDrugId.toLocaleLowerCase()}`,
-        genericName: medication?.canonicalName ?? component.genericName,
-        persianName: medication?.persianName ?? component.persianName ?? component.genericName,
-        therapeuticClass: medication?.className ?? component.therapyGroup,
-        therapyGroup: contractTherapyGroup(component.therapyGroup, medication?.therapyGroup),
-        sourceUrl: evidence.sourceUrl,
-        sourceReference: evidence.sourceReference,
-        considerations: reasons,
-        cautions,
-        priorityScore: 0,
-        priorityTier: rank === 1 ? "recommended" : rank === 2 ? "preferred" : "consider",
-        relativeCost: "medium",
-        rankingReasons: reasons,
-        risks: cautions,
-        insuranceCoverages,
-        therapyAction: currentMedication
-          ? "review_current_therapy"
-          : (request.currentMedications ?? []).some((item) => (item.status ?? "active") === "active")
-            ? "consider_addition"
-            : "consider_initiation",
-        currentMedication,
-        outputStatus: "information_only",
-        decisionGraphAuthority: true,
-        decisionGraphPlanId: plan.planId,
-        decisionGraphPlanRank: rank,
-        decisionGraphComponentOrder: componentIndex,
-        decisionGraphRegimenId: plan.glycemicRegimenId ?? regimen?.regimenId,
-      };
-    });
+  return regimen.components.map((component, componentIndex) => {
+    const medication = medicationForComponent(component.masterDrugId, component.genericName, input.medications);
+    const currentMedication = activeCurrentMedication(
+      component.masterDrugId,
+      component.genericName,
+      input.request,
+      input.medications,
+      input.masterRegistry,
+    );
+    const reasons = unique([...regimen.whySelected, ...regimen.reasons, ...component.availability.reasons]);
+    const cautions = unique(regimen.cautions);
+    return {
+      genericMedicationId: medication?.id ?? `master-${component.masterDrugId.toLocaleLowerCase()}`,
+      genericName: medication?.canonicalName ?? component.genericName,
+      persianName: medication?.persianName ?? component.persianName ?? component.genericName,
+      therapeuticClass: medication?.className ?? component.therapyGroup,
+      therapyGroup: contractTherapyGroup(component.therapyGroup, medication?.therapyGroup),
+      sourceUrl,
+      sourceReference,
+      considerations: reasons,
+      cautions,
+      priorityScore: 0,
+      priorityTier: rank === 1 ? "recommended" : rank === 2 ? "preferred" : "consider",
+      relativeCost: "medium",
+      rankingReasons: reasons,
+      risks: cautions,
+      insuranceCoverages: medication ? input.request.insuranceCoverageByMedicationId?.[medication.id] ?? [] : [],
+      therapyAction: currentMedication
+        ? "review_current_therapy"
+        : (input.request.currentMedications ?? []).some((item) => (item.status ?? "active") === "active")
+          ? "consider_addition"
+          : "consider_initiation",
+      currentMedication,
+      outputStatus: "information_only",
+      decisionGraphAuthority: true,
+      decisionGraphRank: rank,
+      decisionGraphComponentOrder: componentIndex,
+      decisionGraphRegimenId: regimen.regimenId,
+    };
   });
 }
 
-/**
- * Behavior-preserving contract adapter for the existing Type 2 UI.
- * Clinical selection is performed exactly once by Decision Graph v2. The
- * legacy `priorityScore` field is deliberately neutralized to zero and is not
- * a clinical ranking signal. Graph plan order is carried separately for the
- * scenario/presentation adapter.
- */
 export function buildType2AssessmentFromDecisionGraphV2(
   input: BuildType2DecisionGraphAssessmentInput,
 ): Type2DecisionGraphAssessmentResult {
@@ -424,27 +302,31 @@ export function buildType2AssessmentFromDecisionGraphV2(
     masterRegistry: input.masterRegistry,
     marketProducts: input.marketProducts,
   });
-  const request = graphRequest(input.request, input.medications, input.masterRegistry, inventory);
-  const result = runDecisionGraphV2(request);
-  const evidence = evidenceForRecommendation(result);
+  const result = runDecisionGraphV2(graphRequest(input, inventory));
+  const regimens = [result.primary, ...result.alternatives]
+    .filter((item): item is RecommendationV2 => Boolean(item))
+    .slice(0, 3);
+  const evidence = result.primary?.evidenceSummary.length
+    ? result.primary.evidenceSummary
+    : result.clinicalState.evidence;
+  const sourceReference = `${TYPE2_DECISION_GRAPH_V2_AUTHORITY}${evidence.length ? ` · ${unique(evidence.map((item) => item.sourceId)).join(" · ")}` : ""}`;
   const rationale = unique([
     ...result.clinicalState.reasons,
     ...(result.primary?.whySelected ?? []),
-    ...(result.primary?.reasons ?? []),
     ...result.conflicts,
-  ]).filter(Boolean);
+  ]);
 
   return {
     recommendation: {
-      priority: recommendationPriority(result),
-      title: recommendationTitle(result),
+      priority: priorityFor(result),
+      title: titleFor(result),
       rationale,
       hba1cGap: result.clinicalState.hba1cGap,
       urgentReview: result.status === "urgent_clinician_review",
-      sourceUrl: evidence.sourceUrl,
-      sourceReference: evidence.sourceReference,
+      sourceUrl: evidence[0]?.url ?? "about:blank",
+      sourceReference,
     },
-    medications: projectPlans(result, input.request, input.medications, input.masterRegistry),
+    medications: regimens.flatMap((regimen, index) => projectionForRegimen(regimen, index + 1, input)),
     decisionGraphAuthority: true,
     decisionGraphStatus: result.status,
     decisionGraphEngine: result.engine,
