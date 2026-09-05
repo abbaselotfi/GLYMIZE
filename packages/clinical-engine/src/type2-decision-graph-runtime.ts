@@ -9,12 +9,22 @@ import { buildType2Assessment as buildLegacyType2Assessment } from "./index.js";
 import {
   filterHardExcludedLegacyType2Assessment,
 } from "./type2-hard-exclusion-compat.js";
+import {
+  resolveType2ParallelSafetyProjectionV2,
+  type Type2ParallelSafetyProjectionV2,
+  type Type2StructuredConsiderationRequestV2,
+} from "./type2-intake-v2.js";
 import { buildType2AssessmentWithWorldDrugCoverageV2 } from "./type2-worlddrug-recommendation-compat.js";
 
 export interface Type2DecisionGraphRuntimeCatalog {
   masterRegistry: readonly MasterDrugRegistryEntry[];
   marketProducts: readonly IranMarketDrugProduct[];
 }
+
+export type Type2RuntimeAssessmentResultV2 = Type2AssessmentResult & {
+  /** Non-ranking safety/referral channels shared by API and static-browser runtimes. */
+  parallelSafety: Type2ParallelSafetyProjectionV2;
+};
 
 let runtimeCatalog: Type2DecisionGraphRuntimeCatalog | undefined;
 
@@ -33,6 +43,18 @@ export function type2DecisionGraphRuntimeConfigured() {
   return Boolean(runtimeCatalog?.masterRegistry.length);
 }
 
+function withParallelSafety(
+  assessment: Type2AssessmentResult,
+  request: Type2ConsiderationRequest,
+): Type2RuntimeAssessmentResultV2 {
+  return {
+    ...assessment,
+    parallelSafety: resolveType2ParallelSafetyProjectionV2(
+      request as Type2StructuredConsiderationRequestV2,
+    ),
+  };
+}
+
 /**
  * Live Type 2 authority entrypoint.
  *
@@ -43,9 +65,10 @@ export function type2DecisionGraphRuntimeConfigured() {
  * `requires_approved_protocol` review options; those options receive no Decision
  * Graph rank and cannot become executable until a reviewed rule/protocol exists.
  *
- * The public function deliberately retains the stable `Type2AssessmentResult`
- * contract. Additional WorldDrug coverage metadata is an internal compatible
- * extension and must not leak package-private declaration paths into API types.
+ * The stable Type2 assessment fields remain intact. `parallelSafety` is an
+ * additive, non-ranking channel resolved by the same reviewed pathway code in
+ * every runtime. It never participates in medication scoring, graph rank, dose
+ * execution, or scenario ordering.
  *
  * The legacy builder remains only as an explicit compatibility fallback for
  * non-browser/test consumers that have not configured runtime catalogue data.
@@ -55,16 +78,22 @@ export function type2DecisionGraphRuntimeConfigured() {
 export function buildType2Assessment(
   medications: readonly GenericMedication[],
   request: Type2ConsiderationRequest,
-): Type2AssessmentResult {
+): Type2RuntimeAssessmentResultV2 {
   if (!runtimeCatalog?.masterRegistry.length) {
     const legacyAssessment = buildLegacyType2Assessment(medications, request);
-    return filterHardExcludedLegacyType2Assessment(legacyAssessment, medications, request);
+    return withParallelSafety(
+      filterHardExcludedLegacyType2Assessment(legacyAssessment, medications, request),
+      request,
+    );
   }
 
-  return buildType2AssessmentWithWorldDrugCoverageV2({
-    medications,
+  return withParallelSafety(
+    buildType2AssessmentWithWorldDrugCoverageV2({
+      medications,
+      request,
+      masterRegistry: runtimeCatalog.masterRegistry,
+      marketProducts: runtimeCatalog.marketProducts,
+    }),
     request,
-    masterRegistry: runtimeCatalog.masterRegistry,
-    marketProducts: runtimeCatalog.marketProducts,
-  });
+  );
 }

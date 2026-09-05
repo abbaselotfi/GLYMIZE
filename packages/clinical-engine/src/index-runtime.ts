@@ -5,6 +5,7 @@ export {
   configureType2DecisionGraphRuntimeCatalog,
   type2DecisionGraphRuntimeConfigured,
   type Type2DecisionGraphRuntimeCatalog,
+  type Type2RuntimeAssessmentResultV2,
 } from "./type2-decision-graph-runtime.js";
 export {
   TYPE2_DECISION_GRAPH_V2_AUTHORITY,

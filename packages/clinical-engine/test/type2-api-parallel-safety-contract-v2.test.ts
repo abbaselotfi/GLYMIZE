@@ -6,12 +6,18 @@ const controllerPath = fileURLToPath(
   new URL("../../../apps/api/src/catalog/catalog.controller.ts", import.meta.url),
 );
 const controller = readFileSync(controllerPath, "utf8");
+const runtimePath = fileURLToPath(
+  new URL("../src/type2-decision-graph-runtime.ts", import.meta.url),
+);
+const runtime = readFileSync(runtimePath, "utf8");
 
 describe("Type 2 API parallel-safety contract", () => {
-  it("accepts the structured request and appends safety projection to the existing assessment", () => {
+  it("accepts the structured request and delegates the complete assessment to shared runtime authority", () => {
     expect(controller).toContain("Type2StructuredConsiderationRequestV2");
-    expect(controller).toContain("...this.catalogService.listType2MedicationConsiderations(request)");
-    expect(controller).toContain("parallelSafety: resolveType2ParallelSafetyProjectionV2(request)");
+    expect(controller).toContain("return this.catalogService.listType2MedicationConsiderations(request)");
+    expect(controller).not.toContain("resolveType2ParallelSafetyProjectionV2");
+    expect(runtime).toContain("resolveType2ParallelSafetyProjectionV2");
+    expect(runtime).toContain("parallelSafety:");
   });
 
   it("keeps Decision Graph medication execution out of the controller projection boundary", () => {
@@ -27,5 +33,6 @@ describe("Type 2 API parallel-safety contract", () => {
     expect(method).not.toContain("medications:");
     expect(method).not.toContain("ranking:");
     expect(method).not.toContain("candidates:");
+    expect(method).not.toContain("parallelSafety:");
   });
 });
