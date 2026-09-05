@@ -15,6 +15,7 @@ export default function PatientPortalEntry() {
   const fa = locale === "fa";
   const [identity, setIdentity] = useState<PatientIdentityCapabilities | null>(null);
   const [legacyEnabled, setLegacyEnabled] = useState(false);
+  const [multiPracticePatientEnabled, setMultiPracticePatientEnabled] = useState(false);
   const [legacySelected, setLegacySelected] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -28,6 +29,7 @@ export default function PatientPortalEntry() {
       if (patientResult.status === "fulfilled") setIdentity(patientResult.value);
       if (runtimeResult.status === "fulfilled") {
         setLegacyEnabled(runtimeResult.value.patientPortal);
+        setMultiPracticePatientEnabled(runtimeResult.value.multiPracticePatient);
       }
       setReady(true);
     });
@@ -56,6 +58,7 @@ export default function PatientPortalEntry() {
       <PatientIdentityPortal
         capabilities={identity}
         legacyPortalEnabled={legacyEnabled}
+        multiPracticePatientEnabled={multiPracticePatientEnabled}
         onUseLegacy={() => setLegacySelected(true)}
       />
     );
