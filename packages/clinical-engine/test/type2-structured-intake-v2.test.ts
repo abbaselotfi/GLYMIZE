@@ -6,6 +6,7 @@ import {
   resolveRetinopathySpecialistEscalationV2,
 } from "../src/decision-graph-v2/index.js";
 import {
+  resolveType2ParallelSafetyProjectionV2,
   type2StructuredIntakeToDecisionGraphV2,
   type Type2StructuredConsiderationRequestV2,
 } from "../src/type2-intake-v2.js";
@@ -175,5 +176,57 @@ describe("Type 2 structured intake v2", () => {
   ] as const)("maps cost preference %s to %s", (input, expected) => {
     const mapped = type2StructuredIntakeToDecisionGraphV2(request({ costPreference: input }), inventory);
     expect(mapped.preferences.costPreference).toBe(expected);
+  });
+});
+
+describe("Type 2 parallel safety projection", () => {
+  it("resolves all explicit specialist/safety contexts without medication ranking", () => {
+    const projection = resolveType2ParallelSafetyProjectionV2(request({
+      factors: ["pregnancy", "diabetic_foot"],
+      clinicalContext: {
+        pregnancy: true,
+        glycemia: { fastingPlasmaGlucoseMgDl: 99 },
+        pregnancyCare: { diabetesType: "type2", gestationalAgeWeeks: 20 },
+        diabeticFoot: { footUlcerPresent: true, clinicalInfectionPresent: false },
+        retinopathy: {
+          diabeticRetinopathyPresent: true,
+          severity: "moderate_npdr",
+          diabeticMacularEdema: false,
+        },
+        nutritionSupport: { intent: "glycemic_benefit" },
+      },
+    }));
+
+    expect(projection.retinopathy.escalations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ specialty: "ophthalmology", urgency: "prompt" }),
+    ]));
+    expect(projection.diabeticFoot).toMatchObject({
+      state: "uninfected_ulcer",
+      antibioticExecution: false,
+      antibioticBoundary: "not_indicated_for_uninfected_ulcer",
+    });
+    expect(projection.nutritionSupport).toMatchObject({
+      state: "glycemic_supplement_not_recommended",
+      supplementOrNutritionPrescriptionExecution: false,
+    });
+    expect(projection.pregnancy).toMatchObject({
+      state: "type2_insulin_preferred",
+      insulinPreferredOrRequired: true,
+      autonomousInsulinDoseExecution: false,
+    });
+    expect(projection).not.toHaveProperty("medications");
+    expect(projection).not.toHaveProperty("candidates");
+    expect(projection).not.toHaveProperty("ranking");
+  });
+
+  it("keeps broad legacy flags fail-closed when specialist phenotype is absent", () => {
+    const projection = resolveType2ParallelSafetyProjectionV2(request({
+      factors: ["pregnancy", "diabetic_foot"],
+    }));
+    expect(projection.diabeticFoot.state).toBe("no_foot_ulcer_context");
+    expect(projection.diabeticFoot.antibioticExecution).toBe(false);
+    expect(projection.pregnancy.state).toBe("needs_diabetes_type");
+    expect(projection.pregnancy.autonomousInsulinDoseExecution).toBe(false);
+    expect(projection.retinopathy.escalations).toHaveLength(0);
   });
 });
