@@ -63,9 +63,15 @@ function applyCurrentTherapyTransitionGate(
   reasons: string[],
 ) {
   if (result.lane !== "glycemic") return currentStatus;
-  const active = (request.patient.currentMedications ?? []).filter((item) =>
-    (item.status ?? "active") === "active" && item.tolerance !== "intolerant",
-  );
+  const active = (request.patient.currentMedications ?? []).filter((item) => {
+    if ((item.status ?? "active") !== "active" || item.tolerance === "intolerant") return false;
+    // Preserve unresolved identities as a fail-closed reconciliation concern, but
+    // do not force known organ-protection medicines (RAAS/statin/MRA/etc.) into a
+    // glycemic replacement decision merely because they are active medications.
+    if (!item.masterDrugId) return true;
+    const known = medicationById(request, item.masterDrugId);
+    return known ? known.primaryLanes.includes("glycemic") : true;
+  });
   if (!active.length) return currentStatus;
 
   const unresolved = active.filter((item) => !item.masterDrugId);
