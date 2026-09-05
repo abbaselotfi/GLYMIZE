@@ -7,7 +7,6 @@ import type {
   GenericMedication,
   InsuranceProvider,
   MedicationClinicalDomain,
-  PatientClinicalContext,
   Type2AssessmentResult,
   Type2ConsiderationRequest,
   Type2CostPreference,
@@ -15,6 +14,7 @@ import type {
   Type2RoutePreference,
 } from "@glymize/contracts";
 import type { PatientHandoffRecord } from "@glymize/contracts";
+import type { Type2StructuredConsiderationRequestV2 } from "@glymize/clinical-engine/type2-intake-v2";
 import {
   buildType2TreatmentScenarios,
   type Type2CostingPlan,
@@ -29,6 +29,12 @@ import {
 import MedicationMarketDetails from "../components/medication-market-details";
 import PatientHandoffLookup from "../components/patient-handoff-lookup";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
+import Type2StructuredContextFields from "./type2-structured-context-fields";
+import {
+  emptyType2StructuredIntakeDraft,
+  structuredClinicalContextFromDraft,
+  type Type2StructuredIntakeDraft,
+} from "./type2-structured-intake-ui";
 import base from "./type2-v2.module.css";
 import styles from "./type2-scenarios.module.css";
 
@@ -217,6 +223,7 @@ export default function Type2ScenariosClient() {
     eGfr: "", creatinineClearanceMlMin: "", uacr: "", potassiumMmolL: "", dialysis: false, recentAki: false, lvef: "", weight: "", height: "",
     fibrosisStage: "", cirrhosis: false, decompensatedCirrhosis: false,
   });
+  const [structuredContext, setStructuredContext] = useState<Type2StructuredIntakeDraft>({ ...emptyType2StructuredIntakeDraft });
   const [costPreference, setCostPreference] = useState<Type2CostPreference>("moderate");
   const [routePreference, setRoutePreference] = useState<Type2RoutePreference>("oral_and_injectable");
   const [insuranceProvider, setInsuranceProvider] = useState<InsuranceProvider>("social_security");
@@ -333,7 +340,8 @@ export default function Type2ScenariosClient() {
     });
   }
 
-  function clinicalContextPayload(): PatientClinicalContext {
+  function clinicalContextPayload(): NonNullable<Type2StructuredConsiderationRequestV2["clinicalContext"]> {
+    const specialist = structuredClinicalContextFromDraft(structuredContext, { factors, worldDrugDomains });
     return {
       pregnancy: factors.includes("pregnancy"),
       cardiovascular: {
@@ -361,6 +369,7 @@ export default function Type2ScenariosClient() {
         heightCm: numberOrUndefined(context.height),
         bmi,
       },
+      ...specialist,
     };
   }
 
@@ -424,7 +433,7 @@ export default function Type2ScenariosClient() {
       setAssessment(null);
       return;
     }
-    const request: Type2ConsiderationRequest & { activeClinicalDomains?: MedicationClinicalDomain[] } = {
+    const request: Type2StructuredConsiderationRequestV2 & { activeClinicalDomains?: MedicationClinicalDomain[] } = {
       currentHba1c: current,
       targetHba1c: target,
       currentMedications: currentMedicationPayload(),
@@ -540,6 +549,17 @@ export default function Type2ScenariosClient() {
                 <Check label={fa ? "سیروز دکامپنسیه" : "Decompensated cirrhosis"} checked={context.decompensatedCirrhosis} onChange={(value) => setContext((c) => ({ ...c, decompensatedCirrhosis: value }))} />
               </div>}
             </div>}
+
+            <Type2StructuredContextFields
+              draft={structuredContext}
+              factors={factors}
+              worldDrugDomains={worldDrugDomains}
+              locale={locale}
+              onChange={(patch) => {
+                setStructuredContext((current) => ({ ...current, ...patch }));
+                setAssessment(null);
+              }}
+            />
           </section>
 
           <section className={styles.section}>
