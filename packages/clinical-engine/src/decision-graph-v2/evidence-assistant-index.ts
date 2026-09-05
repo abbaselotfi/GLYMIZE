@@ -5,13 +5,15 @@ import {
 } from "./cardiometabolic-protocols.js";
 import { buildReviewedMashDoseRulesV2 } from "./mash-protocols.js";
 import {
-  aasldSemaglutideMash2025EvidenceV2,
+  applyReviewedWegovyMashKnowledgeV2,
+  buildReviewedWegovyMashDoseRulesV2,
   wegovy2026LabelEvidenceV2,
 } from "./wegovy-mash-protocol.js";
 import { buildCoreAda2026DecisionRulesV2 } from "./safety-rules.js";
 import type {
   DoseRuleV2,
   EvidenceReferenceV2,
+  IranMarketProductV2,
   KnowledgeMedicationV2,
   MedicationGateRuleV2,
 } from "./types.js";
@@ -86,6 +88,23 @@ const evidenceIndexKnowledgeV2: KnowledgeMedicationV2[] = [
   },
 ];
 
+const evidenceIndexWegovyProductsV2: IranMarketProductV2[] = [0.25, 0.5, 1, 1.7, 2.4].map((amount) => ({
+  productId: `EA-WEGOVY-${String(amount).replace(".", "_")}`,
+  masterDrugId: "EA-SEMAGLUTIDE-SC",
+  nfiMatchState: "verified",
+  genericName: "Semaglutide",
+  brandName: "Wegovy",
+  dosageFormGroup: "injection_pen",
+  route: "subcutaneous",
+  consumptionUnit: "pen",
+  strengthComponents: [{ ingredientKey: "EA-SEMAGLUTIDE-SC", amount, unit: "mg" }],
+  consumptionUnitsPerPurchaseUnit: 4,
+  purchaseUnitLabel: "box",
+  license: { everValid: true, currentValid: true, revoked: false },
+  marketPresence: "confirmed_active",
+  observedAt: "evidence-index-fixture",
+}));
+
 const genericNameByMasterId = new Map(
   evidenceIndexKnowledgeV2.map((item) => [item.masterDrugId, item.genericName]),
 );
@@ -153,35 +172,15 @@ function safetyRecord(rule: MedicationGateRuleV2): DecisionGraphEvidenceIndexRec
   };
 }
 
-const wegovyMashEvidenceRecordsV2: DecisionGraphEvidenceIndexRecordV2[] = [
-  {
-    ruleId: "LABEL-WEGOVY-MASH-INITIATION-SCHEDULE",
-    domain: "product_dose",
-    textFa: "برای WEGOVY تزریقی در MASH غیرسیروتیک F2-F3، شروع 0.25 mg هفته‌ای است و هر 4 هفته به 0.5، سپس 1، سپس 1.7 و سپس 2.4 mg هفته‌ای افزایش می‌یابد.",
-    textEn: "For WEGOVY injection in noncirrhotic F2-F3 MASH, initiate 0.25 mg weekly and escalate every 4 weeks to 0.5, 1, 1.7, then 2.4 mg weekly.",
-    engineEffect: "approved_product_dose_schedule",
-    searchText: "wegovy semaglutide mash masld f2 f3 noncirrhotic dose dosage initiation start titration escalation 0.25 0.5 1 1.7 2.4 weekly 4 weeks",
-    evidence: [wegovy2026LabelEvidenceV2, aasldSemaglutideMash2025EvidenceV2],
-  },
-  {
-    ruleId: "LABEL-WEGOVY-MASH-MAINTENANCE",
-    domain: "product_dose",
-    textFa: "دوز نگهدارنده توصیه‌شده WEGOVY تزریقی برای MASH بزرگسالان 2.4 mg هفته‌ای است؛ در عدم تحمل می‌توان به 1.7 mg هفته‌ای کاهش داد و re-escalation به 2.4 mg را در نظر گرفت.",
-    textEn: "The recommended WEGOVY injection maintenance dose for adult MASH is 2.4 mg weekly; if not tolerated, reduce to 1.7 mg weekly and consider re-escalation to 2.4 mg.",
-    engineEffect: "approved_product_maintenance_dose",
-    searchText: "wegovy semaglutide mash maintenance 2.4 mg 1.7 mg weekly intolerance re-escalation",
-    evidence: [wegovy2026LabelEvidenceV2, aasldSemaglutideMash2025EvidenceV2],
-  },
-  {
-    ruleId: "LABEL-WEGOVY-MASH-SAFETY-BOUNDARY",
-    domain: "medication_safety",
-    textFa: "اجرای WEGOVY برای MASH به غربالگری contraindication و warningهای label از جمله MTC/MEN2، hypersensitivity شدید، severe gastroparesis، pancreatitis و عدم همزمانی با semaglutide/GLP-1 دیگر نیاز دارد.",
-    textEn: "WEGOVY MASH execution requires label safety screening including MTC/MEN2, serious hypersensitivity, severe gastroparesis, pancreatitis review, and avoidance of concomitant semaglutide/other GLP-1 therapy.",
-    engineEffect: "product_specific_safety_boundary",
-    searchText: "wegovy semaglutide contraindication mtc medullary thyroid carcinoma men2 hypersensitivity gastroparesis pancreatitis concomitant glp-1",
-    evidence: [wegovy2026LabelEvidenceV2],
-  },
-];
+const wegovyMashSafetyEvidenceRecordV2: DecisionGraphEvidenceIndexRecordV2 = {
+  ruleId: "LABEL-WEGOVY-MASH-SAFETY-BOUNDARY",
+  domain: "medication_safety",
+  textFa: "اجرای WEGOVY برای MASH به غربالگری contraindication و warningهای label از جمله MTC/MEN2، hypersensitivity شدید، severe gastroparesis، pancreatitis و عدم همزمانی با semaglutide/GLP-1 دیگر نیاز دارد.",
+  textEn: "WEGOVY MASH execution requires label safety screening including MTC/MEN2, serious hypersensitivity, severe gastroparesis, pancreatitis review, and avoidance of concomitant semaglutide/other GLP-1 therapy.",
+  engineEffect: "product_specific_safety_boundary",
+  searchText: "wegovy semaglutide contraindication mtc medullary thyroid carcinoma men2 hypersensitivity gastroparesis pancreatitis concomitant glp-1",
+  evidence: [wegovy2026LabelEvidenceV2],
+};
 
 /**
  * Evidence Assistant index materialized from the same approved executable rule
@@ -189,10 +188,17 @@ const wegovyMashEvidenceRecordsV2: DecisionGraphEvidenceIndexRecordV2[] = [
  * product/safety rules instead of maintaining an independent citation list.
  */
 export function buildDecisionGraphEvidenceAssistantIndexV2(): DecisionGraphEvidenceIndexRecordV2[] {
+  const wegovyInventory = applyReviewedWegovyMashKnowledgeV2({
+    knowledge: evidenceIndexKnowledgeV2,
+    marketProducts: evidenceIndexWegovyProductsV2,
+    doseRules: [],
+    insurancePolicies: [],
+  });
   const doseRules = [
     ...buildReviewedProductDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedCardiometabolicDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedMashDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
+    ...buildReviewedWegovyMashDoseRulesV2(wegovyInventory),
   ];
   const safetyRules = [
     ...buildCoreAda2026DecisionRulesV2(evidenceIndexKnowledgeV2).medicationGateRules,
@@ -201,6 +207,6 @@ export function buildDecisionGraphEvidenceAssistantIndexV2(): DecisionGraphEvide
   return [
     ...doseRules.map(doseRecord),
     ...safetyRules.map(safetyRecord),
-    ...wegovyMashEvidenceRecordsV2,
+    wegovyMashSafetyEvidenceRecordV2,
   ];
 }
