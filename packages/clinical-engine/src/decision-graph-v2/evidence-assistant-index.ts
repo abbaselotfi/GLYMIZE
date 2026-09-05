@@ -4,10 +4,16 @@ import {
   buildReviewedCardiometabolicGateRulesV2,
 } from "./cardiometabolic-protocols.js";
 import { buildReviewedMashDoseRulesV2 } from "./mash-protocols.js";
+import {
+  applyReviewedWegovyMashKnowledgeV2,
+  buildReviewedWegovyMashDoseRulesV2,
+  wegovy2026LabelEvidenceV2,
+} from "./wegovy-mash-protocol.js";
 import { buildCoreAda2026DecisionRulesV2 } from "./safety-rules.js";
 import type {
   DoseRuleV2,
   EvidenceReferenceV2,
+  IranMarketProductV2,
   KnowledgeMedicationV2,
   MedicationGateRuleV2,
 } from "./types.js";
@@ -82,6 +88,23 @@ const evidenceIndexKnowledgeV2: KnowledgeMedicationV2[] = [
   },
 ];
 
+const evidenceIndexWegovyProductsV2: IranMarketProductV2[] = [0.25, 0.5, 1, 1.7, 2.4].map((amount) => ({
+  productId: `EA-WEGOVY-${String(amount).replace(".", "_")}`,
+  masterDrugId: "EA-SEMAGLUTIDE-SC",
+  nfiMatchState: "verified",
+  genericName: "Semaglutide",
+  brandName: "Wegovy",
+  dosageFormGroup: "injection_pen",
+  route: "subcutaneous",
+  consumptionUnit: "pen",
+  strengthComponents: [{ ingredientKey: "EA-SEMAGLUTIDE-SC", amount, unit: "mg" }],
+  consumptionUnitsPerPurchaseUnit: 4,
+  purchaseUnitLabel: "box",
+  license: { everValid: true, currentValid: true, revoked: false },
+  marketPresence: "confirmed_active",
+  observedAt: "evidence-index-fixture",
+}));
+
 const genericNameByMasterId = new Map(
   evidenceIndexKnowledgeV2.map((item) => [item.masterDrugId, item.genericName]),
 );
@@ -149,16 +172,33 @@ function safetyRecord(rule: MedicationGateRuleV2): DecisionGraphEvidenceIndexRec
   };
 }
 
+const wegovyMashSafetyEvidenceRecordV2: DecisionGraphEvidenceIndexRecordV2 = {
+  ruleId: "LABEL-WEGOVY-MASH-SAFETY-BOUNDARY",
+  domain: "medication_safety",
+  textFa: "اجرای WEGOVY برای MASH به غربالگری contraindication و warningهای label از جمله MTC/MEN2، hypersensitivity شدید، severe gastroparesis، pancreatitis و عدم همزمانی با semaglutide/GLP-1 دیگر نیاز دارد.",
+  textEn: "WEGOVY MASH execution requires label safety screening including MTC/MEN2, serious hypersensitivity, severe gastroparesis, pancreatitis review, and avoidance of concomitant semaglutide/other GLP-1 therapy.",
+  engineEffect: "product_specific_safety_boundary",
+  searchText: "wegovy semaglutide contraindication mtc medullary thyroid carcinoma men2 hypersensitivity gastroparesis pancreatitis concomitant glp-1",
+  evidence: [wegovy2026LabelEvidenceV2],
+};
+
 /**
  * Evidence Assistant index materialized from the same approved executable rule
  * builders used by Decision Graph v2. This keeps citation retrieval tied to the
  * product/safety rules instead of maintaining an independent citation list.
  */
 export function buildDecisionGraphEvidenceAssistantIndexV2(): DecisionGraphEvidenceIndexRecordV2[] {
+  const wegovyInventory = applyReviewedWegovyMashKnowledgeV2({
+    knowledge: evidenceIndexKnowledgeV2,
+    marketProducts: evidenceIndexWegovyProductsV2,
+    doseRules: [],
+    insurancePolicies: [],
+  });
   const doseRules = [
     ...buildReviewedProductDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedCardiometabolicDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedMashDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
+    ...buildReviewedWegovyMashDoseRulesV2(wegovyInventory),
   ];
   const safetyRules = [
     ...buildCoreAda2026DecisionRulesV2(evidenceIndexKnowledgeV2).medicationGateRules,
@@ -167,5 +207,6 @@ export function buildDecisionGraphEvidenceAssistantIndexV2(): DecisionGraphEvide
   return [
     ...doseRules.map(doseRecord),
     ...safetyRules.map(safetyRecord),
+    wegovyMashSafetyEvidenceRecordV2,
   ];
 }

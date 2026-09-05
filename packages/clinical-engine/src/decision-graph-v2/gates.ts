@@ -1,6 +1,7 @@
 import { approvedDoseRulesForV2, resolveDocumentedCurrentDosePlanV2, resolveDosePlanV2 } from "./dose.js";
 import { resolveExactCurrentRegimenFdcPlansV2 } from "./fdc-execution.js";
 import { evaluateReviewedResmetiromProtocolV2 } from "./mash-protocols.js";
+import { evaluateReviewedWegovyMashProtocolV2 } from "./wegovy-mash-protocol.js";
 import { buildFactMapV2, evaluatePredicateV2 } from "./predicates.js";
 import type {
   ClinicalObjectiveV2,
@@ -141,13 +142,30 @@ export function applyHardGatesV2(
       reasons.push(...availability.reasons);
     }
 
-    const mashProtocol = evaluateReviewedResmetiromProtocolV2(request.patient, medication);
-    if (mashProtocol) {
-      evidence.push(...mashProtocol.evidence);
-      reasons.push(...mashProtocol.reasons);
-      if (mashProtocol.status === "exclude") status = "exclude";
-      else if (mashProtocol.status === "needs_data" && status !== "exclude") status = "needs_data";
-      else if (mashProtocol.status === "conditional" && status === "pass") status = "conditional";
+    const resmetiromProtocol = result.lane === "liver"
+      ? evaluateReviewedResmetiromProtocolV2(request.patient, medication)
+      : undefined;
+    if (resmetiromProtocol) {
+      evidence.push(...resmetiromProtocol.evidence);
+      reasons.push(...resmetiromProtocol.reasons);
+      if (resmetiromProtocol.status === "exclude") status = "exclude";
+      else if (resmetiromProtocol.status === "needs_data" && status !== "exclude") status = "needs_data";
+      else if (resmetiromProtocol.status === "conditional" && status === "pass") status = "conditional";
+    }
+
+    const wegovyMashProtocol = result.lane === "liver"
+      ? evaluateReviewedWegovyMashProtocolV2({
+          patient: request.patient,
+          medication,
+          marketProducts: request.inventory.marketProducts,
+        })
+      : undefined;
+    if (wegovyMashProtocol) {
+      evidence.push(...wegovyMashProtocol.evidence);
+      reasons.push(...wegovyMashProtocol.reasons);
+      if (wegovyMashProtocol.status === "exclude") status = "exclude";
+      else if (wegovyMashProtocol.status === "needs_data" && status !== "exclude") status = "needs_data";
+      else if (wegovyMashProtocol.status === "conditional" && status === "pass") status = "conditional";
     }
 
     const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>
@@ -187,9 +205,13 @@ export function applyHardGatesV2(
     );
     const useCase = currentMedication ? "continuation" as const : "initiation" as const;
     let approvedRules = approvedDoseRulesForV2(component.masterDrugId, request.inventory.doseRules, facts, useCase, result.lane);
-    if (mashProtocol?.doseRuleId) {
-      approvedRules = approvedRules.filter((rule) => rule.id === mashProtocol.doseRuleId);
-    } else if (mashProtocol && mashProtocol.status !== "pass") {
+    const reviewedProductDoseRuleId = resmetiromProtocol?.doseRuleId ?? wegovyMashProtocol?.doseRuleId;
+    if (reviewedProductDoseRuleId) {
+      approvedRules = approvedRules.filter((rule) => rule.id === reviewedProductDoseRuleId);
+    } else if (
+      (resmetiromProtocol && resmetiromProtocol.status !== "pass") ||
+      (wegovyMashProtocol && wegovyMashProtocol.status !== "pass")
+    ) {
       approvedRules = [];
     }
     const rulePlans = approvedRules

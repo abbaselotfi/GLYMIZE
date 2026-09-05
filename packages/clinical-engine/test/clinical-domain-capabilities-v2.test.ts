@@ -34,13 +34,16 @@ describe("clinical engine multidomain capability boundary", () => {
     }
   });
 
-  it("marks MASH partially executable after resmetirom while preserving the semaglutide gap", () => {
+  it("marks MASH partially executable for resmetirom and product-bound WEGOVY initiation while keeping continuation/cost gaps explicit", () => {
     for (const domain of ["liver", "masld_mash"] as const) {
       const capability = clinicalDomainCapability(domain);
       expect(capability.executionState).toBe("partially_executable");
       expect(capability.decisionGraphLanes).toContain("liver");
       expect(capability.executableObjectives).toContain("liver_directed_therapy");
-      expect(capability.nextGap).toContain("semaglutide");
+      expect(capability.boundary.toLocaleLowerCase()).toContain("resmetirom");
+      expect(capability.boundary).toContain("WEGOVY");
+      expect(capability.nextGap?.toLocaleLowerCase()).toMatch(/interval|titration/);
+      expect(capability.nextGap?.toLocaleLowerCase()).not.toContain("implement semaglutide");
     }
     expect(clinicalDomainCapability("retinopathy").executionState).toBe("specialist_or_escalation");
     expect(clinicalDomainCapability("diabetic_foot").executionState).toBe("specialist_or_escalation");
