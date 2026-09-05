@@ -36,10 +36,6 @@ export interface WegovyMedicationSafetyContextV2 {
 
 type WegovyPatientContextV2 = PatientContextV2 & {
   medicationSafety?: WegovyMedicationSafetyContextV2;
-  currentMedications?: Array<PatientContextV2["currentMedications"] extends Array<infer T> ? T & {
-    brandName?: string;
-    durationDays?: number;
-  } : never>;
 };
 
 const WEGOVY_STEPS_MG = [0.25, 0.5, 1, 1.7, 2.4] as const;
