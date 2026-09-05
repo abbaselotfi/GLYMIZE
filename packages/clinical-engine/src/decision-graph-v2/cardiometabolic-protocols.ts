@@ -40,13 +40,13 @@ function regulatoryEvidence(
   };
 }
 
-const labels = {
+export const cardiometabolicRegulatoryEvidenceV2 = {
   enalapril: regulatoryEvidence(
     "US-LABEL-ENALAPRIL-2026",
     "Enalapril maleate tablets — U.S. prescribing information",
     "DailyMed label reviewed 2026-09-05",
-    "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=fa93d8e6-2ed2-4a3c-bf6d-33bd0a374efa",
-    "Dosage and Administration — Heart Failure / renal adjustment",
+    "https://www.dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=63187a94-9ac7-4320-ac70-0631e08c2b8d",
+    "Dosage and Administration — hypertension renal-adjustment table; Heart Failure",
   ),
   losartan: regulatoryEvidence(
     "US-LABEL-LOSARTAN-2026",
@@ -86,9 +86,9 @@ const labels = {
   rosuvastatin: regulatoryEvidence(
     "US-LABEL-ROSUVASTATIN-2026",
     "Rosuvastatin tablets — U.S. prescribing information",
-    "DailyMed updated 2026-09-01",
-    "https://www.dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=5c992d3d-d754-48b6-a267-1451208352ed",
-    "Dosage and Administration 2.2, 2.4, 2.5",
+    "DailyMed label reviewed 2026-09-05",
+    "https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=4148e0b3-0340-9f3a-e063-6394a90afc96",
+    "Dosage and Administration 2.2, 2.5; severe renal impairment",
   ),
 } as const;
 
@@ -125,9 +125,8 @@ function fixedDailyRule(
 
 /**
  * Exact reviewed initiation-dose rules for the first Phase 4 cardiometabolic
- * cohort. These rules never use class-average dosing. If a label branch needs a
- * patient fact that GLYMIZE cannot represent safely, that branch is deliberately
- * not authored here (for example enalapril hypertension dosing by CrCl).
+ * cohort. These rules never use class-average dosing. CrCl and eGFR remain
+ * distinct patient facts: a CrCl-labelled branch cannot execute from eGFR.
  */
 export function buildReviewedCardiometabolicDoseRulesV2(
   inventory: Pick<DecisionGraphInventoryV2, "knowledge">,
@@ -142,26 +141,67 @@ export function buildReviewedCardiometabolicDoseRulesV2(
   const rosuvastatin = medicationByName(inventory.knowledge, "Rosuvastatin");
 
   if (enalapril) {
-    rules.push(fixedDailyRule({
-      id: `LABEL-ENALAPRIL-HF-START:${enalapril.masterDrugId}`,
-      masterDrugId: enalapril.masterDrugId,
-      indication: "symptomatic heart failure — standard adult initiation; renal impairment/hyponatremia branch requires separate review",
-      lane: "heart_failure",
-      useCase: "initiation",
-      totalDailyMg: 2.5,
-      administrationsPerDay: 1,
-      titration: {
-        stepText: "Titrate upward as tolerated over days to weeks; do not automate when hypotension, renal deterioration, hyponatremia, or other special-population modifiers are unresolved.",
-      },
-      targetDoseText: "Label dosing range 2.5–20 mg twice daily after individualized titration.",
-      maximumDoseText: "40 mg/day in divided doses in heart-failure clinical trials.",
-      monitoring: [
-        "Check blood pressure after initiation and during titration.",
-        "Review renal function and serum potassium before and after dose changes.",
-        "If hyponatremia or renal impairment is present, use the dedicated label adjustment rather than this standard branch.",
-      ],
-      evidence: [labels.enalapril],
-    }));
+    rules.push(
+      fixedDailyRule({
+        id: `LABEL-ENALAPRIL-HTN-CRCLGT30:${enalapril.masterDrugId}`,
+        masterDrugId: enalapril.masterDrugId,
+        indication: "adult hypertension; CrCl >30 mL/min; not on dialysis",
+        lane: "hypertension",
+        useCase: "initiation",
+        totalDailyMg: 5,
+        administrationsPerDay: 1,
+        eligibility: {
+          all: [
+            { fact: "kidney.creatinineClearanceMlMin", op: "gt", value: 30 },
+            { fact: "kidney.dialysis", op: "eq", value: false },
+          ],
+        },
+        titration: {
+          stepText: "Titrate upward according to blood-pressure response and tolerability; renal function and potassium must be reviewed during treatment.",
+        },
+        targetDoseText: "Usual adult hypertension range is individualized from the 5 mg starting branch.",
+        maximumDoseText: "40 mg/day per label.",
+        monitoring: ["Blood pressure", "serum creatinine/renal function", "serum potassium", "symptomatic hypotension"],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.enalapril],
+      }),
+      fixedDailyRule({
+        id: `LABEL-ENALAPRIL-HTN-CRCL30ORLESS:${enalapril.masterDrugId}`,
+        masterDrugId: enalapril.masterDrugId,
+        indication: "adult hypertension with CrCl ≤30 mL/min; not on dialysis",
+        lane: "hypertension",
+        useCase: "initiation",
+        totalDailyMg: 2.5,
+        administrationsPerDay: 1,
+        eligibility: {
+          all: [
+            { fact: "kidney.creatinineClearanceMlMin", op: "lte", value: 30 },
+            { fact: "kidney.dialysis", op: "eq", value: false },
+          ],
+        },
+        titration: {
+          stepText: "Titrate upward until blood pressure is controlled while monitoring renal function, potassium, and tolerability.",
+        },
+        maximumDoseText: "40 mg/day per label; dialysis-day dosing is a separate non-automated branch.",
+        monitoring: ["Blood pressure", "serum creatinine/renal function", "serum potassium", "symptomatic hypotension"],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.enalapril],
+      }),
+      fixedDailyRule({
+        id: `LABEL-ENALAPRIL-HF-START:${enalapril.masterDrugId}`,
+        masterDrugId: enalapril.masterDrugId,
+        indication: "symptomatic heart failure — standard adult initiation",
+        lane: "heart_failure",
+        useCase: "initiation",
+        totalDailyMg: 2.5,
+        administrationsPerDay: 1,
+        titration: {
+          stepText: "Titrate upward as tolerated under clinician supervision; do not automate escalation when hypotension, renal deterioration, hyponatremia, or other modifiers are unresolved.",
+        },
+        targetDoseText: "Label dosing range 2.5–20 mg twice daily after individualized titration.",
+        maximumDoseText: "40 mg/day in divided doses in heart-failure clinical trials.",
+        monitoring: ["Blood pressure", "renal function", "serum potassium", "symptomatic hypotension"],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.enalapril],
+      }),
+    );
   }
 
   if (losartan) {
@@ -182,7 +222,7 @@ export function buildReviewedCardiometabolicDoseRulesV2(
         "Review volume depletion and hepatic impairment before using this standard 50 mg branch; those label situations start lower.",
         "Monitor renal function and serum potassium as clinically appropriate.",
       ],
-      evidence: [labels.losartan],
+      evidence: [cardiometabolicRegulatoryEvidenceV2.losartan],
     }));
   }
 
@@ -202,7 +242,7 @@ export function buildReviewedCardiometabolicDoseRulesV2(
         targetDoseText: "Adult hypertension labeled range 80–320 mg once daily.",
         maximumDoseText: "320 mg once daily.",
         monitoring: ["Monitor blood pressure, renal function, and potassium as clinically appropriate."],
-        evidence: [labels.valsartan],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.valsartan],
       }),
       fixedDailyRule({
         id: `LABEL-VALSARTAN-HF-START:${valsartan.masterDrugId}`,
@@ -218,7 +258,7 @@ export function buildReviewedCardiometabolicDoseRulesV2(
         targetDoseText: "160 mg twice daily as tolerated.",
         maximumDoseText: "320 mg/day in divided doses in heart-failure clinical trials.",
         monitoring: ["Monitor blood pressure, renal function, potassium, hypotension, and tolerability during uptitration."],
-        evidence: [labels.valsartan],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.valsartan],
       }),
     );
   }
@@ -238,27 +278,57 @@ export function buildReviewedCardiometabolicDoseRulesV2(
       targetDoseText: "Adult label starting dose 10–20 mg once daily; 40 mg may be selected when >45% LDL-C reduction is required.",
       maximumDoseText: "80 mg once daily per adult label; this rule does not authorize automatic escalation.",
       monitoring: ["Review drug interactions, hepatic safety, muscle symptoms, pregnancy status, and follow-up lipids before dose escalation."],
-      evidence: [labels.atorvastatin],
+      evidence: [cardiometabolicRegulatoryEvidenceV2.atorvastatin],
     }));
   }
 
   if (rosuvastatin) {
-    rules.push(fixedDailyRule({
-      id: `LABEL-ROSUVASTATIN-LIPID-START:${rosuvastatin.masterDrugId}`,
-      masterDrugId: rosuvastatin.masterDrugId,
-      indication: "adult dyslipidemia / cardiovascular risk reduction — conservative label-safe initiation",
-      lane: "lipids",
-      useCase: "initiation",
-      totalDailyMg: 5,
-      administrationsPerDay: 1,
-      titration: {
-        stepText: "Select subsequent dose from indication, LDL-C response, cardiovascular risk, ancestry, renal function, interactions, and tolerability; automated escalation is intentionally disabled.",
-      },
-      targetDoseText: "Adult label range 5–40 mg once daily; severe renal impairment and some interaction/ancestry branches require lower limits.",
-      maximumDoseText: "This conservative protocol does not authorize automated dosing above 10 mg/day until CrCl and interaction modifiers are explicitly modeled; full adult label range extends to 40 mg/day in appropriate patients.",
-      monitoring: ["Review renal function, drug interactions, muscle symptoms, hepatic safety, pregnancy status, and follow-up lipids before escalation."],
-      evidence: [labels.rosuvastatin],
-    }));
+    rules.push(
+      fixedDailyRule({
+        id: `LABEL-ROSUVASTATIN-LIPID-CRCL30PLUS:${rosuvastatin.masterDrugId}`,
+        masterDrugId: rosuvastatin.masterDrugId,
+        indication: "adult dyslipidemia / cardiovascular risk reduction; CrCl ≥30 mL/min; not on dialysis",
+        lane: "lipids",
+        useCase: "initiation",
+        totalDailyMg: 5,
+        administrationsPerDay: 1,
+        eligibility: {
+          all: [
+            { fact: "kidney.creatinineClearanceMlMin", op: "gte", value: 30 },
+            { fact: "kidney.dialysis", op: "eq", value: false },
+          ],
+        },
+        titration: {
+          stepText: "Select subsequent dose from indication, LDL-C response, cardiovascular risk, ancestry, interactions, and tolerability; automated escalation is intentionally disabled.",
+        },
+        targetDoseText: "Adult label range 5–40 mg once daily when no lower interaction/ancestry limit applies.",
+        maximumDoseText: "40 mg/day in appropriate adults; this protocol does not authorize automated escalation.",
+        monitoring: ["Drug interactions", "muscle symptoms", "hepatic safety", "pregnancy status", "follow-up lipids"],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.rosuvastatin],
+      }),
+      fixedDailyRule({
+        id: `LABEL-ROSUVASTATIN-LIPID-CRCLLT30:${rosuvastatin.masterDrugId}`,
+        masterDrugId: rosuvastatin.masterDrugId,
+        indication: "adult dyslipidemia / cardiovascular risk reduction; severe renal impairment CrCl <30 mL/min; not on hemodialysis",
+        lane: "lipids",
+        useCase: "initiation",
+        totalDailyMg: 5,
+        administrationsPerDay: 1,
+        eligibility: {
+          all: [
+            { fact: "kidney.creatinineClearanceMlMin", op: "lt", value: 30 },
+            { fact: "kidney.dialysis", op: "eq", value: false },
+          ],
+        },
+        titration: {
+          stepText: "Any dose change requires clinician review of renal status, interactions, muscle toxicity risk, and lipid response.",
+        },
+        targetDoseText: "5–10 mg once daily in the severe renal-impairment branch.",
+        maximumDoseText: "10 mg once daily when CrCl <30 mL/min and the patient is not on hemodialysis.",
+        monitoring: ["Renal status", "drug interactions", "muscle symptoms", "hepatic safety", "pregnancy status", "follow-up lipids"],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.rosuvastatin],
+      }),
+    );
   }
 
   if (finerenone) {
@@ -294,7 +364,7 @@ export function buildReviewedCardiometabolicDoseRulesV2(
           "Recheck potassium and eGFR approximately 4 weeks after initiation/dose change and periodically thereafter.",
           "Review strong CYP3A4 inhibitors and other label contraindications/interactions before prescribing.",
         ],
-        evidence: [labels.finerenone],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.finerenone],
       }),
       fixedDailyRule({
         id: `LABEL-FINERENONE-CKD-EGFR25-59:${finerenone.masterDrugId}`,
@@ -323,7 +393,7 @@ export function buildReviewedCardiometabolicDoseRulesV2(
           "Recheck potassium and eGFR approximately 4 weeks after initiation/dose change and periodically thereafter.",
           "Review strong CYP3A4 inhibitors and other label contraindications/interactions before prescribing.",
         ],
-        evidence: [labels.finerenone],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.finerenone],
       }),
     );
   }
@@ -355,7 +425,7 @@ export function buildReviewedCardiometabolicDoseRulesV2(
         targetDoseText: "25 mg once daily; may increase to 50 mg once daily if clinically indicated and tolerated.",
         maximumDoseText: "50 mg once daily for the represented heart-failure pathway.",
         monitoring: ["Monitor serum potassium and renal function soon after initiation and during titration; reassess with hyperkalemia or renal deterioration."],
-        evidence: [labels.spironolactone],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.spironolactone],
       }),
       {
         id: `LABEL-SPIRONOLACTONE-HF-EGFR30-50:${spironolactone.masterDrugId}`,
@@ -386,7 +456,7 @@ export function buildReviewedCardiometabolicDoseRulesV2(
         targetDoseText: "25 mg every other day at initiation for eGFR 30–50; subsequent dosing is individualized.",
         maximumDoseText: "No automatic escalation authorized by this renal-risk branch.",
         monitoring: ["Monitor serum potassium and renal function closely after initiation and with any dose change."],
-        evidence: [labels.spironolactone],
+        evidence: [cardiometabolicRegulatoryEvidenceV2.spironolactone],
         reviewState: "approved",
       },
     );
@@ -428,7 +498,7 @@ export function buildReviewedCardiometabolicGateRulesV2(
       when: { fact: "pregnancy", op: "eq", value: true },
       effect: "conditional",
       reason: `${name} requires pregnancy-specific clinician review; current U.S. labeling generally advises discontinuation once pregnancy is recognized while allowing individualized exceptions for rare high-risk circumstances.`,
-      evidence: [name === "Atorvastatin" ? labels.atorvastatin : labels.rosuvastatin],
+      evidence: [name === "Atorvastatin" ? cardiometabolicRegulatoryEvidenceV2.atorvastatin : cardiometabolicRegulatoryEvidenceV2.rosuvastatin],
     });
   }
 
