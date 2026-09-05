@@ -195,7 +195,7 @@ export default function HomePage() {
           </div>
 
           <nav className={styles.entryNav} aria-label={copy.entryLabel}>
-            <Link className={styles.entryLink} data-actor="patient" href="/portal">
+            <Link className={styles.entryLink} data-actor="patient" href="/patient">
               <span className={styles.entryMark} aria-hidden="true">P</span>
               <span>{copy.patientEntry}</span>
             </Link>
@@ -230,7 +230,7 @@ export default function HomePage() {
 
             <Link
               className={styles.secondaryCta}
-              href="/portal"
+              href="/patient"
             >
               <span>{copy.patientStart}</span>
               <ArrowIcon rtl={isRtl} />
