@@ -616,6 +616,8 @@ export interface CardiovascularClinicalContext {
 export interface KidneyClinicalContext {
   ckd?: boolean;
   eGfr?: number;
+  /** Clinician/source-provided creatinine clearance. Never infer this value from eGFR. */
+  creatinineClearanceMlMin?: number;
   uacrMgG?: number;
   potassiumMmolL?: number;
   dialysis?: boolean;

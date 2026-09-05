@@ -203,12 +203,12 @@ export interface GlycemicContextV2 {
   randomGlucoseMgDl?: number;
   hyperglycemiaSymptoms?: boolean;
   catabolicFeatures?: boolean;
-    ketonesKnownPositive?: boolean;
-    /**
-     * Explicit clinician/source-provided acute hyperglycemic crisis state.
-     * Do not infer HHS from glucose alone when osmolality/dehydration data are unavailable.
-     */
-    acuteHyperglycemicCrisis?: "none" | "dka" | "hhs" | "mixed";
+  ketonesKnownPositive?: boolean;
+  /**
+   * Explicit clinician/source-provided acute hyperglycemic crisis state.
+   * Do not infer HHS from glucose alone when osmolality/dehydration data are unavailable.
+   */
+  acuteHyperglycemicCrisis?: "none" | "dka" | "hhs" | "mixed";
   smbg?: SmbgPatternV2;
   cgm?: CgmMetricsV2;
 }
@@ -223,6 +223,8 @@ export interface AnthropometricsV2 {
 export interface KidneyContextV2 {
   ckd?: boolean;
   eGfr?: number;
+  /** Explicit clinician/source-provided CrCl; never derived from eGFR. */
+  creatinineClearanceMlMin?: number;
   uacrMgG?: number;
   potassiumMmolL?: number;
   dialysis?: boolean;
@@ -317,8 +319,10 @@ export type FactKeyV2 =
   | "glycemia.twoHourPostprandialGlucoseMgDl"
   | "kidney.ckd"
   | "kidney.eGfr"
+  | "kidney.creatinineClearanceMlMin"
   | "kidney.uacrMgG"
   | "kidney.potassiumMmolL"
+  | "kidney.dialysis"
   | "cardiovascular.ascvd"
   | "cardiovascular.heartFailure"
   | "cardiovascular.lvefPercent"
@@ -462,8 +466,6 @@ export interface ResolvedDosePlanV2 {
   clinicianConfirmationRequired: true;
 }
 
-
-
 export type TitrationActionV2 = "hold" | "increase" | "reduce" | "maintain" | "stop_and_review" | "needs_data";
 
 export interface TitrationProtocolV2 {
@@ -584,7 +586,7 @@ export type Type2PathwayV2 =
   | "modest_intensification"
   | "high_efficacy_combination"
   | "insulin_centered"
-    | "insufficient_glycemic_data";
+  | "insufficient_glycemic_data";
 
 export type InsulinActionV2 =
   | "none"
@@ -594,7 +596,6 @@ export type InsulinActionV2 =
   | "consider_glp1_or_frc_before_prandial"
   | "add_prandial"
   | "consider_premix";
-
 
 export type InsulinConversionExecutionStatusV2 = "executable" | "specialist_review" | "unsupported" | "needs_data";
 export type InsulinConversionEvidenceTierV2 = "regulatory_label" | "reviewed_interchange" | "extrapolation";
@@ -727,7 +728,6 @@ export interface RegimenCandidateV2 {
   cautions: string[];
   preferenceConflicts: string[];
 }
-
 
 export type ComposedTherapyActionV2 =
   | "start"

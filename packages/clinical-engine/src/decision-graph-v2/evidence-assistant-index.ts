@@ -1,4 +1,8 @@
 import { buildReviewedProductDoseRulesV2 } from "./product-dose-rules.js";
+import {
+  buildReviewedCardiometabolicDoseRulesV2,
+  buildReviewedCardiometabolicGateRulesV2,
+} from "./cardiometabolic-protocols.js";
 import { buildCoreAda2026DecisionRulesV2 } from "./safety-rules.js";
 import type {
   DoseRuleV2,
@@ -61,6 +65,13 @@ const evidenceIndexKnowledgeV2: KnowledgeMedicationV2[] = [
   knowledge("EA-TIRZEPATIDE", "Tirzepatide", "dual_gip_glp_1_receptor_agonist", ["subcutaneous"]),
   knowledge("EA-TOUJEO", "Insulin glargine U-300", "basal_insulin_analog", ["subcutaneous"]),
   knowledge("EA-TRESIBA", "Insulin degludec", "basal_insulin_analog", ["subcutaneous"]),
+  knowledge("EA-ENALAPRIL", "Enalapril", "raas_blocker"),
+  knowledge("EA-LOSARTAN", "Losartan", "raas_blocker"),
+  knowledge("EA-VALSARTAN", "Valsartan", "raas_blocker"),
+  knowledge("EA-ATORVASTATIN", "Atorvastatin", "lipid_lowering"),
+  knowledge("EA-ROSUVASTATIN", "Rosuvastatin", "lipid_lowering"),
+  knowledge("EA-FINERENONE", "Finerenone", "mineralocorticoid_receptor_antagonist"),
+  knowledge("EA-SPIRONOLACTONE", "Spironolactone", "mineralocorticoid_receptor_antagonist"),
 ];
 
 const genericNameByMasterId = new Map(
@@ -136,8 +147,14 @@ function safetyRecord(rule: MedicationGateRuleV2): DecisionGraphEvidenceIndexRec
  * product/safety rules instead of maintaining an independent citation list.
  */
 export function buildDecisionGraphEvidenceAssistantIndexV2(): DecisionGraphEvidenceIndexRecordV2[] {
-  const doseRules = buildReviewedProductDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 });
-  const safetyRules = buildCoreAda2026DecisionRulesV2(evidenceIndexKnowledgeV2).medicationGateRules;
+  const doseRules = [
+    ...buildReviewedProductDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
+    ...buildReviewedCardiometabolicDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
+  ];
+  const safetyRules = [
+    ...buildCoreAda2026DecisionRulesV2(evidenceIndexKnowledgeV2).medicationGateRules,
+    ...buildReviewedCardiometabolicGateRulesV2(evidenceIndexKnowledgeV2),
+  ];
   return [
     ...doseRules.map(doseRecord),
     ...safetyRules.map(safetyRecord),
