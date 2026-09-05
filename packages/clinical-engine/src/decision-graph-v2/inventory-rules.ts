@@ -18,6 +18,11 @@ import {
   buildReviewedWegovyMashDoseRulesV2,
   buildReviewedWegovyMashTitrationProtocolsV2,
 } from "./wegovy-mash-protocol.js";
+import {
+  applyReviewedPainfulDpnKnowledgeV2,
+  buildReviewedPainfulDpnDoseRulesV2,
+  buildReviewedPainfulDpnGateRulesV2,
+} from "./painful-dpn-protocol.js";
 
 function mergeById<T extends { id: string }>(base: readonly T[], incoming: readonly T[]) {
   const map = new Map<string, T>();
@@ -34,9 +39,10 @@ export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInve
   const normalized = normalizeDecisionGraphClinicalKnowledgeV2(inventory);
   const resmetiromKnowledge = applyReviewedMashKnowledgeV2(normalized.inventory);
   const mashKnowledge = applyReviewedWegovyMashKnowledgeV2(resmetiromKnowledge);
-  const autoFrc = buildAutoFrcProtocolBindingsV2(mashKnowledge);
-  const frcProtocolBindings = mergeById(mashKnowledge.frcProtocolBindings ?? [], autoFrc.bindings);
-  const withBindings: DecisionGraphInventoryV2 = { ...mashKnowledge, frcProtocolBindings };
+  const dpnKnowledge = applyReviewedPainfulDpnKnowledgeV2(mashKnowledge);
+  const autoFrc = buildAutoFrcProtocolBindingsV2(dpnKnowledge);
+  const frcProtocolBindings = mergeById(dpnKnowledge.frcProtocolBindings ?? [], autoFrc.bindings);
+  const withBindings: DecisionGraphInventoryV2 = { ...dpnKnowledge, frcProtocolBindings };
 
   const rules = buildCoreAda2026DecisionRulesV2(withBindings.knowledge);
   const insulinDoseRules = buildAda2026InsulinDoseRulesV2(withBindings.knowledge);
@@ -45,6 +51,8 @@ export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInve
   const cardiometabolicGateRules = buildReviewedCardiometabolicGateRulesV2(withBindings.knowledge);
   const mashDoseRules = buildReviewedMashDoseRulesV2(withBindings);
   const wegovyMashDoseRules = buildReviewedWegovyMashDoseRulesV2(withBindings);
+  const dpnDoseRules = buildReviewedPainfulDpnDoseRulesV2(withBindings);
+  const dpnGateRules = buildReviewedPainfulDpnGateRulesV2(withBindings.knowledge);
   const titrationProtocols = mergeById(
     mergeById(withBindings.titrationProtocols ?? [], buildReviewedTitrationProtocolsV2(withBindings)),
     buildReviewedWegovyMashTitrationProtocolsV2(withBindings),
@@ -56,20 +64,26 @@ export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInve
       mergeById(
         mergeById(
           mergeById(
-            mergeById(withBindings.doseRules, insulinDoseRules),
-            productDoseRules,
+            mergeById(
+              mergeById(withBindings.doseRules, insulinDoseRules),
+              productDoseRules,
+            ),
+            cardiometabolicDoseRules,
           ),
-          cardiometabolicDoseRules,
+          mashDoseRules,
         ),
-        mashDoseRules,
+        wegovyMashDoseRules,
       ),
-      wegovyMashDoseRules,
+      dpnDoseRules,
     ),
     frcDoseRules,
   );
   const medicationGateRules = mergeById(
-    mergeById(withBindings.medicationGateRules ?? [], rules.medicationGateRules),
-    cardiometabolicGateRules,
+    mergeById(
+      mergeById(withBindings.medicationGateRules ?? [], rules.medicationGateRules),
+      cardiometabolicGateRules,
+    ),
+    dpnGateRules,
   );
 
   return {
@@ -88,13 +102,15 @@ export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInve
       addedCardiometabolicDoseRules: cardiometabolicDoseRules.length,
       addedMashDoseRules: mashDoseRules.length,
       addedWegovyMashDoseRules: wegovyMashDoseRules.length,
+      addedPainfulDpnDoseRules: dpnDoseRules.length,
       addedFrcDoseRules: frcDoseRules.length,
       autoFrcBindings: autoFrc.bindings.length,
       frcBindingIssues: autoFrc.issues,
       insulinConversionRules: insulinConversionRules.length,
       titrationProtocols: titrationProtocols.length,
-      addedMedicationGateRules: rules.medicationGateRules.length + cardiometabolicGateRules.length,
+      addedMedicationGateRules: rules.medicationGateRules.length + cardiometabolicGateRules.length + dpnGateRules.length,
       addedCardiometabolicGateRules: cardiometabolicGateRules.length,
+      addedPainfulDpnGateRules: dpnGateRules.length,
       addedRegimenConflictRules: rules.regimenConflictRules.length,
     },
   };

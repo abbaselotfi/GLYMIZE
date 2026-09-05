@@ -26,5 +26,6 @@ export * from "./fdc-execution.js";
 export * from "./frc-protocols.js";
 export * from "./insulin-execution.js";
 export * from "./titration-engine.js";
+export * from "./painful-dpn-protocol.js";
 
 export * from "./composer.js";

@@ -18,6 +18,7 @@ export function finitePercentClinicalNumberV2(value: unknown): number | undefine
 
 export function buildFactMapV2(patient: PatientContextV2, severeHyperglycemia: boolean): FactMapV2 {
   return {
+    ageYears: finiteNonNegativeClinicalNumberV2(patient.ageYears),
     pregnancy: patient.pregnancy,
     "glycemia.severeHyperglycemia": severeHyperglycemia,
     "glycemia.fastingPlasmaGlucoseMgDl": finiteNonNegativeClinicalNumberV2(
@@ -39,9 +40,16 @@ export function buildFactMapV2(patient: PatientContextV2, severeHyperglycemia: b
     "cardiovascular.lvefPercent": finitePercentClinicalNumberV2(
       patient.cardiovascular?.lvefPercent,
     ),
+    "liver.chronicLiverDisease": patient.liver?.chronicLiverDisease,
     "liver.masldMash": patient.liver?.masldMash,
     "liver.fibrosisStage": patient.liver?.fibrosisStage,
     "liver.cirrhosis": patient.liver?.cirrhosis,
+    "neuropathy.dpnConfirmed": patient.neuropathy?.diabeticPeripheralNeuropathyConfirmed,
+    "neuropathy.painfulSymptoms": patient.neuropathy?.painfulSymptoms,
+    "neuropathy.atypicalFeaturesPresent": patient.neuropathy?.atypicalFeaturesPresent,
+    "medicationSafety.maoiUseOrRecentExposure": patient.medicationSafety?.maoiUseOrRecentExposure,
+    "medicationSafety.substantialAlcoholUse": patient.medicationSafety?.substantialAlcoholUse,
+    "medicationSafety.knownPregabalinHypersensitivity": patient.medicationSafety?.knownPregabalinHypersensitivity,
     "hypoglycemia.highRisk": patient.hypoglycemiaRisk === "high",
   };
 }
