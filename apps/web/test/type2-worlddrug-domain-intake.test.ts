@@ -9,7 +9,7 @@ const sourcePath = fileURLToPath(
 const source = readFileSync(sourcePath, "utf8");
 
 const factorBackedDomains = {
-  diabetes: "Type 2",
+  diabetes: "currentHba1c",
   cardiovascular: 'key: "ascvd"',
   kidney: 'key: "ckd"',
   liver: 'key: "masld_mash"',
