@@ -1,5 +1,6 @@
 import { approvedDoseRulesForV2, resolveDocumentedCurrentDosePlanV2, resolveDosePlanV2 } from "./dose.js";
 import { resolveExactCurrentRegimenFdcPlansV2 } from "./fdc-execution.js";
+import { evaluateReviewedResmetiromProtocolV2 } from "./mash-protocols.js";
 import { buildFactMapV2, evaluatePredicateV2 } from "./predicates.js";
 import type {
   ClinicalObjectiveV2,
@@ -140,6 +141,15 @@ export function applyHardGatesV2(
       reasons.push(...availability.reasons);
     }
 
+    const mashProtocol = evaluateReviewedResmetiromProtocolV2(request.patient, medication);
+    if (mashProtocol) {
+      evidence.push(...mashProtocol.evidence);
+      reasons.push(...mashProtocol.reasons);
+      if (mashProtocol.status === "exclude") status = "exclude";
+      else if (mashProtocol.status === "needs_data" && status !== "exclude") status = "needs_data";
+      else if (mashProtocol.status === "conditional" && status === "pass") status = "conditional";
+    }
+
     const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>
       (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&
       (!rule.therapyGroup || rule.therapyGroup === medication.therapyGroup) &&
@@ -176,7 +186,12 @@ export function applyHardGatesV2(
       (item.masterDrugId === component.masterDrugId || item.genericName.toLocaleLowerCase() === medication.genericName.toLocaleLowerCase()),
     );
     const useCase = currentMedication ? "continuation" as const : "initiation" as const;
-    const approvedRules = approvedDoseRulesForV2(component.masterDrugId, request.inventory.doseRules, facts, useCase, result.lane);
+    let approvedRules = approvedDoseRulesForV2(component.masterDrugId, request.inventory.doseRules, facts, useCase, result.lane);
+    if (mashProtocol?.doseRuleId) {
+      approvedRules = approvedRules.filter((rule) => rule.id === mashProtocol.doseRuleId);
+    } else if (mashProtocol && mashProtocol.status !== "pass") {
+      approvedRules = [];
+    }
     const rulePlans = approvedRules
       .map((rule) => resolveDosePlanV2(rule, request.patient, state))
       .filter((plan): plan is NonNullable<typeof plan> => Boolean(plan));
