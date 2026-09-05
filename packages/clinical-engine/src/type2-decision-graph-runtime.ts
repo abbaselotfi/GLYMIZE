@@ -9,11 +9,7 @@ import { buildType2Assessment as buildLegacyType2Assessment } from "./index.js";
 import {
   filterHardExcludedLegacyType2Assessment,
 } from "./type2-hard-exclusion-compat.js";
-import type { Type2DecisionGraphAssessmentResult } from "./type2-decision-graph-compat.js";
-import {
-  buildType2AssessmentWithWorldDrugCoverageV2,
-  type Type2AssessmentWithWorldDrugCoverage,
-} from "./type2-worlddrug-recommendation-compat.js";
+import { buildType2AssessmentWithWorldDrugCoverageV2 } from "./type2-worlddrug-recommendation-compat.js";
 
 export interface Type2DecisionGraphRuntimeCatalog {
   masterRegistry: readonly MasterDrugRegistryEntry[];
@@ -47,6 +43,10 @@ export function type2DecisionGraphRuntimeConfigured() {
  * `requires_approved_protocol` review options; those options receive no Decision
  * Graph rank and cannot become executable until a reviewed rule/protocol exists.
  *
+ * The public function deliberately retains the stable `Type2AssessmentResult`
+ * contract. Additional WorldDrug coverage metadata is an internal compatible
+ * extension and must not leak package-private declaration paths into API types.
+ *
  * The legacy builder remains only as an explicit compatibility fallback for
  * non-browser/test consumers that have not configured runtime catalogue data.
  * Its returned medication list is passed through a structural hard-exclusion
@@ -55,7 +55,7 @@ export function type2DecisionGraphRuntimeConfigured() {
 export function buildType2Assessment(
   medications: readonly GenericMedication[],
   request: Type2ConsiderationRequest,
-): Type2AssessmentResult | Type2DecisionGraphAssessmentResult | Type2AssessmentWithWorldDrugCoverage {
+): Type2AssessmentResult {
   if (!runtimeCatalog?.masterRegistry.length) {
     const legacyAssessment = buildLegacyType2Assessment(medications, request);
     return filterHardExcludedLegacyType2Assessment(legacyAssessment, medications, request);
