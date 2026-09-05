@@ -1,3 +1,4 @@
+import { finiteNonNegativeClinicalNumberV2 } from "./predicates.js";
 import type {
   ClinicalObjectiveV2,
   DecisionGraphRequestV2,
@@ -31,12 +32,12 @@ export const ada2026CardiovascularObjectiveTriggersV2 = {
 
 export function bloodPressureInAda2026TreatmentRangeV2(request: DecisionGraphRequestV2) {
   const cardiovascular = request.patient.cardiovascular;
-  const systolic = cardiovascular?.systolicBloodPressure;
-  const diastolic = cardiovascular?.diastolicBloodPressure;
+  const systolic = finiteNonNegativeClinicalNumberV2(cardiovascular?.systolicBloodPressure);
+  const diastolic = finiteNonNegativeClinicalNumberV2(cardiovascular?.diastolicBloodPressure);
   return (
-    (typeof systolic === "number" &&
+    (systolic !== undefined &&
       systolic >= ada2026CardiovascularObjectiveTriggersV2.hypertensionTreatmentSystolicAtOrAbove) ||
-    (typeof diastolic === "number" &&
+    (diastolic !== undefined &&
       diastolic >= ada2026CardiovascularObjectiveTriggersV2.hypertensionTreatmentDiastolicAtOrAbove)
   );
 }
@@ -44,11 +45,13 @@ export function bloodPressureInAda2026TreatmentRangeV2(request: DecisionGraphReq
 export function hasTask6RaasIndicationV2(request: DecisionGraphRequestV2) {
   const kidney = request.patient.kidney;
   const cardiovascular = request.patient.cardiovascular;
+  const uacrMgG = finiteNonNegativeClinicalNumberV2(kidney?.uacrMgG);
+  const eGfr = finiteNonNegativeClinicalNumberV2(kidney?.eGfr);
   return (
-    (typeof kidney?.uacrMgG === "number" &&
-      kidney.uacrMgG >= ada2026CardiovascularObjectiveTriggersV2.raasAlbuminuriaUacrAtOrAboveMgG) ||
-    (typeof kidney?.eGfr === "number" &&
-      kidney.eGfr < ada2026CardiovascularObjectiveTriggersV2.raasReducedEgfrBelow) ||
+    (uacrMgG !== undefined &&
+      uacrMgG >= ada2026CardiovascularObjectiveTriggersV2.raasAlbuminuriaUacrAtOrAboveMgG) ||
+    (eGfr !== undefined &&
+      eGfr < ada2026CardiovascularObjectiveTriggersV2.raasReducedEgfrBelow) ||
     cardiovascular?.priorMi === true
   );
 }
@@ -67,9 +70,10 @@ export function hasEstablishedHypertensionTreatmentContextV2(
 }
 
 function hasRepresentedAdditionalAscvdRiskFactor(request: DecisionGraphRequestV2) {
+  const bmi = finiteNonNegativeClinicalNumberV2(request.patient.anthropometrics?.bmi);
   return (
     request.patient.kidney?.ckd === true ||
-    (request.patient.anthropometrics?.bmi ?? 0) >= 30 ||
+    (bmi !== undefined && bmi >= 30) ||
     (
       bloodPressureInAda2026TreatmentRangeV2(request) &&
       hasEstablishedHypertensionTreatmentContextV2(request)
@@ -94,12 +98,17 @@ function bloodPressureObjective(request: DecisionGraphRequestV2): ClinicalObject
   }
 
   const reasons: string[] = [];
-  if ((request.patient.kidney?.uacrMgG ?? 0) >= ada2026CardiovascularObjectiveTriggersV2.raasAlbuminuriaUacrAtOrAboveMgG) {
+  const uacrMgG = finiteNonNegativeClinicalNumberV2(request.patient.kidney?.uacrMgG);
+  const eGfr = finiteNonNegativeClinicalNumberV2(request.patient.kidney?.eGfr);
+  if (
+    uacrMgG !== undefined &&
+    uacrMgG >= ada2026CardiovascularObjectiveTriggersV2.raasAlbuminuriaUacrAtOrAboveMgG
+  ) {
     reasons.push("UACR ≥30 mg/g");
   }
   if (
-    typeof request.patient.kidney?.eGfr === "number" &&
-    request.patient.kidney.eGfr < ada2026CardiovascularObjectiveTriggersV2.raasReducedEgfrBelow
+    eGfr !== undefined &&
+    eGfr < ada2026CardiovascularObjectiveTriggersV2.raasReducedEgfrBelow
   ) {
     reasons.push("eGFR <60 mL/min/1.73 m²");
   }
@@ -117,7 +126,7 @@ function bloodPressureObjective(request: DecisionGraphRequestV2): ClinicalObject
 function lipidObjective(request: DecisionGraphRequestV2): ClinicalObjectiveV2 | undefined {
   if (request.patient.pregnancy) return undefined;
 
-  const age = request.patient.ageYears;
+  const age = finiteNonNegativeClinicalNumberV2(request.patient.ageYears);
   if (request.patient.cardiovascular?.ascvd) {
     return {
       id: "lipid_risk_reduction",
@@ -129,7 +138,7 @@ function lipidObjective(request: DecisionGraphRequestV2): ClinicalObjectiveV2 | 
   }
 
   if (
-    typeof age === "number" &&
+    age !== undefined &&
     age >= ada2026CardiovascularObjectiveTriggersV2.statinPrimaryPreventionAgeAtOrAbove &&
     age <= ada2026CardiovascularObjectiveTriggersV2.statinPrimaryPreventionAgeAtOrBelow
   ) {
@@ -142,7 +151,7 @@ function lipidObjective(request: DecisionGraphRequestV2): ClinicalObjectiveV2 | 
     };
   }
 
-  if (typeof age === "number" && age > ada2026CardiovascularObjectiveTriggersV2.statinPrimaryPreventionAgeAtOrBelow) {
+  if (age !== undefined && age > ada2026CardiovascularObjectiveTriggersV2.statinPrimaryPreventionAgeAtOrBelow) {
     return {
       id: "lipid_risk_reduction",
       lane: "lipids",
@@ -153,7 +162,7 @@ function lipidObjective(request: DecisionGraphRequestV2): ClinicalObjectiveV2 | 
   }
 
   if (
-    typeof age === "number" &&
+    age !== undefined &&
     age >= ada2026CardiovascularObjectiveTriggersV2.statinYoungAdultConsiderationAgeAtOrAbove &&
     age < ada2026CardiovascularObjectiveTriggersV2.statinPrimaryPreventionAgeAtOrAbove &&
     hasRepresentedAdditionalAscvdRiskFactor(request)
