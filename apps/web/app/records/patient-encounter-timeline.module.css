@@ -1,0 +1,165 @@
+.timeline {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, rgba(120, 130, 145, 0.24));
+}
+
+.header {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+
+.header span {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.62;
+}
+
+.header h3 {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+}
+
+.header small {
+  line-height: 1.55;
+  opacity: 0.72;
+}
+
+.list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.card {
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.24));
+  border-radius: 0.85rem;
+  overflow: hidden;
+}
+
+.card[data-newest="true"] {
+  border-width: 1.5px;
+}
+
+.summary {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.8rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+
+.summary > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.summary strong {
+  font-size: 0.85rem;
+}
+
+.summary span {
+  font-size: 0.72rem;
+  opacity: 0.68;
+}
+
+.summaryMeta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.summaryMeta small {
+  padding: 0.18rem 0.38rem;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.28));
+  font-size: 0.64rem;
+}
+
+.summaryMeta b {
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.82;
+}
+
+.summaryMeta i {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  font-style: normal;
+}
+
+.details {
+  padding: 0.75rem 0.8rem 0.8rem;
+  border-top: 1px solid var(--border, rgba(120, 130, 145, 0.2));
+  background: color-mix(in srgb, currentColor 2%, transparent);
+}
+
+.details dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 0 0 0.75rem;
+}
+
+.details dl > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.details dt {
+  font-size: 0.68rem;
+  opacity: 0.62;
+}
+
+.details dd {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.openButton {
+  width: 100%;
+  padding: 0.52rem 0.65rem;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.3));
+  border-radius: 0.58rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.openButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+@media (max-width: 720px) {
+  .summary {
+    align-items: flex-start;
+  }
+
+  .summaryMeta {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .details dl {
+    grid-template-columns: 1fr;
+  }
+}
