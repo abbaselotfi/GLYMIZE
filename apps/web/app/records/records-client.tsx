@@ -13,13 +13,16 @@ import {
   searchPatientRecordArchive,
 } from "../../lib/patient-record-archive-client";
 import {
+  loadLatestPatientVisitChangeSummary,
   loadPatientTrendWorkspaceForArchiveItem,
   loadPatientTrendWorkspaceForRecord,
   openPatientTrendSourceEncounter,
 } from "../../lib/patient-trend-workspace-client";
+import type { PatientVisitChangeSummary } from "../../lib/patient-visit-change-summary";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import { PatientEncounterTimeline } from "./patient-encounter-timeline";
 import { PatientTrendPanel } from "./patient-trend-panel";
+import { PatientVisitChanges } from "./patient-visit-changes";
 import styles from "./records.module.css";
 
 const PAGE_SIZE = 50;
@@ -45,9 +48,39 @@ export default function RecordsClient() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selected, setSelected] = useState<PatientHandoffRecord | null>(null);
   const [trendWorkspace, setTrendWorkspace] = useState<PatientWorkspaceSnapshot | null>(null);
+  const [visitChanges, setVisitChanges] = useState<PatientVisitChangeSummary | null>(null);
+  const [visitChangesLoading, setVisitChangesLoading] = useState(false);
   const [searchCode, setSearchCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+
+  async function refreshVisitChanges(
+    workspace: PatientWorkspaceSnapshot | null,
+    record: PatientHandoffRecord,
+  ) {
+    setVisitChanges(null);
+    if (!workspace || workspace.encounters.length < 2) {
+      setVisitChangesLoading(false);
+      return;
+    }
+
+    setVisitChangesLoading(true);
+    try {
+      setVisitChanges(
+        await loadLatestPatientVisitChangeSummary({
+          workspace,
+          patientCodeKind: record.patientCodeKind,
+          patientCodeDisplay: record.patientCodeDisplay,
+        }),
+      );
+    } catch {
+      // Change projection is supplementary. Failure must never block access to
+      // the authoritative encounter or the rest of Patient Workspace.
+      setVisitChanges(null);
+    } finally {
+      setVisitChangesLoading(false);
+    }
+  }
 
   async function loadPage(reset = false) {
     setBusy(true);
@@ -101,12 +134,14 @@ export default function RecordsClient() {
 
     try {
       const record = await openPatientRecordArchiveItem(item);
+      const workspace = await loadPatientTrendWorkspaceForArchiveItem(item);
       setSelected(record);
-      setTrendWorkspace(
-        await loadPatientTrendWorkspaceForArchiveItem(item),
-      );
+      setTrendWorkspace(workspace);
+      await refreshVisitChanges(workspace, record);
     } catch (reason) {
       setTrendWorkspace(null);
+      setVisitChanges(null);
+      setVisitChangesLoading(false);
       const code =
         reason instanceof Error
           ? reason.message
@@ -148,6 +183,8 @@ export default function RecordsClient() {
       if (!result.found || !result.record) {
         setSelected(null);
         setTrendWorkspace(null);
+        setVisitChanges(null);
+        setVisitChangesLoading(false);
         setStatus(
           fa
             ? "\u067e\u0631\u0648\u0646\u062f\u0647\u200c\u0627\u06cc \u0628\u0627 \u0627\u06cc\u0646 \u06a9\u062f \u067e\u06cc\u062f\u0627 \u0646\u0634\u062f."
@@ -156,12 +193,14 @@ export default function RecordsClient() {
         return;
       }
 
+      const workspace = await loadPatientTrendWorkspaceForRecord(result.record);
       setSelected(result.record);
-      setTrendWorkspace(
-        await loadPatientTrendWorkspaceForRecord(result.record),
-      );
+      setTrendWorkspace(workspace);
+      await refreshVisitChanges(workspace, result.record);
     } catch {
       setTrendWorkspace(null);
+      setVisitChanges(null);
+      setVisitChangesLoading(false);
       setStatus(
         fa
           ? "\u062c\u0633\u062a\u200c\u0648\u062c\u0648\u06cc \u067e\u0631\u0648\u0646\u062f\u0647 \u0627\u0646\u062c\u0627\u0645 \u0646\u0634\u062f."
@@ -418,6 +457,12 @@ export default function RecordsClient() {
 
               {trendWorkspace && (
                 <>
+                  <PatientVisitChanges
+                    summary={visitChanges}
+                    loading={visitChangesLoading}
+                    encounterCount={trendWorkspace.encounters.length}
+                    locale={fa ? "fa" : "en"}
+                  />
                   <PatientTrendPanel
                     trends={trendWorkspace.trends}
                     locale={fa ? "fa" : "en"}
