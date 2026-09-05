@@ -196,7 +196,7 @@ describe("reviewed product-bound WEGOVY MASH protocol", () => {
     expect(gated.gate.status).toBe("pass");
     expect(gated.components[0]?.doseOptions).toHaveLength(1);
     expect(gated.components[0]?.dosePlan?.perAdministrationComponents?.[0]?.amount).toBe(0.25);
-    expect(gated.components[0]?.dosePlan?.scheduleText).toContain("7");
+    expect(gated.components[0]?.dosePlan?.scheduleText).toBe("once weekly");
   });
 
   it("fails closed for incomplete safety data and excludes label contraindications", () => {
