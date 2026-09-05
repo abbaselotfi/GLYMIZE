@@ -16,6 +16,7 @@ export * from "./selector.js";
 export * from "./explain.js";
 export * from "./engine.js";
 export * from "./inventory-adapter.js";
+export * from "./type2-live-adapter.js";
 export * from "./clinical-normalization.js";
 export * from "./safety-rules.js";
 export * from "./insulin-rules.js";
