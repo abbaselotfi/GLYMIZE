@@ -3,6 +3,7 @@ import {
   buildReviewedCardiometabolicDoseRulesV2,
   buildReviewedCardiometabolicGateRulesV2,
 } from "./cardiometabolic-protocols.js";
+import { buildReviewedMashDoseRulesV2 } from "./mash-protocols.js";
 import { buildCoreAda2026DecisionRulesV2 } from "./safety-rules.js";
 import type {
   DoseRuleV2,
@@ -72,6 +73,13 @@ const evidenceIndexKnowledgeV2: KnowledgeMedicationV2[] = [
   knowledge("EA-ROSUVASTATIN", "Rosuvastatin", "lipid_lowering"),
   knowledge("EA-FINERENONE", "Finerenone", "mineralocorticoid_receptor_antagonist"),
   knowledge("EA-SPIRONOLACTONE", "Spironolactone", "mineralocorticoid_receptor_antagonist"),
+  {
+    ...knowledge("EA-RESMETIROM", "Resmetirom", "liver_directed_therapy"),
+    therapeuticAreas: ["MASH"],
+    primaryLanes: ["liver"],
+    efficacyBand: "none",
+    hypoglycemiaRisk: "minimal",
+  },
 ];
 
 const genericNameByMasterId = new Map(
@@ -150,6 +158,7 @@ export function buildDecisionGraphEvidenceAssistantIndexV2(): DecisionGraphEvide
   const doseRules = [
     ...buildReviewedProductDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
     ...buildReviewedCardiometabolicDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
+    ...buildReviewedMashDoseRulesV2({ knowledge: evidenceIndexKnowledgeV2 }),
   ];
   const safetyRules = [
     ...buildCoreAda2026DecisionRulesV2(evidenceIndexKnowledgeV2).medicationGateRules,
