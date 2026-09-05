@@ -1,7 +1,7 @@
 import { resolveAdaptiveDataRequirementsV2 } from "./adaptive-data.js";
 import { classifyClinicalStateV2 } from "./classify.js";
 import { composeTreatmentPlanV2 } from "./composer.js";
-import { enrichCandidateWithDoseMarketCostV2 } from "./enrich.js";
+import { enrichCandidateWithDoseMarketCostV2 } from "./enrich-wegovy-continuation.js";
 import { toRecommendationV2 } from "./explain.js";
 import { applyHardGatesV2 } from "./gates.js";
 import { resolveClinicalObjectivesV2 } from "./objectives.js";
