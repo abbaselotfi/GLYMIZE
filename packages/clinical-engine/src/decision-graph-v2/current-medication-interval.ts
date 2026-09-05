@@ -10,6 +10,8 @@ export type IntervalAwareCurrentMedicationInputV2 = CurrentMedicationInput & {
   daysOnCurrentDose?: number;
   /** Explicit treatment phase when a dose can mean more than one clinical stage. */
   therapyPhase?: "initiation" | "escalation" | "maintenance";
+  /** Days from the encounter to the next scheduled administration; 0 means today. */
+  nextAdministrationInDays?: number;
 };
 
 export interface CurrentMedicationAdministrationIntervalV2 {
@@ -21,6 +23,7 @@ export interface CurrentMedicationAdministrationIntervalV2 {
   daysOnCurrentDose?: number;
   therapyPhase?: "initiation" | "escalation" | "maintenance";
   referencePresentationId?: string;
+  nextAdministrationInDays?: number;
 }
 
 /** Runtime extension carried structurally through PatientContextV2 without changing
@@ -48,6 +51,11 @@ function validDaysOnCurrentDose(value: number | undefined) {
   return value === undefined || (Number.isInteger(value) && value >= 0);
 }
 
+function validNextAdministrationInDays(value: number | undefined, periodDays: number | undefined) {
+  if (value === undefined) return true;
+  return Number.isInteger(value) && value >= 0 && periodDays !== undefined && value < periodDays;
+}
+
 function doseComponent(ingredientKey: string, amount: number, unit: string): StrengthComponentV2[] {
   return [{ ingredientKey, amount, unit }];
 }
@@ -65,6 +73,7 @@ function intervalMetadata(input: IntervalAwareCurrentMedicationInputV2) {
     daysOnCurrentDose: input.daysOnCurrentDose,
     therapyPhase: input.therapyPhase,
     referencePresentationId: input.referencePresentationId,
+    nextAdministrationInDays: input.nextAdministrationInDays,
   };
 }
 
@@ -89,6 +98,9 @@ export function resolveCurrentMedicationAdministrationV2(
   if (explicitIntervalRequested) {
     if (!positiveFinite(input.administrationsPerPeriod) || !positiveFinite(input.administrationPeriodDays)) {
       return { intervalIssue: "Explicit medication interval requires positive administrationsPerPeriod and administrationPeriodDays." };
+    }
+    if (!validNextAdministrationInDays(input.nextAdministrationInDays, input.administrationPeriodDays)) {
+      return { intervalIssue: "nextAdministrationInDays must be an integer from 0 through periodDays - 1 when documented." };
     }
     if (!positiveFinite(input.doseAmount) || !normalizedUnit) {
       return { intervalIssue: "Explicit medication interval requires a positive per-administration doseAmount and doseUnit." };
@@ -119,6 +131,10 @@ export function resolveCurrentMedicationAdministrationV2(
     }
 
     return { administrationInterval };
+  }
+
+  if (input.nextAdministrationInDays !== undefined) {
+    return { intervalIssue: "nextAdministrationInDays requires an explicit administration interval." };
   }
 
   const frequencyPerDay = positiveFinite(input.frequencyPerDay) ? input.frequencyPerDay : undefined;
