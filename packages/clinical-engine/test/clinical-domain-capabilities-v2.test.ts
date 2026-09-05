@@ -14,8 +14,6 @@ describe("clinical engine multidomain capability boundary", () => {
 
   it("keeps review/specialist/safety domains out of claimed executable coverage", () => {
     for (const domain of [
-      "liver",
-      "masld_mash",
       "neuropathy",
       "retinopathy",
       "diabetic_foot",
@@ -36,9 +34,14 @@ describe("clinical engine multidomain capability boundary", () => {
     }
   });
 
-  it("makes MASH the first protocol gap and preserves specialist boundaries", () => {
-    expect(clinicalDomainCapability("masld_mash").nextGap).toContain("resmetirom");
-    expect(clinicalDomainCapability("masld_mash").nextGap).toContain("semaglutide");
+  it("marks MASH partially executable after resmetirom while preserving the semaglutide gap", () => {
+    for (const domain of ["liver", "masld_mash"] as const) {
+      const capability = clinicalDomainCapability(domain);
+      expect(capability.executionState).toBe("partially_executable");
+      expect(capability.decisionGraphLanes).toContain("liver");
+      expect(capability.executableObjectives).toContain("liver_directed_therapy");
+      expect(capability.nextGap).toContain("semaglutide");
+    }
     expect(clinicalDomainCapability("retinopathy").executionState).toBe("specialist_or_escalation");
     expect(clinicalDomainCapability("diabetic_foot").executionState).toBe("specialist_or_escalation");
   });
