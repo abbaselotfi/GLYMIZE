@@ -8,16 +8,24 @@ import type {
   Type2MedicationConsideration,
   Type2PathwayPriority,
 } from "@glymize/contracts";
+import {
+  resolveCurrentMedicationAdministrationV2,
+  type IntervalAwareCurrentMedicationInputV2,
+  type IntervalAwareCurrentMedicationV2,
+} from "./decision-graph-v2/current-medication-interval.js";
 import { runDecisionGraphV2 } from "./decision-graph-v2/engine.js";
 import { buildDecisionGraphInventoryFromContractsV2 } from "./decision-graph-v2/inventory-adapter.js";
 import type {
-  CurrentMedicationV2,
   DecisionGraphRequestV2,
   DecisionGraphResultV2,
   RecommendationV2,
 } from "./decision-graph-v2/types.js";
 
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
+
+export type IntervalAwareType2ConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "currentMedications"> & {
+  currentMedications?: IntervalAwareCurrentMedicationInputV2[];
+};
 
 export interface Type2DecisionGraphMedicationProjection extends Type2MedicationConsideration {
   decisionGraphAuthority: true;
@@ -35,7 +43,7 @@ export interface Type2DecisionGraphAssessmentResult extends Type2AssessmentResul
 
 export interface BuildType2DecisionGraphAssessmentInput {
   medications: readonly GenericMedication[];
-  request: Type2ConsiderationRequest;
+  request: IntervalAwareType2ConsiderationRequestV2;
   masterRegistry: readonly MasterDrugRegistryEntry[];
   marketProducts: readonly IranMarketDrugProduct[];
 }
@@ -57,7 +65,7 @@ function unique(values: readonly string[]) {
 }
 
 function masterIdForCurrentMedication(
-  current: NonNullable<Type2ConsiderationRequest["currentMedications"]>[number],
+  current: IntervalAwareCurrentMedicationInputV2,
   medications: readonly GenericMedication[],
   masterRegistry: readonly MasterDrugRegistryEntry[],
 ) {
@@ -73,21 +81,21 @@ function masterIdForCurrentMedication(
 }
 
 function currentMedicationsV2(
-  request: Type2ConsiderationRequest,
+  request: IntervalAwareType2ConsiderationRequestV2,
   medications: readonly GenericMedication[],
   masterRegistry: readonly MasterDrugRegistryEntry[],
-): CurrentMedicationV2[] {
+): IntervalAwareCurrentMedicationV2[] {
   return (request.currentMedications ?? []).map((current) => {
     const generic = current.genericMedicationId
       ? medications.find((item) => item.id === current.genericMedicationId)
       : medications.find((item) => normalized(item.canonicalName) === normalized(current.genericName));
-    const unit = current.totalDailyDoseUnit ?? current.doseUnit;
-    const totalDailyDose = current.totalDailyDose ?? (
-      current.doseAmount !== undefined && current.frequencyPerDay !== undefined
-        ? current.doseAmount * current.frequencyPerDay
-        : undefined
-    );
+    const explicitIntervalRequested =
+      current.administrationsPerPeriod !== undefined || current.administrationPeriodDays !== undefined;
+    const unit = explicitIntervalRequested
+      ? current.doseUnit
+      : current.totalDailyDoseUnit ?? current.doseUnit;
     const masterDrugId = masterIdForCurrentMedication(current, medications, masterRegistry);
+    const ingredientKey = masterDrugId ?? normalized(current.genericName);
     const insulinLike = [
       "human_insulin",
       "basal_insulin_analog",
@@ -96,6 +104,10 @@ function currentMedicationsV2(
       "fixed_ratio_combination",
     ].includes(generic?.therapyGroup ?? "");
     const normalizedUnit = unit && ["u", "iu", "unit", "units"].includes(normalized(unit)) ? "U" : unit;
+    const administration = resolveCurrentMedicationAdministrationV2(current, ingredientKey, normalizedUnit);
+    const totalDailyDose = administration.dailyDose?.length === 1
+      ? administration.dailyDose[0]?.amount
+      : undefined;
 
     return {
       masterDrugId,
@@ -103,14 +115,16 @@ function currentMedicationsV2(
       therapyGroup: generic?.therapyGroup,
       route: current.route ?? generic?.administrationRoute,
       dosageFormGroup: current.dosageForm,
-      dailyDose: totalDailyDose !== undefined && normalizedUnit
-        ? [{ ingredientKey: masterDrugId ?? normalized(current.genericName), amount: totalDailyDose, unit: normalizedUnit }]
-        : undefined,
-      administrationsPerDay: current.frequencyPerDay,
+      dailyDose: administration.dailyDose,
+      administrationsPerDay: administration.administrationsPerDay,
       basalInsulinUnitsPerDay: insulinLike && normalizedUnit === "U" ? totalDailyDose : undefined,
       status: current.status,
       adherence: current.adherence,
       tolerance: current.tolerance,
+      administrationInterval: administration.administrationInterval,
+      intervalIssue: administration.intervalIssue,
+      brandName: current.brandName,
+      durationDays: current.durationDays,
     };
   });
 }
@@ -232,7 +246,7 @@ function contractTherapyGroup(value: string, fallback?: MedicationTherapyGroup):
 function activeCurrentMedication(
   masterDrugId: string,
   genericName: string,
-  request: Type2ConsiderationRequest,
+  request: IntervalAwareType2ConsiderationRequestV2,
   medications: readonly GenericMedication[],
   masterRegistry: readonly MasterDrugRegistryEntry[],
 ) {
