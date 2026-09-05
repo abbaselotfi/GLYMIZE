@@ -5,11 +5,23 @@ import type {
   Type2CostPreference,
   Type2RoutePreference,
 } from "@glymize/contracts";
-import type { DiabeticFootContextV2 } from "./decision-graph-v2/diabetic-foot-escalation.js";
+import {
+  resolveDiabeticFootPathwayV2,
+  type DiabeticFootContextV2,
+} from "./decision-graph-v2/diabetic-foot-escalation.js";
 import type { DecisionGraphRequestWithSpecialistContextsV2 } from "./decision-graph-v2/engine-with-specialist-escalations.js";
-import type { NutritionSupportContextV2 } from "./decision-graph-v2/nutrition-support-boundary.js";
-import type { PregnancyDiabetesContextV2 } from "./decision-graph-v2/pregnancy-diabetes-pathway.js";
-import type { RetinopathyContextV2 } from "./decision-graph-v2/retinopathy-escalation.js";
+import {
+  resolveNutritionSupportBoundaryV2,
+  type NutritionSupportContextV2,
+} from "./decision-graph-v2/nutrition-support-boundary.js";
+import {
+  resolvePregnancyDiabetesPathwayV2,
+  type PregnancyDiabetesContextV2,
+} from "./decision-graph-v2/pregnancy-diabetes-pathway.js";
+import {
+  resolveRetinopathySpecialistEscalationV2,
+  type RetinopathyContextV2,
+} from "./decision-graph-v2/retinopathy-escalation.js";
 import type {
   DecisionGraphInventoryV2,
   MedicationSafetyContextV2,
@@ -134,5 +146,40 @@ export function type2StructuredIntakeToDecisionGraphV2(
       costPreference: costPreference(request.costPreference),
     },
     inventory,
+  };
+}
+
+export interface Type2ParallelSafetyProjectionV2 {
+  retinopathy: ReturnType<typeof resolveRetinopathySpecialistEscalationV2>;
+  diabeticFoot: ReturnType<typeof resolveDiabeticFootPathwayV2>;
+  nutritionSupport: ReturnType<typeof resolveNutritionSupportBoundaryV2>;
+  pregnancy: ReturnType<typeof resolvePregnancyDiabetesPathwayV2>;
+}
+
+const parallelSafetyInventoryV2: DecisionGraphInventoryV2 = {
+  knowledge: [],
+  marketProducts: [],
+  doseRules: [],
+  insurancePolicies: [],
+};
+
+/**
+ * Resolves non-ranking parallel safety/specialist pathways for the live Type 2
+ * API. This deliberately bypasses core medication selection and therefore cannot
+ * create a second medication-ranking authority beside the existing assessment.
+ *
+ * Painful-DPN medication execution is intentionally absent here because it is a
+ * treatment-selection lane, not a specialist-only safety projection. It must be
+ * converged with the authoritative Decision Graph medication path separately.
+ */
+export function resolveType2ParallelSafetyProjectionV2(
+  request: Type2StructuredConsiderationRequestV2,
+): Type2ParallelSafetyProjectionV2 {
+  const graphRequest = type2StructuredIntakeToDecisionGraphV2(request, parallelSafetyInventoryV2);
+  return {
+    retinopathy: resolveRetinopathySpecialistEscalationV2(graphRequest),
+    diabeticFoot: resolveDiabeticFootPathwayV2(graphRequest),
+    nutritionSupport: resolveNutritionSupportBoundaryV2(graphRequest),
+    pregnancy: resolvePregnancyDiabetesPathwayV2(graphRequest),
   };
 }
