@@ -2,6 +2,7 @@
 
 import type {
   GlobalPatientAccountSummary,
+  PatientPracticeContext,
   PatientVerifiedLegacyLinkSummary,
 } from "@glymize/contracts";
 
@@ -11,23 +12,32 @@ import styles from "./patient-identity-portal.module.css";
 type Props = {
   account: GlobalPatientAccountSummary;
   links: PatientVerifiedLegacyLinkSummary[];
+  practiceContexts: PatientPracticeContext[];
+  selectedPracticeContextId: string | null;
+  careContextError: string;
   legacyPortalEnabled: boolean;
   busy: boolean;
   onLogout: () => void;
+  onSelectPracticeContext: (context: PatientPracticeContext) => void;
   onOpenPractice: (link: PatientVerifiedLegacyLinkSummary) => void;
 };
 
 /**
  * Authenticated patient surface within the Patient Care Hub.
  * Practice-local records remain distinct verified destinations and are never
- * synthesized into a global clinical chart.
+ * synthesized into a global clinical chart. Selecting a P5-B practice context
+ * is a view preference only and must never grant clinical or cross-practice access.
  */
 export default function PatientCareHub({
   account,
   links,
+  practiceContexts,
+  selectedPracticeContextId,
+  careContextError,
   legacyPortalEnabled,
   busy,
   onLogout,
+  onSelectPracticeContext,
   onOpenPractice,
 }: Props) {
   const { locale } = useGlymizeLocale();
@@ -57,8 +67,46 @@ export default function PatientCareHub({
           <div><small>{fa ? "پروندهٔ متصل" : "Linked record"}</small><strong>{account.linkedClinicalRecord ? (fa ? "دارد" : "Yes") : (fa ? "ندارد" : "No")}</strong></div>
         </div>
 
-        <div className={styles.practices}>
-          <h2>{fa ? "پرونده‌ها و مراکز درمانی من" : "My records and care organizations"}</h2>
+        {practiceContexts.length > 0 ? (
+          <div className={styles.practices} data-patient-section="care-contexts">
+            <h2>{fa ? "تیم‌ها و زمینه‌های مراقبت من" : "My care contexts"}</h2>
+            {practiceContexts.map((context) => {
+              const selected = selectedPracticeContextId === context.id;
+              return (
+                <article key={context.id} data-selected={selected ? "true" : "false"}>
+                  <span aria-hidden="true">{selected ? "●" : "○"}</span>
+                  <div>
+                    <strong>{context.provider.practiceDisplayName}</strong>
+                    <small>{context.provider.displayName} · {context.provider.specialtyName}</small>
+                    <small>{fa ? `رابطه مراقبتی: ${context.relationshipStatus}` : `Care relationship: ${context.relationshipStatus}`}</small>
+                    {context.linkedLocalRecord ? <small>{fa ? "پرونده محلی متصل است" : "Local record linked"}</small> : null}
+                  </div>
+                  {context.selectable ? (
+                    <button
+                      type="button"
+                      disabled={busy || selected}
+                      onClick={() => onSelectPracticeContext(context)}
+                    >
+                      {selected ? (fa ? "زمینه فعال" : "Active context") : (fa ? "انتخاب زمینه" : "Select context")}
+                    </button>
+                  ) : (
+                    <small>{fa ? "این رابطه قابل انتخاب نیست" : "This relationship is not selectable"}</small>
+                  )}
+                </article>
+              );
+            })}
+            <p className={styles.boundaryNote}>
+              {fa
+                ? "انتخاب زمینه مراقبت فقط ترجیح نمایشی این نشست است و هیچ دسترسی درمانی یا دسترسی بین‌مطب ایجاد نمی‌کند."
+                : "Selecting a care context is only a session view preference; it grants neither clinical nor cross-practice access."}
+            </p>
+          </div>
+        ) : null}
+
+        {careContextError ? <p className={styles.error} role="status">{careContextError}</p> : null}
+
+        <div className={styles.practices} data-patient-section="verified-record-links">
+          <h2>{fa ? "پرونده‌های تأییدشده من" : "My verified care records"}</h2>
           {links.length > 0 ? links.map((link) => (
             <article key={link.portalUserId}>
               <span aria-hidden="true">✓</span>
