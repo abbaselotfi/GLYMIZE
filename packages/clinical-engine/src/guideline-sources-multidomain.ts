@@ -1,3 +1,5 @@
+import type { ClinicalEvidenceSource } from "./guideline-registry.js";
+
 /**
  * Reviewed multidomain evidence sources that complement the original Type 2
  * glycemic registry. They are registered for provenance/monitoring only here;
@@ -107,7 +109,7 @@ export const multidomainGuidelineSources = [
     publishedAt: "2022-04-01",
     monitored: true,
     engineInfluence: true,
-    engineDomains: ["heart_failure", "hfref", "hfmrEF", "hfpef", "mra", "spironolactone", "sglt2", "raas"],
+    engineDomains: ["heart_failure", "hfref", "hfmref", "hfpef", "mra", "spironolactone", "sglt2", "raas"],
     engineRoleFa: "GDMT نارسایی قلبی و eligibility/safety کلاس MRA از جمله spironolactone؛ اجرای دوز product-specific جداست",
     engineRoleEn: "Heart-failure GDMT and MRA eligibility/safety including spironolactone; product-specific dosing remains separate",
   },
@@ -156,4 +158,4 @@ export const multidomainGuidelineSources = [
     engineRoleFa: "معیارهای انتخاب بیمار، مدیریت همبودها و پایش semaglutide در MASH با فیبروز متوسط تا پیشرفته",
     engineRoleEn: "Patient selection, comorbidity management, and semaglutide monitoring in MASH with moderate-to-advanced fibrosis",
   },
-] as const;
+] satisfies ClinicalEvidenceSource[];
