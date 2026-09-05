@@ -6,6 +6,10 @@ export type IntervalAwareCurrentMedicationInputV2 = CurrentMedicationInput & {
   administrationsPerPeriod?: number;
   /** Length of the explicit administration interval in days. Must be paired with administrationsPerPeriod. */
   administrationPeriodDays?: number;
+  /** Days documented on the current dose, distinct from total medication durationDays. */
+  daysOnCurrentDose?: number;
+  /** Explicit treatment phase when a dose can mean more than one clinical stage. */
+  therapyPhase?: "initiation" | "escalation" | "maintenance";
 };
 
 export interface CurrentMedicationAdministrationIntervalV2 {
@@ -14,6 +18,9 @@ export interface CurrentMedicationAdministrationIntervalV2 {
   periodDays: number;
   scheduleText: string;
   source: "explicit_interval" | "legacy_daily";
+  daysOnCurrentDose?: number;
+  therapyPhase?: "initiation" | "escalation" | "maintenance";
+  referencePresentationId?: string;
 }
 
 /** Runtime extension carried structurally through PatientContextV2 without changing
@@ -37,6 +44,10 @@ function positiveFinite(value: number | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+function validDaysOnCurrentDose(value: number | undefined) {
+  return value === undefined || (Number.isInteger(value) && value >= 0);
+}
+
 function doseComponent(ingredientKey: string, amount: number, unit: string): StrengthComponentV2[] {
   return [{ ingredientKey, amount, unit }];
 }
@@ -47,6 +58,14 @@ function intervalText(administrationsPerPeriod: number, periodDays: number) {
   if (administrationsPerPeriod === 1 && periodDays === 28) return "once every 28 days";
   if (periodDays === 1) return `${administrationsPerPeriod} administration(s) per day`;
   return `${administrationsPerPeriod} administration(s) every ${periodDays} days`;
+}
+
+function intervalMetadata(input: IntervalAwareCurrentMedicationInputV2) {
+  return {
+    daysOnCurrentDose: input.daysOnCurrentDose,
+    therapyPhase: input.therapyPhase,
+    referencePresentationId: input.referencePresentationId,
+  };
 }
 
 /**
@@ -60,6 +79,10 @@ export function resolveCurrentMedicationAdministrationV2(
   ingredientKey: string,
   normalizedUnit?: string,
 ): CurrentMedicationAdministrationResolutionV2 {
+  if (!validDaysOnCurrentDose(input.daysOnCurrentDose)) {
+    return { intervalIssue: "daysOnCurrentDose must be a non-negative integer when documented." };
+  }
+
   const explicitIntervalRequested =
     input.administrationsPerPeriod !== undefined || input.administrationPeriodDays !== undefined;
 
@@ -78,6 +101,7 @@ export function resolveCurrentMedicationAdministrationV2(
       periodDays: input.administrationPeriodDays,
       scheduleText: intervalText(input.administrationsPerPeriod, input.administrationPeriodDays),
       source: "explicit_interval",
+      ...intervalMetadata(input),
     };
 
     // A one-day explicit interval is genuinely daily and can safely populate the
@@ -124,6 +148,7 @@ export function resolveCurrentMedicationAdministrationV2(
         periodDays: 1,
         scheduleText: intervalText(frequencyPerDay, 1),
         source: "legacy_daily",
+        ...intervalMetadata(input),
       };
     }
   }
