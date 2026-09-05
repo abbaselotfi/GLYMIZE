@@ -2,21 +2,43 @@ import type { FactKeyV2, PatientContextV2, PredicateV2, ScalarV2 } from "./types
 
 export type FactMapV2 = Record<FactKeyV2, ScalarV2 | undefined>;
 
+export function finiteNonNegativeClinicalNumberV2(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+export function finitePositiveClinicalNumberV2(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+export function finitePercentClinicalNumberV2(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100
+    ? value
+    : undefined;
+}
+
 export function buildFactMapV2(patient: PatientContextV2, severeHyperglycemia: boolean): FactMapV2 {
   return {
     pregnancy: patient.pregnancy,
     "glycemia.severeHyperglycemia": severeHyperglycemia,
-    "glycemia.fastingPlasmaGlucoseMgDl": patient.glycemia.fastingPlasmaGlucoseMgDl,
-    "glycemia.twoHourPostprandialGlucoseMgDl": patient.glycemia.twoHourPostprandialGlucoseMgDl,
+    "glycemia.fastingPlasmaGlucoseMgDl": finiteNonNegativeClinicalNumberV2(
+      patient.glycemia.fastingPlasmaGlucoseMgDl,
+    ),
+    "glycemia.twoHourPostprandialGlucoseMgDl": finiteNonNegativeClinicalNumberV2(
+      patient.glycemia.twoHourPostprandialGlucoseMgDl,
+    ),
     "kidney.ckd": patient.kidney?.ckd,
-    "kidney.eGfr": patient.kidney?.eGfr,
-    "kidney.creatinineClearanceMlMin": patient.kidney?.creatinineClearanceMlMin,
-    "kidney.uacrMgG": patient.kidney?.uacrMgG,
-    "kidney.potassiumMmolL": patient.kidney?.potassiumMmolL,
+    "kidney.eGfr": finiteNonNegativeClinicalNumberV2(patient.kidney?.eGfr),
+    "kidney.creatinineClearanceMlMin": finiteNonNegativeClinicalNumberV2(
+      patient.kidney?.creatinineClearanceMlMin,
+    ),
+    "kidney.uacrMgG": finiteNonNegativeClinicalNumberV2(patient.kidney?.uacrMgG),
+    "kidney.potassiumMmolL": finitePositiveClinicalNumberV2(patient.kidney?.potassiumMmolL),
     "kidney.dialysis": patient.kidney?.dialysis,
     "cardiovascular.ascvd": patient.cardiovascular?.ascvd,
     "cardiovascular.heartFailure": patient.cardiovascular?.heartFailure,
-    "cardiovascular.lvefPercent": patient.cardiovascular?.lvefPercent,
+    "cardiovascular.lvefPercent": finitePercentClinicalNumberV2(
+      patient.cardiovascular?.lvefPercent,
+    ),
     "liver.masldMash": patient.liver?.masldMash,
     "liver.fibrosisStage": patient.liver?.fibrosisStage,
     "liver.cirrhosis": patient.liver?.cirrhosis,
@@ -25,6 +47,7 @@ export function buildFactMapV2(patient: PatientContextV2, severeHyperglycemia: b
 }
 
 function comparable(value: ScalarV2 | undefined): string | number | boolean | undefined {
+  if (typeof value === "number" && !Number.isFinite(value)) return undefined;
   return value;
 }
 
