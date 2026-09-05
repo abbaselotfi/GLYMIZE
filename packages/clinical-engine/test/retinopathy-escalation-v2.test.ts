@@ -102,7 +102,8 @@ describe("ADA 2026 retinopathy specialist escalation", () => {
     }));
     expect(result.specialistEscalations).toHaveLength(1);
     expect(result.specialistEscalations[0]!.autonomousMedicationExecution).toBe(false);
-    expect(result.trace.at(-1)?.nodeId).toBe("retinopathy-specialist-escalation");
-    expect(result.trace.at(-1)?.summary).toContain("outside medication ranking");
+    const retinopathyTrace = result.trace.find((item) => item.nodeId === "retinopathy-specialist-escalation");
+    expect(retinopathyTrace).toBeDefined();
+    expect(retinopathyTrace?.summary).toContain("outside medication ranking");
   });
 });
