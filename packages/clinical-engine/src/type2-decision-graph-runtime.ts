@@ -9,10 +9,11 @@ import { buildType2Assessment as buildLegacyType2Assessment } from "./index.js";
 import {
   filterHardExcludedLegacyType2Assessment,
 } from "./type2-hard-exclusion-compat.js";
+import type { Type2DecisionGraphAssessmentResult } from "./type2-decision-graph-compat.js";
 import {
-  buildType2AssessmentFromDecisionGraphV2,
-  type Type2DecisionGraphAssessmentResult,
-} from "./type2-decision-graph-compat.js";
+  buildType2AssessmentWithWorldDrugCoverageV2,
+  type Type2AssessmentWithWorldDrugCoverage,
+} from "./type2-worlddrug-recommendation-compat.js";
 
 export interface Type2DecisionGraphRuntimeCatalog {
   masterRegistry: readonly MasterDrugRegistryEntry[];
@@ -40,8 +41,13 @@ export function type2DecisionGraphRuntimeConfigured() {
  * Live Type 2 authority entrypoint.
  *
  * Browser runtime configures the approved WorldDrug master registry plus the
- * current Iran market snapshot before the first consideration request. The
- * legacy builder remains only as an explicit compatibility fallback for
+ * current Iran market snapshot before the first consideration request. Decision
+ * Graph v2 remains the only executable/ranking authority. The WorldDrug coverage
+ * projection may append current-market, patient-context-relevant medicines as
+ * `requires_approved_protocol` review options; those options receive no Decision
+ * Graph rank and cannot become executable until a reviewed rule/protocol exists.
+ *
+ * The legacy builder remains only as an explicit compatibility fallback for
  * non-browser/test consumers that have not configured runtime catalogue data.
  * Its returned medication list is passed through a structural hard-exclusion
  * firewall so legacy scores can never re-promote a contraindicated candidate.
@@ -49,13 +55,13 @@ export function type2DecisionGraphRuntimeConfigured() {
 export function buildType2Assessment(
   medications: readonly GenericMedication[],
   request: Type2ConsiderationRequest,
-): Type2AssessmentResult | Type2DecisionGraphAssessmentResult {
+): Type2AssessmentResult | Type2DecisionGraphAssessmentResult | Type2AssessmentWithWorldDrugCoverage {
   if (!runtimeCatalog?.masterRegistry.length) {
     const legacyAssessment = buildLegacyType2Assessment(medications, request);
     return filterHardExcludedLegacyType2Assessment(legacyAssessment, medications, request);
   }
 
-  return buildType2AssessmentFromDecisionGraphV2({
+  return buildType2AssessmentWithWorldDrugCoverageV2({
     medications,
     request,
     masterRegistry: runtimeCatalog.masterRegistry,
