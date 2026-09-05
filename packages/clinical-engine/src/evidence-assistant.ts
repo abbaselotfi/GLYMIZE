@@ -1,3 +1,5 @@
+import { buildDecisionGraphEvidenceAssistantIndexV2 } from "./decision-graph-v2/evidence-assistant-index.js";
+import type { EvidenceReferenceV2 } from "./decision-graph-v2/types.js";
 import { activeGuidelineSources, evidenceSourcesFor } from "./guideline-registry.js";
 import { getActiveClinicalRulePack } from "./rule-pack.js";
 
@@ -10,6 +12,7 @@ export interface EvidenceAssistantCitation {
   activeVersion: string;
   sourceUrl: string;
   sourceKind: "guideline" | "consensus" | "regulatory";
+  locator?: string;
 }
 
 export interface EvidenceAssistantHit {
@@ -59,6 +62,14 @@ const QUERY_ALIASES: Record<string, string[]> = {
   insulin: ["انسولین", "hyperglycemia", "catabolism", "هایپرگلیسمی"],
   انسولین: ["insulin", "hyperglycemia", "catabolism", "هایپرگلیسمی"],
   resmetirom: ["mash", "fibrosis", "f2", "f3", "rezdiffra", "رسمتی‌روم", "رسمتیrom"],
+  dose: ["dosage", "starting", "start", "titration", "دوز", "شروع", "تیتراسیون"],
+  dosage: ["dose", "starting", "start", "titration", "دوز", "شروع", "تیتراسیون"],
+  دوز: ["dose", "dosage", "starting", "start", "titration", "شروع", "تیتراسیون"],
+  شروع: ["start", "starting", "initial", "initiation", "دوز"],
+  toujeo: ["توجئو", "glargine", "u-300", "u300"],
+  توجئو: ["toujeo", "glargine", "u-300", "u300"],
+  tresiba: ["ترسیبا", "degludec"],
+  ترسیبا: ["tresiba", "degludec"],
 };
 
 function normalizeText(value: string) {
@@ -96,11 +107,23 @@ function scoreRule(questionTokens: readonly string[], haystack: string, domain: 
   return score;
 }
 
+function graphCitation(reference: EvidenceReferenceV2): EvidenceAssistantCitation {
+  return {
+    sourceId: reference.sourceId,
+    shortCode: reference.sourceId,
+    title: reference.title,
+    activeVersion: reference.version ?? "current",
+    sourceUrl: reference.url,
+    sourceKind: reference.strength === "regulatory_label" ? "regulatory" : "guideline",
+    locator: reference.locator,
+  };
+}
+
 /**
  * Retrieval is deliberately limited to clinically approved, executable rule
  * provenance. It never reads draft rule packs and it cannot change clinical
- * ranking or patient inputs. Full guideline chunks can be added later through
- * the approved evidence-corpus pipeline without changing this interface.
+ * ranking or patient inputs. Product/safety citations are materialized from the
+ * same Decision Graph rule builders that execute those rules.
  */
 export function retrieveApprovedEvidence(
   question: string,
@@ -110,39 +133,58 @@ export function retrieveApprovedEvidence(
   const pack = getActiveClinicalRulePack();
   const queryTokens = tokens(question);
 
-  const hits = pack.rules
-    .map((rule) => {
-      const sources = evidenceSourcesFor(rule.sourceIds);
-      const sourceText = sources.map((source) => [
-        source.shortCode,
-        source.title,
-        source.engineRoleFa,
-        source.engineRoleEn,
-        source.engineDomains.join(" "),
-      ].join(" ")).join(" ");
-      const score = scoreRule(
-        queryTokens,
-        `${rule.descriptionFa} ${rule.descriptionEn} ${rule.engineEffect} ${sourceText}`,
-        rule.domain,
-      );
-      return {
-        ruleId: rule.id,
-        domain: rule.domain,
-        score,
-        textFa: rule.descriptionFa,
-        textEn: rule.descriptionEn,
-        engineEffect: rule.engineEffect,
-        sourceIds: [...rule.sourceIds],
-        citations: sources.map((source) => ({
-          sourceId: source.id,
-          shortCode: source.shortCode,
-          title: source.title,
-          activeVersion: source.activeVersion,
-          sourceUrl: source.sourceUrl,
-          sourceKind: source.sourceKind,
-        })),
-      } satisfies EvidenceAssistantHit;
-    })
+  const rulePackHits = pack.rules.map((rule) => {
+    const sources = evidenceSourcesFor(rule.sourceIds);
+    const sourceText = sources.map((source) => [
+      source.shortCode,
+      source.title,
+      source.engineRoleFa,
+      source.engineRoleEn,
+      source.engineDomains.join(" "),
+    ].join(" ")).join(" ");
+    const score = scoreRule(
+      queryTokens,
+      `${rule.descriptionFa} ${rule.descriptionEn} ${rule.engineEffect} ${sourceText}`,
+      rule.domain,
+    );
+    return {
+      ruleId: rule.id,
+      domain: rule.domain,
+      score,
+      textFa: rule.descriptionFa,
+      textEn: rule.descriptionEn,
+      engineEffect: rule.engineEffect,
+      sourceIds: [...rule.sourceIds],
+      citations: sources.map((source) => ({
+        sourceId: source.id,
+        shortCode: source.shortCode,
+        title: source.title,
+        activeVersion: source.activeVersion,
+        sourceUrl: source.sourceUrl,
+        sourceKind: source.sourceKind,
+      })),
+    } satisfies EvidenceAssistantHit;
+  });
+
+  const decisionGraphHits = buildDecisionGraphEvidenceAssistantIndexV2().map((record) => {
+    const score = scoreRule(
+      queryTokens,
+      `${record.textFa} ${record.textEn} ${record.engineEffect} ${record.searchText}`,
+      record.domain,
+    );
+    return {
+      ruleId: record.ruleId,
+      domain: record.domain,
+      score,
+      textFa: record.textFa,
+      textEn: record.textEn,
+      engineEffect: record.engineEffect,
+      sourceIds: [...new Set(record.evidence.map((item) => item.sourceId))],
+      citations: record.evidence.map(graphCitation),
+    } satisfies EvidenceAssistantHit;
+  });
+
+  const hits = [...rulePackHits, ...decisionGraphHits]
     .filter((hit) => hit.score > 0)
     .sort((left, right) => right.score - left.score || left.ruleId.localeCompare(right.ruleId))
     .slice(0, limit);
@@ -166,8 +208,8 @@ export function buildExtractiveEvidenceAnswer(result: EvidenceAssistantRetrieval
   const top = result.hits.slice(0, 3);
   const lines = top.map((hit) => result.locale === "fa" ? hit.textFa : hit.textEn);
   return result.locale === "fa"
-    ? `بر اساس شواهد تاییدشده فعلی:\n${lines.map((line) => `• ${line}`).join("\n")}\n\nاین پاسخ خلاصهٔ بازیابی‌شده از Rule Pack فعال است و جایگزین قضاوت بالینی یا متن کامل منبع نیست.`
-    : `Based on the currently approved evidence:\n${lines.map((line) => `• ${line}`).join("\n")}\n\nThis is an extractive summary from the active Rule Pack and does not replace clinical judgment or the complete source text.`;
+    ? `بر اساس شواهد تاییدشده فعلی:\n${lines.map((line) => `• ${line}`).join("\n")}\n\nاین پاسخ خلاصهٔ بازیابی‌شده از Rule Pack و Ruleهای اجرایی فعال است و جایگزین قضاوت بالینی یا متن کامل منبع نیست.`
+    : `Based on the currently approved evidence:\n${lines.map((line) => `• ${line}`).join("\n")}\n\nThis is an extractive summary from the active Rule Pack and executable evidence rules and does not replace clinical judgment or the complete source text.`;
 }
 
 export const evidenceAssistantSources = activeGuidelineSources.filter((source) => source.engineInfluence);
