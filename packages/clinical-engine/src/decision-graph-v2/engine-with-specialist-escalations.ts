@@ -14,7 +14,7 @@ export type DecisionGraphRequestWithSpecialistContextsV2 = Omit<DecisionGraphReq
   };
 };
 
-export type DecisionGraphResultWithSpecialistEscalationsV2 = DecisionGraphResultV2 & {
+export type DecisionGraphResultWithSpecialistPathwaysV2 = DecisionGraphResultV2 & {
   specialistEscalations: SpecialistEscalationV2[];
   diabeticFootPathway: ReturnType<typeof resolveDiabeticFootPathwayV2>;
 };
@@ -30,7 +30,7 @@ export type DecisionGraphResultWithSpecialistEscalationsV2 = DecisionGraphResult
 export function runDecisionGraphV2WithSpecialistEscalations(
   request: DecisionGraphRequestWithSpecialistContextsV2,
   policy?: DecisionGraphPolicyV2,
-): DecisionGraphResultWithSpecialistEscalationsV2 {
+): DecisionGraphResultWithSpecialistPathwaysV2 {
   const core = policy ? runDecisionGraphV2(request, policy) : runDecisionGraphV2(request);
   const retinopathy = resolveRetinopathySpecialistEscalationV2(request);
   const diabeticFootPathway = resolveDiabeticFootPathwayV2(request);
