@@ -166,8 +166,8 @@ describe("Patient Record v2 longitudinal trend read model", () => {
       new URL("../src/patient-record-v2/trends.ts", import.meta.url),
       "utf8",
     );
-    const routeSource = fs.readFileSync(
-      new URL("../src/platform-patient-record-v2.ts", import.meta.url),
+    const routeCoreSource = fs.readFileSync(
+      new URL("../src/platform-patient-record-v2-core.ts", import.meta.url),
       "utf8",
     );
 
@@ -176,7 +176,7 @@ describe("Patient Record v2 longitudinal trend read model", () => {
     expect(trendSource).toContain("o.canonical_key NOT LIKE 'raw:%'");
     expect(trendSource).not.toContain("mg/dLToMmol");
     expect(trendSource).not.toContain("mmolToMg");
-    expect(routeSource).toContain("readPatientTrendSeries(context, patientId)");
-    expect(routeSource).not.toContain("trends: [],");
+    expect(routeCoreSource).toContain("readPatientTrendSeries(context, patientId)");
+    expect(routeCoreSource).not.toContain("trends: [],");
   });
 });

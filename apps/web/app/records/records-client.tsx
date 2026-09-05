@@ -24,6 +24,7 @@ import { PatientEncounterTimeline } from "./patient-encounter-timeline";
 import { PatientTrendPanel } from "./patient-trend-panel";
 import { PatientVisitChanges } from "./patient-visit-changes";
 import { PatientWorkspaceHeader } from "./patient-workspace-header";
+import { PatientWorkspaceOrders } from "./patient-workspace-orders";
 import styles from "./records.module.css";
 
 const PAGE_SIZE = 50;
@@ -470,6 +471,11 @@ export default function RecordsClient() {
                     loading={visitChangesLoading}
                     encounterCount={trendWorkspace.encounters.length}
                     locale={fa ? "fa" : "en"}
+                  />
+                  <PatientWorkspaceOrders
+                    orders={trendWorkspace.orders ?? []}
+                    locale={fa ? "fa" : "en"}
+                    onOpenEncounter={openTrendSourceEncounter}
                   />
                   <PatientTrendPanel
                     trends={trendWorkspace.trends}
