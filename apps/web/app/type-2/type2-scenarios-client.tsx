@@ -14,7 +14,10 @@ import type {
   Type2RoutePreference,
 } from "@glymize/contracts";
 import type { PatientHandoffRecord } from "@glymize/contracts";
-import type { Type2StructuredConsiderationRequestV2 } from "@glymize/clinical-engine/type2-intake-v2";
+import type {
+  Type2ParallelSafetyProjectionV2,
+  Type2StructuredConsiderationRequestV2,
+} from "@glymize/clinical-engine/type2-intake-v2";
 import {
   buildType2TreatmentScenarios,
   type Type2CostingPlan,
@@ -29,6 +32,7 @@ import {
 import MedicationMarketDetails from "../components/medication-market-details";
 import PatientHandoffLookup from "../components/patient-handoff-lookup";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
+import Type2ParallelSafetyPanel from "./type2-parallel-safety-panel";
 import Type2StructuredContextFields from "./type2-structured-context-fields";
 import {
   emptyType2StructuredIntakeDraft,
@@ -61,6 +65,10 @@ type ContextDraft = {
   fibrosisStage: "" | "F0" | "F1" | "F2" | "F3" | "F4" | "unknown";
   cirrhosis: boolean;
   decompensatedCirrhosis: boolean;
+};
+
+type Type2AssessmentWithParallelSafety = Type2AssessmentResult & {
+  parallelSafety?: Type2ParallelSafetyProjectionV2;
 };
 
 const FACTORS: Array<{ key: Type2DecisionFactor; fa: string; en: string; hintFa: string; hintEn: string }> = [
@@ -230,7 +238,7 @@ export default function Type2ScenariosClient() {
   const [scenarioSortMode, setScenarioSortMode] = useState<Type2ScenarioSortMode>("balanced");
   const [hyperglycemiaSymptoms, setHyperglycemiaSymptoms] = useState(false);
   const [catabolicFeatures, setCatabolicFeatures] = useState(false);
-  const [assessment, setAssessment] = useState<Type2AssessmentResult | null>(null);
+  const [assessment, setAssessment] = useState<Type2AssessmentWithParallelSafety | null>(null);
   const [submittedRequest, setSubmittedRequest] = useState<Type2ConsiderationRequest | null>(null);
   const [costPlans, setCostPlans] = useState<Record<string, Type2CostingPlan>>({});
   const [status, setStatus] = useState("");
@@ -454,7 +462,7 @@ export default function Type2ScenariosClient() {
         body: JSON.stringify(request),
       });
       if (!response.ok) throw new Error("assessment_failed");
-      setAssessment(await response.json() as Type2AssessmentResult);
+      setAssessment(await response.json() as Type2AssessmentWithParallelSafety);
       setSubmittedRequest(request);
       setStatus(fa ? "سناریوها بر اساس وضعیت بیمار، گایدلاین و داده‌های فعلی بازار ساخته شدند." : "Scenarios were generated from patient context, guidelines, and current market data.");
     } catch {
@@ -602,6 +610,8 @@ export default function Type2ScenariosClient() {
         </div>
 
         {assessment.recommendation.urgentReview && <div className={styles.urgentCallout}><b>{fa ? "نیاز به بازبینی فوری مسیر درمان" : "Urgent treatment-path review"}</b><span>{fa ? "علائم/کاتابولیسم یا هایپرگلیسمی شدید، رتبه‌بندی معمول را تغییر داده است." : "Symptoms, catabolism, or severe hyperglycemia changed the usual ranking."}</span></div>}
+
+        <Type2ParallelSafetyPanel projection={assessment.parallelSafety} locale={locale} />
 
         <div className={styles.scenarioStack}>{scenarioList.map((scenario) => <article className={styles.scenarioCard} key={scenario.id}>
           <div className={styles.scenarioHead}>
