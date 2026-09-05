@@ -23,8 +23,26 @@ import type {
 
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
 
-export type IntervalAwareType2ConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "currentMedications"> & {
+type ContractClinicalContextV2 = NonNullable<Type2ConsiderationRequest["clinicalContext"]>;
+export type PainfulDpnAwareClinicalContextV2 = Omit<ContractClinicalContextV2, "liver"> & {
+  liver?: ContractClinicalContextV2["liver"] & {
+    chronicLiverDisease?: boolean;
+  };
+  neuropathy?: {
+    diabeticPeripheralNeuropathyConfirmed?: boolean;
+    painfulSymptoms?: boolean;
+    atypicalFeaturesPresent?: boolean;
+  };
+  medicationSafety?: {
+    maoiUseOrRecentExposure?: boolean;
+    substantialAlcoholUse?: boolean;
+    knownPregabalinHypersensitivity?: boolean;
+  };
+};
+
+export type IntervalAwareType2ConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "currentMedications" | "clinicalContext"> & {
   currentMedications?: IntervalAwareCurrentMedicationInputV2[];
+  clinicalContext?: PainfulDpnAwareClinicalContextV2;
 };
 
 export interface Type2DecisionGraphMedicationProjection extends Type2MedicationConsideration {
@@ -165,6 +183,7 @@ function graphRequest(
         heartFailure: context?.cardiovascular?.heartFailure || request.factors.includes("heart_failure"),
       },
       liver: context?.liver ? {
+        chronicLiverDisease: context.liver.chronicLiverDisease,
         masldMash: context.liver.masldMash || request.factors.includes("masld_mash"),
         fibrosisStage: context.liver.fibrosisStage,
         cirrhosis: context.liver.cirrhosis,
@@ -174,6 +193,8 @@ function graphRequest(
         plateletCount10e9L: context.liver.plateletCount10e9L,
         liverStiffnessKpa: context.liver.liverStiffnessKpa,
       } : request.factors.includes("masld_mash") ? { masldMash: true } : undefined,
+      neuropathy: context?.neuropathy,
+      medicationSafety: context?.medicationSafety,
       hypoglycemiaRisk: request.factors.includes("hypoglycemia_risk") ? "high" : "standard",
       currentMedications: currentMedicationsV2(request, medications, masterRegistry),
     },
@@ -240,6 +261,7 @@ function contractTherapyGroup(value: string, fallback?: MedicationTherapyGroup):
   if (value === "heart_failure_therapy") return "heart_failure_therapy";
   if (value === "antihypertensive") return "antihypertensive";
   if (value === "liver_directed_therapy") return "liver_directed_therapy";
+  if (value === "gabapentinoid" || value === "snri") return "other";
   return "oral_glucose_lowering";
 }
 
