@@ -1,3 +1,4 @@
+import { configureType2DecisionGraphRuntimeCatalog } from "@glymize/clinical-engine";
 import type {
   AdminNotification,
   DrugDataUpdateRun,
@@ -13,6 +14,10 @@ import type {
 import { getAdminSession, isAdminApiConfigured, publishAdminCatalog } from "../admin-auth";
 import { withBasePath } from "../base-path";
 import { loadClinicianMarketV2 } from "../clinician-market-v2";
+import {
+  cachedType2DecisionGraphMarketProducts,
+  loadType2DecisionGraphMarketProducts,
+} from "../type2-decision-graph-market";
 
 const storageKey = "glymize-browser-catalog-v2";
 
@@ -101,6 +106,15 @@ function notifyPublish(status: "pending" | "publishing" | "success" | "error", m
   window.dispatchEvent(new CustomEvent("glymize-publish-status", { detail: { status, message } }));
 }
 
+function configureDecisionGraph(state: BrowserCatalogState) {
+  const marketProducts = cachedType2DecisionGraphMarketProducts();
+  if (!state.masterRegistry.length || !marketProducts.length) return;
+  configureType2DecisionGraphRuntimeCatalog({
+    masterRegistry: state.masterRegistry,
+    marketProducts,
+  });
+}
+
 export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => void) {
   let stateCache = emptyState();
   let stateLoaded = false;
@@ -132,6 +146,7 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
             run.status === "ready_to_publish" ? { ...run, status: "published" as const } : run,
           );
           stateCache = { ...current, updateRuns };
+          configureDecisionGraph(stateCache);
           window.localStorage.setItem(
             storageKey,
             JSON.stringify({
@@ -157,7 +172,10 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
     if (statePromise) return statePromise;
     statePromise = (async () => {
       try {
-        await loadClinicianMarketV2();
+        await Promise.all([
+          loadClinicianMarketV2(),
+          loadType2DecisionGraphMarketProducts(),
+        ]);
       } catch (error) {
         console.warn(
           "GLYMIZE clinician market v2 unavailable; retaining existing catalog only.",
@@ -196,6 +214,7 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
       } catch {
         stateCache = localDraft?.state ?? emptyState();
       }
+      configureDecisionGraph(stateCache);
       invalidateDerivedCaches();
       stateLoaded = true;
     })();
@@ -204,6 +223,7 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
 
   function save(state: BrowserCatalogState, publish = true) {
     stateCache = state;
+    configureDecisionGraph(stateCache);
     invalidateDerivedCaches();
     window.localStorage.setItem(
       storageKey,
