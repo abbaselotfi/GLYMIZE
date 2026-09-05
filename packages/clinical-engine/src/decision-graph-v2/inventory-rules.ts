@@ -9,6 +9,10 @@ import {
   buildReviewedCardiometabolicDoseRulesV2,
   buildReviewedCardiometabolicGateRulesV2,
 } from "./cardiometabolic-protocols.js";
+import {
+  applyReviewedMashKnowledgeV2,
+  buildReviewedMashDoseRulesV2,
+} from "./mash-protocols.js";
 
 function mergeById<T extends { id: string }>(base: readonly T[], incoming: readonly T[]) {
   const map = new Map<string, T>();
@@ -23,25 +27,30 @@ function mergeById<T extends { id: string }>(base: readonly T[], incoming: reado
  */
 export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInventoryV2) {
   const normalized = normalizeDecisionGraphClinicalKnowledgeV2(inventory);
-  const autoFrc = buildAutoFrcProtocolBindingsV2(normalized.inventory);
-  const frcProtocolBindings = mergeById(normalized.inventory.frcProtocolBindings ?? [], autoFrc.bindings);
-  const withBindings: DecisionGraphInventoryV2 = { ...normalized.inventory, frcProtocolBindings };
+  const mashKnowledge = applyReviewedMashKnowledgeV2(normalized.inventory);
+  const autoFrc = buildAutoFrcProtocolBindingsV2(mashKnowledge);
+  const frcProtocolBindings = mergeById(mashKnowledge.frcProtocolBindings ?? [], autoFrc.bindings);
+  const withBindings: DecisionGraphInventoryV2 = { ...mashKnowledge, frcProtocolBindings };
 
   const rules = buildCoreAda2026DecisionRulesV2(withBindings.knowledge);
   const insulinDoseRules = buildAda2026InsulinDoseRulesV2(withBindings.knowledge);
   const productDoseRules = buildReviewedProductDoseRulesV2(withBindings);
   const cardiometabolicDoseRules = buildReviewedCardiometabolicDoseRulesV2(withBindings);
   const cardiometabolicGateRules = buildReviewedCardiometabolicGateRulesV2(withBindings.knowledge);
+  const mashDoseRules = buildReviewedMashDoseRulesV2(withBindings);
   const titrationProtocols = mergeById(withBindings.titrationProtocols ?? [], buildReviewedTitrationProtocolsV2(withBindings));
   const frcDoseRules = buildReviewedFrcDoseRulesV2(withBindings);
   const insulinConversionRules = mergeById(withBindings.insulinConversionRules ?? [], buildReviewedInsulinConversionRulesV2(withBindings.knowledge));
   const doseRules = mergeById(
     mergeById(
       mergeById(
-        mergeById(withBindings.doseRules, insulinDoseRules),
-        productDoseRules,
+        mergeById(
+          mergeById(withBindings.doseRules, insulinDoseRules),
+          productDoseRules,
+        ),
+        cardiometabolicDoseRules,
       ),
-      cardiometabolicDoseRules,
+      mashDoseRules,
     ),
     frcDoseRules,
   );
@@ -64,6 +73,7 @@ export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInve
       addedInsulinDoseRules: insulinDoseRules.length,
       addedProductDoseRules: productDoseRules.length,
       addedCardiometabolicDoseRules: cardiometabolicDoseRules.length,
+      addedMashDoseRules: mashDoseRules.length,
       addedFrcDoseRules: frcDoseRules.length,
       autoFrcBindings: autoFrc.bindings.length,
       frcBindingIssues: autoFrc.issues,
