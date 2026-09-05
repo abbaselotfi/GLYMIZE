@@ -145,6 +145,37 @@ function nextStep(step: WegovyStepMgV2): WegovyStepMgV2 | undefined {
   return WEGOVY_STEPS_MG[index + 1];
 }
 
+function selectedPlanMatchesClinicalContinuation(input: {
+  current: IntervalAwareCurrentMedicationV2;
+  currentStep: WegovyStepMgV2;
+  selectedStep: WegovyStepMgV2;
+  daysOnCurrentDose: number;
+  therapyPhase: "initiation" | "escalation" | "maintenance";
+}) {
+  const { current, currentStep, selectedStep, daysOnCurrentDose, therapyPhase } = input;
+  if (current.adherence !== "good") return false;
+  if (current.tolerance !== "good" && current.tolerance !== "limited") return false;
+
+  if (selectedStep !== currentStep) {
+    return therapyPhase === "escalation" &&
+      daysOnCurrentDose >= 28 &&
+      current.tolerance === "good" &&
+      nextStep(currentStep) === selectedStep;
+  }
+
+  // With good tolerability after a complete escalation stage, Task 4 must have
+  // selected the exact next dose. A stale same-step plan is not valid financial
+  // input and must not let the cost layer become a second titration authority.
+  if (
+    therapyPhase === "escalation" &&
+    daysOnCurrentDose >= 28 &&
+    current.tolerance === "good" &&
+    nextStep(currentStep) !== undefined
+  ) return false;
+
+  return true;
+}
+
 function addAdministration(input: {
   used: Map<string, { product: IranMarketProductV2; units: number; value: number }>;
   phaseMap: Map<string, WegovyContinuationCostPhaseV2>;
@@ -251,6 +282,13 @@ export function buildWegovyMashContinuationWindowCostV2(input: {
   const currentStep = exactStepFromComponents(interval.perAdministrationDose);
   const selectedStep = exactStepFromComponents(selectedPlan.perAdministrationComponents);
   if (currentStep === undefined || selectedStep === undefined) return undefined;
+  if (!selectedPlanMatchesClinicalContinuation({
+    current,
+    currentStep,
+    selectedStep,
+    daysOnCurrentDose: interval.daysOnCurrentDose,
+    therapyPhase: interval.therapyPhase,
+  })) return undefined;
 
   const selectedProduct = uniqueProductForStep({
     request,
