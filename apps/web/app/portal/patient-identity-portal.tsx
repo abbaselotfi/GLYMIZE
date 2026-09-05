@@ -5,6 +5,7 @@ import type {
   PatientIdentityCapabilities,
   PatientPracticeContext,
   PatientVerifiedLegacyLinkSummary,
+  ReferralRedemption,
 } from "@glymize/contracts";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -25,6 +26,7 @@ import {
 import { adoptPortalSession } from "../../lib/portal-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import PatientCareHub from "./patient-care-hub";
+import PatientCareRelationships from "./patient-care-relationships";
 import PatientReferralRedemption from "./patient-referral-redemption";
 import styles from "./patient-identity-portal.module.css";
 
@@ -33,6 +35,7 @@ type Props = {
   legacyPortalEnabled: boolean;
   multiPracticePatientEnabled: boolean;
   referralServiceEnabled: boolean;
+  careRelationshipsEnabled: boolean;
   onUseLegacy: () => void;
 };
 
@@ -41,6 +44,7 @@ export default function PatientIdentityPortal({
   legacyPortalEnabled,
   multiPracticePatientEnabled,
   referralServiceEnabled,
+  careRelationshipsEnabled,
   onUseLegacy,
 }: Props) {
   const { locale } = useGlymizeLocale();
@@ -53,6 +57,8 @@ export default function PatientIdentityPortal({
   const [links, setLinks] = useState<PatientVerifiedLegacyLinkSummary[]>([]);
   const [practiceContexts, setPracticeContexts] = useState<PatientPracticeContext[]>([]);
   const [selectedPracticeContextId, setSelectedPracticeContextId] = useState<string | null>(null);
+  const [pendingCareRelationshipReferral, setPendingCareRelationshipReferral] = useState<ReferralRedemption | null>(null);
+  const [referralFlowVersion, setReferralFlowVersion] = useState(0);
   const [careContextError, setCareContextError] = useState("");
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -149,6 +155,8 @@ export default function PatientIdentityPortal({
       setLinks([]);
       setPracticeContexts([]);
       setSelectedPracticeContextId(null);
+      setPendingCareRelationshipReferral(null);
+      setReferralFlowVersion((value) => value + 1);
       setCareContextError("");
     } finally {
       setBusy(false);
@@ -217,7 +225,19 @@ export default function PatientIdentityPortal({
           onSelectPracticeContext={(context) => void choosePracticeContext(context)}
           onOpenPractice={(link) => void openPracticePortal(link)}
         />
-        <PatientReferralRedemption enabled={referralServiceEnabled} />
+        <PatientReferralRedemption
+          key={referralFlowVersion}
+          enabled={referralServiceEnabled}
+          onRedeemed={(redemption) => setPendingCareRelationshipReferral(redemption)}
+        />
+        <PatientCareRelationships
+          enabled={careRelationshipsEnabled}
+          pendingReferral={pendingCareRelationshipReferral}
+          onReferralConverted={() => {
+            setPendingCareRelationshipReferral(null);
+            setReferralFlowVersion((value) => value + 1);
+          }}
+        />
       </>
     );
   }

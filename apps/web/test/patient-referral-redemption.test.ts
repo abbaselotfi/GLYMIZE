@@ -29,13 +29,11 @@ describe("patient referral inspection and redemption", () => {
 
     const accountBranch = identity.indexOf("if (account) {");
     const identityEntry = identity.indexOf('data-patient-surface="identity-entry"');
-    const referralSurface = identity.indexOf(
-      "<PatientReferralRedemption enabled={referralServiceEnabled} />",
-    );
+    const referralSurface = identity.indexOf("<PatientReferralRedemption");
     expect(accountBranch).toBeGreaterThanOrEqual(0);
     expect(referralSurface).toBeGreaterThan(accountBranch);
     expect(identityEntry).toBeGreaterThan(referralSurface);
-    expect(identity.match(/<PatientReferralRedemption enabled=\{referralServiceEnabled\} \/>/g)).toHaveLength(1);
+    expect(identity.match(/<PatientReferralRedemption\b/g)).toHaveLength(1);
   });
 
   it("keeps inspection read-only and requires a separate explicit redemption action", () => {

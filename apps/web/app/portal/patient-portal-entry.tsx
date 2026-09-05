@@ -19,6 +19,7 @@ export default function PatientPortalEntry() {
   const [multiPracticePatientEnabled, setMultiPracticePatientEnabled] = useState(false);
   const [providerDirectoryEnabled, setProviderDirectoryEnabled] = useState(false);
   const [referralServiceEnabled, setReferralServiceEnabled] = useState(false);
+  const [careRelationshipsEnabled, setCareRelationshipsEnabled] = useState(false);
   const [legacySelected, setLegacySelected] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -35,6 +36,7 @@ export default function PatientPortalEntry() {
         setMultiPracticePatientEnabled(runtimeResult.value.multiPracticePatient);
         setProviderDirectoryEnabled(runtimeResult.value.providerDirectory);
         setReferralServiceEnabled(runtimeResult.value.referralService);
+        setCareRelationshipsEnabled(runtimeResult.value.careRelationships);
       }
       setReady(true);
     });
@@ -66,6 +68,7 @@ export default function PatientPortalEntry() {
           legacyPortalEnabled={legacyEnabled}
           multiPracticePatientEnabled={multiPracticePatientEnabled}
           referralServiceEnabled={referralServiceEnabled}
+          careRelationshipsEnabled={careRelationshipsEnabled}
           onUseLegacy={() => setLegacySelected(true)}
         />
         <PatientProviderDiscovery enabled={providerDirectoryEnabled} />
