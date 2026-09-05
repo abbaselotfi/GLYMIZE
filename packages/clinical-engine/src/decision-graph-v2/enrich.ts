@@ -1,4 +1,8 @@
 import { calculateProductMonthlyCostV2, chooseGenericCostBenchmarkV2 } from "./cost.js";
+import {
+  attachPhaseAwareTitrationCostV2,
+  buildWegovyMashInitiationTitrationCostV2,
+} from "./wegovy-titration-cost.js";
 import type {
   DecisionGraphRequestV2,
   GenericCostBenchmarkV2,
@@ -185,6 +189,34 @@ export function enrichCandidateWithDoseMarketCostV2(
     component.genericCostBenchmark = selected.benchmark;
     component.selectedProductCost = selected.selectedCost;
     component.selectedProduct = selected.selectedProduct;
+
+    const needsWegovyPhaseCost = selected.plan.ruleId.startsWith("LABEL-WEGOVY-MASH-INIT-0_25:");
+    if (needsWegovyPhaseCost) {
+      const phasePlan = buildWegovyMashInitiationTitrationCostV2({ request, component, windowDays: 30 });
+      // A single-strength 30-day cost is not a valid substitute when escalation
+      // crosses into 0.5 mg on day 29. Remove it even if the composite plan fails.
+      component.selectedProductCost = undefined;
+      component.genericCostBenchmark = undefined;
+      insuranceFits.push("unknown");
+      if (!phasePlan) {
+        hasKnownCost = false;
+        result.cautions.push("هزینه شروع WEGOVY چندمرحله‌ای قابل حل نیست؛ موتور از نمایش هزینه ۳۰روزه تک-strength خودداری کرد.");
+        dailyBurden += selected.plan.administrationsPerDay;
+        continue;
+      }
+      attachPhaseAwareTitrationCostV2(component, phasePlan);
+      dailyBurden += phasePlan.totalAdministrations / phasePlan.windowDays;
+      if (request.preferences.costPreference === "insured_only") {
+        hasKnownCost = false;
+        result.cautions.push("پوشش بیمه برای شروع چند-strength WEGOVY تا زمان مدل‌سازی claim timing هر فاز ناشناخته است؛ هزینه insured-only نمایش داده نمی‌شود.");
+      } else {
+        totalPatientCost += phasePlan.normalizedTreatmentValueToman;
+      }
+      result.reasons.push(
+        `هزینه شروع WEGOVY به‌صورت phase-aware محاسبه شد: ${phasePlan.totalAdministrations} تزریق در ${phasePlan.windowDays} روز، ارزش مصرفی ${phasePlan.normalizedTreatmentValueToman.toLocaleString("en-US")} تومان و خرید نقدی صفر-inventory ${phasePlan.cashPurchaseCostToman.toLocaleString("en-US")} تومان.`,
+      );
+      continue;
+    }
 
     if (selected.selectedCost) {
       const providerCosts = selected.selectedCost.insurance.filter((item) => (request.preferences.insuranceProviders ?? []).includes(item.provider));
