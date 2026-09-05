@@ -2617,8 +2617,6 @@ async function createEncounter(
         403,
       );
     }
-    // This request is necessarily both authoring and approving the new
-    // encounter. Require a later approval request from another approver.
     return context.respond({ error: "self_approval_forbidden" }, 409);
   }
 
@@ -2968,10 +2966,6 @@ function allowedRevisionStatuses(
   currentStatus: EncounterStateRow["status"],
 ) {
   if (role === "assistant") {
-    // WS-1 authorization fix (handoff section 15): an assistant may only act
-    // on encounters that have NOT yet reached physician review. Once an
-    // encounter is reviewed/locked, there are no assistant-reachable target
-    // statuses; the reviseEncounter gate rejects earlier with 403.
     return currentStatus === "draft" ||
       currentStatus === "ready_for_physician"
       ? ["draft", "ready_for_physician"]
@@ -3040,11 +3034,6 @@ async function reviseEncounter(
     encounter.status !== "draft" &&
     encounter.status !== "ready_for_physician"
   ) {
-    // WS-1 authorization fix (handoff section 15 edge case): once a
-    // care_team encounter has been reviewed/locked by physician policy, an
-    // assistant must not silently revise clinical content or return it to
-    // draft. A deliberate physician-driven amendment workflow with its own
-    // authorization and audit is required instead. Fail closed.
     await context.audit(
       "patient.encounter_assistant_revision_denied",
       "patient_encounter",
@@ -3387,6 +3376,11 @@ async function workspace(
     latest_signed_plan_id: string | null;
   }>();
 
+  const { readPatientTrendSeries } = await import(
+    "./patient-record-v2/trends"
+  );
+  const trends = await readPatientTrendSeries(context, patientId);
+
   return context.respond({
     patient,
     encounters: encounters.results.map((row) => ({
@@ -3407,7 +3401,7 @@ async function workspace(
         : {}),
     })),
     patientNotes: [],
-    trends: [],
+    trends,
     mode: context.user.layoutPreset,
   });
 }

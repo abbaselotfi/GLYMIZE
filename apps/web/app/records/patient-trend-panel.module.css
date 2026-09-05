@@ -1,0 +1,205 @@
+.panel {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, rgba(120, 130, 145, 0.24));
+}
+
+.header {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.header span {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.62;
+}
+
+.header h3 {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+}
+
+.header small {
+  line-height: 1.55;
+  opacity: 0.72;
+}
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.card {
+  padding: 0.8rem;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.24));
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, currentColor 2%, transparent);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cardTop > div:first-child {
+  min-width: 0;
+}
+
+.cardTop strong,
+.cardTop small {
+  display: block;
+}
+
+.cardTop strong {
+  font-size: 0.94rem;
+  overflow-wrap: anywhere;
+}
+
+.cardTop small {
+  margin-top: 0.2rem;
+  opacity: 0.64;
+}
+
+.latest {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.latest b {
+  font-size: 1.22rem;
+}
+
+.latest span {
+  font-size: 0.72rem;
+  opacity: 0.65;
+}
+
+.chart {
+  width: 100%;
+  height: 7rem;
+  margin: 0.75rem 0 0.35rem;
+  overflow: visible;
+}
+
+.line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.68;
+}
+
+.point {
+  fill: currentColor;
+  stroke: var(--surface, Canvas);
+  stroke-width: 2;
+}
+
+.notChartable {
+  margin: 0.75rem 0 0.45rem;
+  padding: 0.72rem;
+  border-radius: 0.7rem;
+  border: 1px dashed var(--border, rgba(120, 130, 145, 0.28));
+  font-size: 0.78rem;
+  line-height: 1.55;
+  opacity: 0.72;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+}
+
+.meta span {
+  opacity: 0.7;
+}
+
+.meta .unverified {
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.meta button,
+.measurement button {
+  margin-inline-start: auto;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.3));
+  border-radius: 0.55rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.meta button {
+  padding: 0.35rem 0.58rem;
+}
+
+.details {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border, rgba(120, 130, 145, 0.2));
+}
+
+.measurement {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0;
+}
+
+.measurement + .measurement {
+  border-top: 1px solid var(--border, rgba(120, 130, 145, 0.16));
+}
+
+.measurement > div {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.measurement strong {
+  font-size: 0.82rem;
+}
+
+.measurement span,
+.measurement small {
+  font-size: 0.7rem;
+  opacity: 0.68;
+}
+
+.measurement button {
+  flex: 0 0 auto;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.7rem;
+}
+
+.measurement button:disabled,
+.meta button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+@media (max-width: 720px) {
+  .measurement {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .measurement button {
+    margin-inline-start: 0;
+  }
+}
