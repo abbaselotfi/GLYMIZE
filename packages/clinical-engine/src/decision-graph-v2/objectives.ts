@@ -1,4 +1,5 @@
 import { resolveCardiovascularRiskObjectivesV2 } from "./cardiovascular-objectives.js";
+import { ada2026PainfulDpnEvidenceV2 } from "./painful-dpn-protocol.js";
 import type {
   ClinicalObjectiveV2,
   ClinicalStateV2,
@@ -109,6 +110,21 @@ export function resolveClinicalObjectivesV2(
       level: "strong_preference",
       reason: "MASLD/MASH فعال است؛ stage و شواهد کبدی باید در انتخاب لحاظ شوند.",
       evidence: [],
+    });
+  }
+
+  const neuropathy = request.patient.neuropathy;
+  if (
+    neuropathy?.diabeticPeripheralNeuropathyConfirmed === true &&
+    neuropathy.painfulSymptoms === true &&
+    neuropathy.atypicalFeaturesPresent === false
+  ) {
+    add({
+      id: "painful_dpn_symptom_control",
+      lane: "neuropathy",
+      level: "mandatory",
+      reason: "نوروپاتی محیطی دیابتی دردناک توسط پزشک تأیید شده و ویژگی آتیپیک گزارش نشده است؛ کنترل درد باید به‌عنوان هدف مستقل در کنار درمان دیابت لحاظ شود.",
+      evidence: [ada2026PainfulDpnEvidenceV2],
     });
   }
 
