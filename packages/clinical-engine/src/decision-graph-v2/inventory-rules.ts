@@ -5,6 +5,10 @@ import { buildAda2026InsulinDoseRulesV2 } from "./insulin-rules.js";
 import { buildReviewedInsulinConversionRulesV2 } from "./insulin-execution.js";
 import { buildAutoFrcProtocolBindingsV2, buildReviewedFrcDoseRulesV2 } from "./frc-protocols.js";
 import { buildCoreAda2026DecisionRulesV2 } from "./safety-rules.js";
+import {
+  buildReviewedCardiometabolicDoseRulesV2,
+  buildReviewedCardiometabolicGateRulesV2,
+} from "./cardiometabolic-protocols.js";
 
 function mergeById<T extends { id: string }>(base: readonly T[], incoming: readonly T[]) {
   const map = new Map<string, T>();
@@ -26,22 +30,31 @@ export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInve
   const rules = buildCoreAda2026DecisionRulesV2(withBindings.knowledge);
   const insulinDoseRules = buildAda2026InsulinDoseRulesV2(withBindings.knowledge);
   const productDoseRules = buildReviewedProductDoseRulesV2(withBindings);
+  const cardiometabolicDoseRules = buildReviewedCardiometabolicDoseRulesV2(withBindings);
+  const cardiometabolicGateRules = buildReviewedCardiometabolicGateRulesV2(withBindings.knowledge);
   const titrationProtocols = mergeById(withBindings.titrationProtocols ?? [], buildReviewedTitrationProtocolsV2(withBindings));
   const frcDoseRules = buildReviewedFrcDoseRulesV2(withBindings);
   const insulinConversionRules = mergeById(withBindings.insulinConversionRules ?? [], buildReviewedInsulinConversionRulesV2(withBindings.knowledge));
   const doseRules = mergeById(
     mergeById(
-      mergeById(withBindings.doseRules, insulinDoseRules),
-      productDoseRules,
+      mergeById(
+        mergeById(withBindings.doseRules, insulinDoseRules),
+        productDoseRules,
+      ),
+      cardiometabolicDoseRules,
     ),
     frcDoseRules,
+  );
+  const medicationGateRules = mergeById(
+    mergeById(withBindings.medicationGateRules ?? [], rules.medicationGateRules),
+    cardiometabolicGateRules,
   );
 
   return {
     inventory: {
       ...withBindings,
       doseRules,
-      medicationGateRules: mergeById(withBindings.medicationGateRules ?? [], rules.medicationGateRules),
+      medicationGateRules,
       regimenConflictRules: mergeById(withBindings.regimenConflictRules ?? [], rules.regimenConflictRules),
       insulinConversionRules,
       titrationProtocols,
@@ -50,12 +63,14 @@ export function applyCoreClinicalRulesToInventoryV2(inventory: DecisionGraphInve
       knowledgeNormalization: normalized.report,
       addedInsulinDoseRules: insulinDoseRules.length,
       addedProductDoseRules: productDoseRules.length,
+      addedCardiometabolicDoseRules: cardiometabolicDoseRules.length,
       addedFrcDoseRules: frcDoseRules.length,
       autoFrcBindings: autoFrc.bindings.length,
       frcBindingIssues: autoFrc.issues,
       insulinConversionRules: insulinConversionRules.length,
       titrationProtocols: titrationProtocols.length,
-      addedMedicationGateRules: rules.medicationGateRules.length,
+      addedMedicationGateRules: rules.medicationGateRules.length + cardiometabolicGateRules.length,
+      addedCardiometabolicGateRules: cardiometabolicGateRules.length,
       addedRegimenConflictRules: rules.regimenConflictRules.length,
     },
   };
