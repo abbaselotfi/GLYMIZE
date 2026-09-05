@@ -1,28 +1,42 @@
+import { resolveDiabeticFootPathwayV2, type DiabeticFootContextV2 } from "./diabetic-foot-escalation.js";
 import { runDecisionGraphV2 } from "./engine.js";
 import {
   resolveRetinopathySpecialistEscalationV2,
-  type DecisionGraphRequestWithRetinopathyV2,
-  type DecisionGraphResultWithSpecialistEscalationsV2,
+  type RetinopathyContextV2,
+  type SpecialistEscalationV2,
 } from "./retinopathy-escalation.js";
-import type { DecisionGraphPolicyV2 } from "./types.js";
+import type { DecisionGraphPolicyV2, DecisionGraphRequestV2, DecisionGraphResultV2 } from "./types.js";
+
+export type DecisionGraphRequestWithSpecialistContextsV2 = Omit<DecisionGraphRequestV2, "patient"> & {
+  patient: DecisionGraphRequestV2["patient"] & {
+    retinopathy?: RetinopathyContextV2;
+    diabeticFoot?: DiabeticFootContextV2;
+  };
+};
+
+export type DecisionGraphResultWithSpecialistPathwaysV2 = DecisionGraphResultV2 & {
+  specialistEscalations: SpecialistEscalationV2[];
+  diabeticFootPathway: ReturnType<typeof resolveDiabeticFootPathwayV2>;
+};
 
 /**
  * Additive execution wrapper for specialist/escalation pathways that must never
  * become medication-ranking authority in the general Decision Graph.
  *
- * The core treatment result is preserved byte-for-byte in structure; specialist
- * escalations are appended as a separate channel. This keeps ophthalmology
- * referral semantics orthogonal to medication candidates and scoring/ranking.
+ * The core treatment result is preserved; specialist pathways are appended as
+ * separate channels. Ophthalmology and diabetic-foot triage therefore cannot
+ * manufacture medication candidates, doses, or a second ranking authority.
  */
 export function runDecisionGraphV2WithSpecialistEscalations(
-  request: DecisionGraphRequestWithRetinopathyV2,
+  request: DecisionGraphRequestWithSpecialistContextsV2,
   policy?: DecisionGraphPolicyV2,
-): DecisionGraphResultWithSpecialistEscalationsV2 {
+): DecisionGraphResultWithSpecialistPathwaysV2 {
   const core = policy ? runDecisionGraphV2(request, policy) : runDecisionGraphV2(request);
   const retinopathy = resolveRetinopathySpecialistEscalationV2(request);
+  const diabeticFootPathway = resolveDiabeticFootPathwayV2(request);
 
   const missingData = [...core.missingData];
-  for (const item of retinopathy.missingData) {
+  for (const item of [...retinopathy.missingData, ...diabeticFootPathway.missingData]) {
     if (!missingData.some((existing) => existing.key === item.key)) missingData.push(item);
   }
 
@@ -30,6 +44,7 @@ export function runDecisionGraphV2WithSpecialistEscalations(
     ...core,
     missingData,
     specialistEscalations: retinopathy.escalations,
+    diabeticFootPathway,
     trace: [
       ...core.trace,
       {
@@ -40,6 +55,21 @@ export function runDecisionGraphV2WithSpecialistEscalations(
           : "No ADA 2026 prompt-retinopathy referral trigger was represented.",
         details: retinopathy.escalations.flatMap((item) => [item.reason, ...item.triggers]),
         evidence: retinopathy.escalations.flatMap((item) => item.evidence),
+      },
+      {
+        nodeId: "diabetic-foot-safety-escalation",
+        status: diabeticFootPathway.missingData.length
+          ? "needs_data"
+          : diabeticFootPathway.escalations.length
+            ? "branched"
+            : "passed",
+        summary: `Diabetic-foot pathway=${diabeticFootPathway.state}; antibioticExecution=false; escalations=${diabeticFootPathway.escalations.length}.`,
+        details: [
+          `antibioticBoundary=${diabeticFootPathway.antibioticBoundary}`,
+          ...diabeticFootPathway.actions,
+          ...diabeticFootPathway.escalations.map((item) => item.reason),
+        ],
+        evidence: diabeticFootPathway.evidence,
       },
     ],
   };
