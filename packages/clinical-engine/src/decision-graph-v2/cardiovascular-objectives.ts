@@ -15,7 +15,7 @@ export const ada2026CardiovascularRiskEvidenceV2: EvidenceReferenceV2 = {
   title: "ADA Standards of Care in Diabetes—2026, Section 10: Cardiovascular Disease and Risk Management",
   version: "2026",
   url: "https://diabetesjournals.org/care/article/49/Supplement_1/S216/163933/10-Cardiovascular-Disease-and-Risk-Management",
-  locator: "Recommendations 10.6, 10.8, 10.10, and 10.18-10.28",
+  locator: "Recommendations 10.1, 10.6, 10.8, 10.10, and 10.18-10.28",
   strength: "guideline_grade_a",
 };
 
@@ -29,7 +29,7 @@ export const ada2026CardiovascularObjectiveTriggersV2 = {
   statinYoungAdultConsiderationAgeAtOrAbove: 20,
 } as const;
 
-function bloodPressureInTreatmentRange(request: DecisionGraphRequestV2) {
+export function bloodPressureInAda2026TreatmentRangeV2(request: DecisionGraphRequestV2) {
   const cardiovascular = request.patient.cardiovascular;
   const systolic = cardiovascular?.systolicBloodPressure;
   const diastolic = cardiovascular?.diastolicBloodPressure;
@@ -41,7 +41,7 @@ function bloodPressureInTreatmentRange(request: DecisionGraphRequestV2) {
   );
 }
 
-function hasTask6RaasIndication(request: DecisionGraphRequestV2) {
+export function hasTask6RaasIndicationV2(request: DecisionGraphRequestV2) {
   const kidney = request.patient.kidney;
   const cardiovascular = request.patient.cardiovascular;
   return (
@@ -53,21 +53,48 @@ function hasTask6RaasIndication(request: DecisionGraphRequestV2) {
   );
 }
 
+export function hasEstablishedHypertensionTreatmentContextV2(
+  request: DecisionGraphRequestV2,
+) {
+  return (request.patient.currentMedications ?? []).some((medication) =>
+    (medication.status ?? "active") === "active" &&
+    [
+      "raas_blocker",
+      "antihypertensive",
+      "mineralocorticoid_receptor_antagonist",
+    ].includes(medication.therapyGroup ?? ""),
+  );
+}
+
 function hasRepresentedAdditionalAscvdRiskFactor(request: DecisionGraphRequestV2) {
   return (
     request.patient.kidney?.ckd === true ||
     (request.patient.anthropometrics?.bmi ?? 0) >= 30 ||
-    bloodPressureInTreatmentRange(request)
+    (
+      bloodPressureInAda2026TreatmentRangeV2(request) &&
+      hasEstablishedHypertensionTreatmentContextV2(request)
+    )
   );
 }
 
 function bloodPressureObjective(request: DecisionGraphRequestV2): ClinicalObjectiveV2 | undefined {
-  // Phase 4 Task 6 deliberately contains ACEi/ARB but not the full general
-  // hypertension formulary (e.g. thiazide-like diuretics / DHP CCBs). Therefore
-  // Task 7 only activates an executable BP support lane when BP is in the ADA
-  // pharmacologic range AND a represented ACEi/ARB indication is present.
+  // ADA 2026 requires confirmation of hypertension rather than diagnosis from a
+  // single reading. The current Decision Graph contract has BP values but no
+  // explicit confirmation flag. Task 7 therefore fails closed for initiation:
+  // an executable BP lane is activated only in an established antihypertensive
+  // treatment context, while adaptive-data asks for confirmation otherwise.
+  //
+  // Task 6 deliberately contains ACEi/ARB but not the full general hypertension
+  // formulary (e.g. thiazide-like diuretics / DHP CCBs), so an explicit RAAS
+  // indication is also required before this limited catalogue can compose support.
   if (request.patient.pregnancy) return undefined;
-  if (!bloodPressureInTreatmentRange(request) || !hasTask6RaasIndication(request)) return undefined;
+  if (
+    !bloodPressureInAda2026TreatmentRangeV2(request) ||
+    !hasTask6RaasIndicationV2(request) ||
+    !hasEstablishedHypertensionTreatmentContextV2(request)
+  ) {
+    return undefined;
+  }
 
   const reasons: string[] = [];
   if ((request.patient.kidney?.uacrMgG ?? 0) >= ada2026CardiovascularObjectiveTriggersV2.raasAlbuminuriaUacrAtOrAboveMgG) {
@@ -85,7 +112,7 @@ function bloodPressureObjective(request: DecisionGraphRequestV2): ClinicalObject
     id: "blood_pressure_control",
     lane: "hypertension",
     level: "mandatory",
-    reason: `فشارخون ثبت‌شده در محدوده درمان دارویی ADA است و indication مشخص ACEi/ARB وجود دارد (${reasons.join("، ")}).`,
+    reason: `فشارخون در context درمانیِ فعال هنوز در محدوده نیازمند کنترل است و indication مشخص ACEi/ARB وجود دارد (${reasons.join("، ")}).`,
     evidence: [ada2026CardiovascularRiskEvidenceV2],
   };
 }
