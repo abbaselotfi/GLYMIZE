@@ -10,8 +10,8 @@
       "default": "./dist/index-runtime.js"
     },
     "./scenario-engine": {
-      "types": "./dist/scenario-engine-safe.d.ts",
-      "default": "./dist/scenario-engine-safe.js"
+      "types": "./dist/scenario-engine-worlddrug-safe.d.ts",
+      "default": "./dist/scenario-engine-worlddrug-safe.js"
     },
     "./insulin-conversion": {
       "types": "./dist/insulin-conversion.d.ts",
