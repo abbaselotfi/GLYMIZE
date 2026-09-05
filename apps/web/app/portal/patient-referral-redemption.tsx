@@ -13,6 +13,7 @@ import styles from "./patient-identity-portal.module.css";
 
 type Props = {
   enabled: boolean;
+  onRedeemed?: (redemption: ReferralRedemption) => void;
 };
 
 /**
@@ -20,7 +21,7 @@ type Props = {
  * Inspection is read-only. Redemption requires a second explicit confirmation
  * and starts the existing care-relationship workflow; it never grants record access.
  */
-export default function PatientReferralRedemption({ enabled }: Props) {
+export default function PatientReferralRedemption({ enabled, onRedeemed }: Props) {
   const { locale } = useGlymizeLocale();
   const fa = locale === "fa";
   const [patientRedemptionEnabled, setPatientRedemptionEnabled] = useState(false);
@@ -88,6 +89,7 @@ export default function PatientReferralRedemption({ enabled }: Props) {
     try {
       const next = await redeemReferralCode(inspectedCode);
       setRedemption(next);
+      onRedeemed?.(next);
       setInspection(null);
       setCode("");
       setInspectedCode("");
