@@ -6,6 +6,7 @@ import type {
   CurrentMedicationInput,
   GenericMedication,
   InsuranceProvider,
+  MedicationClinicalDomain,
   PatientClinicalContext,
   Type2AssessmentResult,
   Type2ConsiderationRequest,
@@ -62,7 +63,17 @@ const FACTORS: Array<{ key: Type2DecisionFactor; fa: string; en: string; hintFa:
   { key: "hypoglycemia_risk", fa: "ریسک هیپوگلیسمی", en: "Hypoglycemia risk", hintFa: "داروهای هیپوگلیسمی‌زا پایین‌تر می‌روند", hintEn: "Down-rank hypoglycemia-prone therapies" },
   { key: "masld_mash", fa: "MASLD / MASH", en: "MASLD / MASH", hintFa: "مرحله فیبروز و سیروز لحاظ شود", hintEn: "Include fibrosis and cirrhosis" },
   { key: "diabetic_foot", fa: "زخم پای دیابتی", en: "Diabetes-related foot ulcer", hintFa: "مسیر IWGDF هم‌زمان فعال شود", hintEn: "Run IWGDF pathway in parallel" },
+  { key: "pregnancy", fa: "بارداری", en: "Pregnancy", hintFa: "مسیرهای ایمنی بارداری در Decision Graph فعال شوند", hintEn: "Activate pregnancy safety handling in Decision Graph" },
   { key: "insulin_pathway", fa: "مسیر انسولین / FRC", en: "Insulin / FRC pathway", hintFa: "در صورت نیاز مسیر تزریقی بررسی شود", hintEn: "Consider injectable pathway when needed" },
+];
+
+const WORLD_DRUG_DOMAINS: Array<{ key: MedicationClinicalDomain; fa: string; en: string; hintFa: string; hintEn: string }> = [
+  { key: "cardiovascular", fa: "سایر بیماری‌های قلبی‌عروقی", en: "Other cardiovascular disease", hintFa: "برای مرور داروهای قلبی WorldDrug خارج از ASCVD/HF", hintEn: "Review WorldDrug cardiovascular medicines beyond ASCVD/HF" },
+  { key: "hypertension", fa: "فشارخون", en: "Hypertension", hintFa: "داروهای مرتبط با فشارخون برای مرور بالینی نمایش داده شوند", hintEn: "Surface hypertension medicines for clinical review" },
+  { key: "lipids", fa: "اختلال چربی خون", en: "Lipid disorder", hintFa: "استاتین و سایر داروهای چربی مرتبط با بیمار مرور شوند", hintEn: "Review relevant statin and lipid-lowering medicines" },
+  { key: "neuropathy", fa: "نوروپاتی", en: "Neuropathy", hintFa: "داروهای مرتبط با نوروپاتی دیابتی/محیطی نمایش داده شوند", hintEn: "Surface medicines relevant to diabetic/peripheral neuropathy" },
+  { key: "retinopathy", fa: "رتینوپاتی", en: "Retinopathy", hintFa: "درمان‌های مرتبط با رتینوپاتی/ادم ماکولا برای مرور نمایش داده شوند", hintEn: "Surface retinopathy/macular edema therapies for review" },
+  { key: "nutrition_support", fa: "حمایت تغذیه‌ای", en: "Nutrition support", hintFa: "فرآورده‌ها و درمان‌های WorldDrug مرتبط با حمایت تغذیه‌ای", hintEn: "Review WorldDrug entries related to nutrition support" },
 ];
 
 const INSURERS: Array<{ value: InsuranceProvider; fa: string; en: string }> = [
@@ -114,7 +125,6 @@ function tomanRange(min?: number, max?: number, locale: "fa" | "en" = "fa") {
   if (min === max) return toman(min, locale);
   return `${toman(min, locale)} – ${toman(max, locale)}`;
 }
-
 
 function costingUnitLabels(profile: ClinicianMedicationCostingProfile | undefined, fa: boolean) {
   const basis = profile?.basis ?? "unknown";
@@ -200,6 +210,7 @@ export default function Type2ScenariosClient() {
   const [targetHba1c, setTargetHba1c] = useState("7");
   const [medications, setMedications] = useState<MedicationRow[]>([]);
   const [factors, setFactors] = useState<Type2DecisionFactor[]>([]);
+  const [worldDrugDomains, setWorldDrugDomains] = useState<MedicationClinicalDomain[]>([]);
   const [context, setContext] = useState<ContextDraft>({
     eGfr: "", uacr: "", dialysis: false, recentAki: false, lvef: "", weight: "", height: "",
     fibrosisStage: "", cirrhosis: false, decompensatedCirrhosis: false,
@@ -277,9 +288,16 @@ export default function Type2ScenariosClient() {
       maxScenarios: 3,
     });
   }, [assessment, submittedRequest, insuranceProvider, effectiveCostPlans, scenarioSortMode]);
+  const clinicalScenarioCount = scenarioList.filter((scenario) => scenario.kind !== "worlddrug_review").length;
+  const hasWorldDrugReview = scenarioList.some((scenario) => scenario.kind === "worlddrug_review");
 
   function setFactor(key: Type2DecisionFactor) {
     setFactors((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+    setAssessment(null);
+  }
+
+  function setWorldDrugDomain(key: MedicationClinicalDomain) {
+    setWorldDrugDomains((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
     setAssessment(null);
   }
 
@@ -315,6 +333,7 @@ export default function Type2ScenariosClient() {
 
   function clinicalContextPayload(): PatientClinicalContext {
     return {
+      pregnancy: factors.includes("pregnancy"),
       cardiovascular: {
         ascvd: factors.includes("ascvd"),
         heartFailure: factors.includes("heart_failure"),
@@ -397,7 +416,7 @@ export default function Type2ScenariosClient() {
       setAssessment(null);
       return;
     }
-    const request: Type2ConsiderationRequest = {
+    const request: Type2ConsiderationRequest & { activeClinicalDomains?: MedicationClinicalDomain[] } = {
       currentHba1c: current,
       targetHba1c: target,
       currentMedications: currentMedicationPayload(),
@@ -407,6 +426,7 @@ export default function Type2ScenariosClient() {
       hyperglycemiaSymptoms,
       catabolicFeatures,
       factors,
+      activeClinicalDomains: worldDrugDomains,
     };
     setStatus(fa ? "در حال ساخت سناریوهای درمانی…" : "Building treatment scenarios…");
     setCostPlans({});
@@ -481,6 +501,16 @@ export default function Type2ScenariosClient() {
               </button>;
             })}</div>
 
+            <div className={styles.subhead}>
+              <div><b>{fa ? "سایر حوزه‌های بالینی برای مرور WorldDrug" : "Additional clinical domains for WorldDrug review"}</b><small>{fa ? "انتخاب این موارد فقط داروهای مرتبط و موجود در بازار را برای مرور نمایش می‌دهد؛ به‌تنهایی توصیه اجرایی یا رتبه بالینی ایجاد نمی‌کند." : "These selections only surface relevant current-market medicines for review; they do not create an executable recommendation or clinical rank by themselves."}</small></div>
+            </div>
+            <div className={styles.factorGrid}>{WORLD_DRUG_DOMAINS.map((domain) => {
+              const selected = worldDrugDomains.includes(domain.key);
+              return <button type="button" className={`${styles.factor} ${selected ? styles.factorSelected : ""}`} key={domain.key} onClick={() => setWorldDrugDomain(domain.key)}>
+                <i>{selected ? "✓" : ""}</i><span><b>{fa ? domain.fa : domain.en}</b><small>{fa ? domain.hintFa : domain.hintEn}</small></span>
+              </button>;
+            })}</div>
+
             {(factors.includes("ckd") || factors.includes("heart_failure") || factors.includes("weight_priority") || factors.includes("masld_mash")) && <div className={styles.contextBox}>
               {factors.includes("ckd") && <div className={styles.twoCols}>
                 <Field label="eGFR" value={context.eGfr} onChange={(value) => setContext((c) => ({ ...c, eGfr: value }))} unit="mL/min/1.73m²" placeholder="45" />
@@ -528,16 +558,16 @@ export default function Type2ScenariosClient() {
           <h2>{fa ? "کمتر، دقیق‌تر، قابل دفاع‌تر" : "Fewer, sharper, defensible"}</h2>
           <ol>
             <li><b>{fa ? "ایمنی و اندیکاسیون" : "Safety and indication"}</b><small>{fa ? "اولویت مطلق نسبت به هزینه" : "Always ahead of cost"}</small></li>
-            <li><b>{fa ? "فنوتیپ بیمار" : "Patient phenotype"}</b><small>ASCVD · HF · CKD · Weight · MASH</small></li>
+            <li><b>{fa ? "فنوتیپ بیمار" : "Patient phenotype"}</b><small>ASCVD · HF · CKD · Weight · MASH · WorldDrug domains</small></li>
             <li><b>{fa ? "بازار و بیمه ایران" : "Iran market and insurance"}</b><small>{fa ? "بعد از عبور از فیلتر بالینی" : "After clinical gating"}</small></li>
           </ol>
-          <div className={styles.guardrail}>{fa ? "GLYMIZE دوز تجویزی جدید را از خودش نمی‌سازد. هزینه ۳۰روزه فقط با داده دوز/بسته معتبر محاسبه می‌شود." : "GLYMIZE never invents a new prescription dose. A 30-day cost is calculated only when valid dose/pack inputs exist."}</div>
+          <div className={styles.guardrail}>{fa ? "GLYMIZE دوز تجویزی جدید را از خودش نمی‌سازد. گزینه‌های WorldDrug بدون پروتکل approved فقط برای مرور نمایش داده می‌شوند و وارد رتبه بالینی نمی‌شوند." : "GLYMIZE never invents a new prescription dose. WorldDrug options without an approved protocol are review-only and never enter clinical ranking."}</div>
         </aside>
       </div>
 
       {assessment && <section className={styles.results}>
         <div className={styles.resultHeader}>
-          <div><span>{fa ? "خروجی تصمیم" : "DECISION OUTPUT"}</span><h2>{fa ? `${scenarioList.length} سناریوی مناسب برای این بیمار` : `${scenarioList.length} suitable scenarios for this patient`}</h2><p>{fa ? "ترتیب سناریوها با تغییر اطلاعات بیمار، موجودی، قیمت و بیمه قابل تغییر است." : "Scenario order can change with patient context, availability, price, and insurance."}</p></div>
+          <div><span>{fa ? "خروجی تصمیم" : "DECISION OUTPUT"}</span><h2>{fa ? `${clinicalScenarioCount} سناریوی درمانی${hasWorldDrugReview ? " + مرور WorldDrug" : ""}` : `${clinicalScenarioCount} treatment scenarios${hasWorldDrugReview ? " + WorldDrug review" : ""}`}</h2><p>{fa ? "ترتیب سناریوهای درمانی با تغییر اطلاعات بیمار، موجودی، قیمت و بیمه قابل تغییر است؛ کارت WorldDrug خارج از رتبه‌بندی درمانی است." : "Treatment-scenario order can change with patient context, availability, price, and insurance; the WorldDrug card is outside treatment ranking."}</p></div>
           <div className={assessment.recommendation.urgentReview ? styles.urgentBadge : styles.gapBadge}><small>{fa ? "فاصله HbA1c" : "A1C gap"}</small><b>{assessment.recommendation.hba1cGap.toFixed(1)}%</b></div>
         </div>
 
@@ -545,9 +575,9 @@ export default function Type2ScenariosClient() {
 
         <div className={styles.scenarioStack}>{scenarioList.map((scenario) => <article className={styles.scenarioCard} key={scenario.id}>
           <div className={styles.scenarioHead}>
-            <div className={styles.rank}>{scenario.rank}</div>
+            <div className={styles.rank}>{scenario.kind === "worlddrug_review" ? "WD" : scenario.rank}</div>
             <div><span>{fa ? scenario.titleFa : scenario.titleEn}</span><h3>{fa ? scenario.summaryFa : scenario.summaryEn}</h3></div>
-            <span className={styles.kind}>{scenario.kind === "clinical_best" ? (fa ? "بالاترین تناسب بالینی" : "Best clinical fit") : scenario.kind === "access_balanced" ? (fa ? "تعادل علم/دسترسی" : "Clinical/access balance") : scenario.kind === "maintain_monitor" ? (fa ? "عدم تشدید غیرضروری" : "Avoid unnecessary intensification") : (fa ? "جایگزین" : "Alternative")}</span>
+            <span className={styles.kind}>{scenario.kind === "worlddrug_review" ? (fa ? "مرور WorldDrug" : "WorldDrug review") : scenario.kind === "clinical_best" ? (fa ? "بالاترین تناسب بالینی" : "Best clinical fit") : scenario.kind === "access_balanced" ? (fa ? "تعادل علم/دسترسی" : "Clinical/access balance") : scenario.kind === "maintain_monitor" ? (fa ? "عدم تشدید غیرضروری" : "Avoid unnecessary intensification") : (fa ? "جایگزین" : "Alternative")}</span>
           </div>
 
           {scenario.medications.length > 0 && <div className={styles.scenarioMeds}>{scenario.medications.map((medication, medIndex) => {
@@ -560,7 +590,7 @@ export default function Type2ScenariosClient() {
             const plan = effectiveCostPlans[medication.genericMedicationId] ?? {};
             const profileHint = costingProfileHint(profile, fa);
             return <section className={styles.scenarioMed} key={medication.cardId ?? medication.genericMedicationId}>
-              <div className={styles.medTop}><div><b>{medication.displayName ?? medication.persianName}</b>{medication.selectedBrandName && <small>{fa ? "ژنریک" : "Generic"}: {medication.persianName}</small>}<small>{medication.therapeuticClass}</small></div><span>{medication.priorityScore}/100</span></div>
+              <div className={styles.medTop}><div><b>{medication.displayName ?? medication.persianName}</b>{medication.selectedBrandName && <small>{fa ? "ژنریک" : "Generic"}: {medication.persianName}</small>}<small>{medication.therapeuticClass}</small></div><span>{medication.outputStatus === "requires_approved_protocol" ? (fa ? "نیازمند پروتکل" : "Protocol required") : `${medication.priorityScore}/100`}</span></div>
               <div className={styles.insuranceRow}>{medication.insuranceCoverages.length ? medication.insuranceCoverages.map((entry) => <span key={entry.provider}>✓ {INSURERS.find((item) => item.value === entry.provider)?.[fa ? "fa" : "en"] ?? entry.provider}: {formatCoveragePercent(entry.percent, locale)}%</span>) : <span>{fa ? "پوشش بیمه ثبت نشده" : "No recorded coverage"}</span>}</div>
               <div className={styles.financialCluster}>
               <MedicationMarketDetails brandRegistryCode={medication.brandRegistryCode} coverages={medication.insuranceCoverages} genericRegistryCode={medication.genericRegistryCode} locale={locale} marketBadge={medication.marketBadge} price={medication.price} priceRange={medication.priceRange} selectedBrands={medication.selectedBrands} />
