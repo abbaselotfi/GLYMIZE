@@ -18,6 +18,7 @@ import {
   openPatientTrendSourceEncounter,
 } from "../../lib/patient-trend-workspace-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
+import { PatientEncounterTimeline } from "./patient-encounter-timeline";
 import { PatientTrendPanel } from "./patient-trend-panel";
 import styles from "./records.module.css";
 
@@ -416,11 +417,18 @@ export default function RecordsClient() {
               </div>
 
               {trendWorkspace && (
-                <PatientTrendPanel
-                  trends={trendWorkspace.trends}
-                  locale={fa ? "fa" : "en"}
-                  onOpenEncounter={openTrendSourceEncounter}
-                />
+                <>
+                  <PatientTrendPanel
+                    trends={trendWorkspace.trends}
+                    locale={fa ? "fa" : "en"}
+                    onOpenEncounter={openTrendSourceEncounter}
+                  />
+                  <PatientEncounterTimeline
+                    encounters={trendWorkspace.encounters}
+                    locale={fa ? "fa" : "en"}
+                    onOpenEncounter={openTrendSourceEncounter}
+                  />
+                </>
               )}
 
               {selected.labs.length > 0 && (
