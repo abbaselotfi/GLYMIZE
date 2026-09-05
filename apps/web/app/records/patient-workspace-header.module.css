@@ -1,0 +1,127 @@
+.header {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.titleRow > div:first-child {
+  min-width: 0;
+}
+
+.titleRow span {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  opacity: 0.62;
+}
+
+.titleRow h2 {
+  margin: 0.18rem 0 0.2rem;
+  font-size: 1.28rem;
+  overflow-wrap: anywhere;
+}
+
+.titleRow small {
+  font-size: 0.72rem;
+  opacity: 0.68;
+}
+
+.visitCount {
+  flex: 0 0 auto;
+  min-width: 4.2rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.24));
+  border-radius: 0.78rem;
+  text-align: center;
+}
+
+.visitCount b,
+.visitCount span {
+  display: block;
+}
+
+.visitCount b {
+  font-size: 1.15rem;
+}
+
+.visitCount span {
+  margin-top: 0.08rem;
+  font-size: 0.66rem;
+  opacity: 0.64;
+}
+
+.identifiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.55rem;
+}
+
+.identifier {
+  padding: 0.58rem 0.65rem;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.22));
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, currentColor 2%, transparent);
+}
+
+.identifier span,
+.identifier strong,
+.identifier small {
+  display: block;
+}
+
+.identifier span {
+  font-size: 0.64rem;
+  opacity: 0.62;
+}
+
+.identifier strong {
+  margin-top: 0.16rem;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.identifier small {
+  margin-top: 0.16rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.2rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border, rgba(120, 130, 145, 0.18));
+}
+
+.meta > div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.meta span {
+  font-size: 0.64rem;
+  opacity: 0.62;
+}
+
+.meta strong {
+  font-size: 0.76rem;
+}
+
+@media (max-width: 720px) {
+  .titleRow {
+    align-items: stretch;
+  }
+
+  .visitCount {
+    min-width: 3.8rem;
+  }
+}
