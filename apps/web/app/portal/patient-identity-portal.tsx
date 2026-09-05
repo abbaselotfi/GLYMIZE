@@ -25,12 +25,14 @@ import {
 import { adoptPortalSession } from "../../lib/portal-client";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import PatientCareHub from "./patient-care-hub";
+import PatientReferralRedemption from "./patient-referral-redemption";
 import styles from "./patient-identity-portal.module.css";
 
 type Props = {
   capabilities: PatientIdentityCapabilities;
   legacyPortalEnabled: boolean;
   multiPracticePatientEnabled: boolean;
+  referralServiceEnabled: boolean;
   onUseLegacy: () => void;
 };
 
@@ -38,6 +40,7 @@ export default function PatientIdentityPortal({
   capabilities,
   legacyPortalEnabled,
   multiPracticePatientEnabled,
+  referralServiceEnabled,
   onUseLegacy,
 }: Props) {
   const { locale } = useGlymizeLocale();
@@ -201,18 +204,21 @@ export default function PatientIdentityPortal({
 
   if (account) {
     return (
-      <PatientCareHub
-        account={account}
-        links={links}
-        practiceContexts={practiceContexts}
-        selectedPracticeContextId={selectedPracticeContextId}
-        careContextError={careContextError}
-        legacyPortalEnabled={legacyPortalEnabled}
-        busy={busy}
-        onLogout={() => void logout()}
-        onSelectPracticeContext={(context) => void choosePracticeContext(context)}
-        onOpenPractice={(link) => void openPracticePortal(link)}
-      />
+      <>
+        <PatientCareHub
+          account={account}
+          links={links}
+          practiceContexts={practiceContexts}
+          selectedPracticeContextId={selectedPracticeContextId}
+          careContextError={careContextError}
+          legacyPortalEnabled={legacyPortalEnabled}
+          busy={busy}
+          onLogout={() => void logout()}
+          onSelectPracticeContext={(context) => void choosePracticeContext(context)}
+          onOpenPractice={(link) => void openPracticePortal(link)}
+        />
+        <PatientReferralRedemption enabled={referralServiceEnabled} />
+      </>
     );
   }
 
