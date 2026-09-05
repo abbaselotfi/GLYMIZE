@@ -145,6 +145,14 @@ describe("Phase 4 Task 7 cardiovascular objectives", () => {
           systolicBloodPressure: 138,
           diastolicBloodPressure: 84,
         },
+        currentMedications: [
+          {
+            masterDrugId: "WD-LOSARTAN",
+            genericName: "Losartan",
+            therapyGroup: "raas_blocker",
+            status: "active",
+          },
+        ],
       },
     });
 
@@ -182,13 +190,13 @@ describe("Phase 4 Task 7 cardiovascular objectives", () => {
     expect(result.status).toBe("complete");
   });
 
-  it("does not make Task 6 RAAS therapy a general hypertension default without an ACEi/ARB indication", () => {
+  it("does not initiate RAAS support from a single BP context when hypertension is not established", () => {
     const result = runDecisionGraphV2({
       ...baseRequest(),
       patient: {
         ageYears: 30,
         glycemia: { currentHba1c: 7, targetHba1c: 7 },
-        kidney: { ckd: false, eGfr: 90, uacrMgG: 10 },
+        kidney: { ckd: false, eGfr: 90, uacrMgG: 45 },
         cardiovascular: {
           systolicBloodPressure: 142,
           diastolicBloodPressure: 92,
@@ -199,6 +207,11 @@ describe("Phase 4 Task 7 cardiovascular objectives", () => {
     expect(
       result.objectives.some((objective) => objective.id === "blood_pressure_control"),
     ).toBe(false);
+    expect(
+      result.missingData.find(
+        (item) => item.key === "cardiovascular.hypertensionConfirmation",
+      ),
+    ).toMatchObject({ priority: "recommended", blocksFinalDecision: false });
     expect(result.treatmentPlan).toBeUndefined();
   });
 
@@ -244,6 +257,14 @@ describe("Phase 4 Task 7 cardiovascular objectives", () => {
           diastolicBloodPressure: 90,
           ascvd: false,
         },
+        currentMedications: [
+          {
+            masterDrugId: "WD-LOSARTAN",
+            genericName: "Losartan",
+            therapyGroup: "raas_blocker",
+            status: "active",
+          },
+        ],
       },
     });
     expect(
