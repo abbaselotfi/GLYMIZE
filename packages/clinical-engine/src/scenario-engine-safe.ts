@@ -1,4 +1,5 @@
-import type { Type2ConsiderationRequest } from "@glymize/contracts";
+import type { Type2ConsiderationRequest, Type2MedicationConsideration } from "@glymize/contracts";
+import { TYPE2_DECISION_GRAPH_V2_AUTHORITY } from "./type2-decision-graph-compat.js";
 import {
   buildType2TreatmentScenarios as buildBaseScenarios,
   currentMedicationDailyUnits,
@@ -24,6 +25,13 @@ export type {
 export type Type2ScenarioKind = BaseScenarioKind | "access_constrained";
 export type Type2TreatmentScenario = Omit<BaseTreatmentScenario, "kind"> & { kind: Type2ScenarioKind };
 type Type2CostingInput = Parameters<typeof estimateBase30DayCost>[0];
+
+type DecisionGraphMedication = Type2MedicationConsideration & {
+  decisionGraphAuthority?: true;
+  decisionGraphRank?: number;
+  decisionGraphComponentOrder?: number;
+  decisionGraphRegimenId?: string;
+};
 
 function boundedCost(estimate: Type2MonthlyCostEstimate): Type2MonthlyCostEstimate {
   const retail = estimate.retailPerPackageToman;
@@ -100,7 +108,108 @@ function boundScenarioCosts(scenario: BaseTreatmentScenario | Type2TreatmentScen
   return { ...scenario, cost30Days: scenario.cost30Days.map(boundedCost) };
 }
 
+function isDecisionGraphAssessment(input: Type2ScenarioBuildInput) {
+  return input.assessment.medications.some((medication) => {
+    const item = medication as DecisionGraphMedication;
+    return item.decisionGraphAuthority === true || medication.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY);
+  }) || input.assessment.recommendation.sourceReference.includes(TYPE2_DECISION_GRAPH_V2_AUTHORITY);
+}
+
+function graphMedicationCost(
+  medication: Type2MedicationConsideration,
+  input: Type2ScenarioBuildInput,
+) {
+  return estimateType2Medication30DayCost({
+    price: medication.price,
+    priceRange: medication.priceRange,
+    coverages: medication.insuranceCoverages,
+    insuranceProvider: input.insuranceProvider,
+    plan: input.costingPlansByMedicationId?.[medication.genericMedicationId],
+  });
+}
+
+function graphScenario(
+  rank: 1 | 2 | 3,
+  medications: Type2MedicationConsideration[],
+  input: Type2ScenarioBuildInput,
+): Type2TreatmentScenario {
+  const first = medications[0] as DecisionGraphMedication | undefined;
+  const rationale = [...new Set(medications.flatMap((medication) => medication.rankingReasons))];
+  const cautions = [...new Set(medications.flatMap((medication) => medication.risks))];
+  const titleFa = rank === 1 ? "پیشنهاد اصلی" : rank === 2 ? "گزینه جایگزین ۱" : "گزینه جایگزین ۲";
+  const titleEn = rank === 1 ? "Primary recommendation" : rank === 2 ? "Alternative 1" : "Alternative 2";
+  return {
+    id: first?.decisionGraphRegimenId ?? `decision-graph-rank-${rank}`,
+    rank,
+    kind: rank === 1 ? "clinical_best" : "alternative",
+    titleFa,
+    titleEn,
+    summaryFa: input.assessment.recommendation.title,
+    summaryEn: rank === 1
+      ? "Decision Graph v2 primary regimen."
+      : "Decision Graph v2 alternative regimen.",
+    medicationIds: medications.map((medication) => medication.genericMedicationId),
+    medications,
+    rationaleFa: rationale,
+    rationaleEn: [`${TYPE2_DECISION_GRAPH_V2_AUTHORITY}: rank ${rank}; no scenario-layer clinical rescoring.`],
+    tradeoffsFa: cautions,
+    tradeoffsEn: cautions,
+    parallelCareFa: [],
+    parallelCareEn: [],
+    cost30Days: medications.map((medication) => graphMedicationCost(medication, input)),
+    urgentReview: input.assessment.recommendation.urgentReview,
+  };
+}
+
+function buildDecisionGraphScenarios(input: Type2ScenarioBuildInput): Type2TreatmentScenario[] {
+  const graphMedications = input.assessment.medications as DecisionGraphMedication[];
+  const grouped = new Map<number, DecisionGraphMedication[]>();
+  for (const medication of graphMedications) {
+    const rank = medication.decisionGraphRank;
+    if (rank !== 1 && rank !== 2 && rank !== 3) continue;
+    grouped.set(rank, [...(grouped.get(rank) ?? []), medication]);
+  }
+
+  const max = input.maxScenarios ?? 3;
+  const scenarios = ([1, 2, 3] as const)
+    .flatMap((rank) => {
+      const medications = (grouped.get(rank) ?? [])
+        .sort((left, right) => (left.decisionGraphComponentOrder ?? 0) - (right.decisionGraphComponentOrder ?? 0));
+      return medications.length ? [graphScenario(rank, medications, input)] : [];
+    })
+    .slice(0, max);
+
+  if (scenarios.length) return scenarios;
+
+  const maintain: Type2TreatmentScenario = {
+    id: "decision-graph-maintain-monitor",
+    rank: 1,
+    kind: "maintain_monitor",
+    titleFa: input.assessment.recommendation.title,
+    titleEn: "Decision Graph clinical review",
+    summaryFa: input.assessment.recommendation.rationale.join(" "),
+    summaryEn: `${TYPE2_DECISION_GRAPH_V2_AUTHORITY}: no eligible new regimen was emitted.`,
+    medicationIds: [],
+    medications: [],
+    rationaleFa: input.assessment.recommendation.rationale,
+    rationaleEn: [`${TYPE2_DECISION_GRAPH_V2_AUTHORITY}: no scenario-layer clinical scoring was executed.`],
+    tradeoffsFa: [],
+    tradeoffsEn: [],
+    parallelCareFa: [],
+    parallelCareEn: [],
+    cost30Days: [],
+    urgentReview: input.assessment.recommendation.urgentReview,
+  };
+  return stillNeedsClinicalAction(input)
+    ? [accessConstrainedScenario(input, maintain)]
+    : [maintain];
+}
+
 export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Type2TreatmentScenario[] {
+  if (isDecisionGraphAssessment(input)) {
+    return buildDecisionGraphScenarios(input).map(boundScenarioCosts);
+  }
+
   const scenarios = buildBaseScenarios(input);
   if (scenarios.length === 1 && scenarios[0]?.kind === "maintain_monitor" && stillNeedsClinicalAction(input)) {
     return [boundScenarioCosts(accessConstrainedScenario(input, scenarios[0]))];
