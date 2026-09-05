@@ -1,4 +1,10 @@
+import {
+  currentMedicationAdministrationIntervalV2,
+  currentMedicationIntervalIssueV2,
+  type IntervalAwareCurrentMedicationV2,
+} from "./current-medication-interval.js";
 import type {
+  CurrentMedicationV2,
   DecisionGraphInventoryV2,
   DoseRuleV2,
   EvidenceReferenceV2,
@@ -39,6 +45,7 @@ type WegovyPatientContextV2 = PatientContextV2 & {
 };
 
 const WEGOVY_STEPS_MG = [0.25, 0.5, 1, 1.7, 2.4] as const;
+type WegovyStepMgV2 = (typeof WEGOVY_STEPS_MG)[number];
 
 function normalized(value: string | undefined) {
   return (value ?? "")
@@ -68,8 +75,8 @@ function semaglutideStrengthMg(product: IranMarketProductV2) {
   const components = product.strengthComponents.filter((item) => normalized(item.unit) === "mg");
   if (components.length !== 1) return undefined;
   const amount = components[0]?.amount;
-  return typeof amount === "number" && Number.isFinite(amount) && WEGOVY_STEPS_MG.includes(amount as typeof WEGOVY_STEPS_MG[number])
-    ? amount
+  return typeof amount === "number" && Number.isFinite(amount) && WEGOVY_STEPS_MG.includes(amount as WegovyStepMgV2)
+    ? amount as WegovyStepMgV2
     : undefined;
 }
 
@@ -106,10 +113,15 @@ export function applyReviewedWegovyMashKnowledgeV2(inventory: DecisionGraphInven
   return { ...inventory, knowledge };
 }
 
+function doseRuleIdForStep(step: WegovyStepMgV2, productId: string) {
+  const phase = step === 0.25 ? "INIT" : step === 2.4 ? "MAINT" : step === 1.7 ? "MAINT-ALT" : "ESCALATION";
+  return `LABEL-WEGOVY-MASH-${phase}-${String(step).replace(".", "_")}:${productId}`;
+}
+
 function weeklyRule(medication: KnowledgeMedicationV2, product: IranMarketProductV2, amountMg: number, useCase: DoseRuleV2["useCase"]): DoseRuleV2 {
-  const phase = amountMg === 0.25 ? "INIT" : amountMg === 2.4 ? "MAINT" : amountMg === 1.7 ? "MAINT-ALT" : "ESCALATION";
+  const step = amountMg as WegovyStepMgV2;
   return {
-    id: `LABEL-WEGOVY-MASH-${phase}-${String(amountMg).replace(".", "_")}:${product.productId}`,
+    id: doseRuleIdForStep(step, product.productId),
     masterDrugId: medication.masterDrugId,
     productId: product.productId,
     indication: "Adults with noncirrhotic MASH and F2-F3 fibrosis — WEGOVY injection only",
@@ -134,7 +146,7 @@ function weeklyRule(medication: KnowledgeMedicationV2, product: IranMarketProduc
       ],
     },
     titration: amountMg === 0.25 ? {
-      stepText: "Increase every 4 weeks: 0.25 mg -> 0.5 mg -> 1 mg -> 1.7 mg -> 2.4 mg once weekly; escalation is used to reduce gastrointestinal adverse reactions.",
+      stepText: "Increase every 4 weeks: 0.25 mg -> 0.5 mg -> 1 mg -> 1.7 mg -> 2.4 mg once weekly; if a dose is not tolerated during escalation, consider delaying escalation for 4 weeks.",
       intervalDays: 28,
       targetMetric: "tolerability and MASH maintenance dose",
     } : undefined,
@@ -166,7 +178,9 @@ export function buildReviewedWegovyMashDoseRulesV2(inventory: Pick<DecisionGraph
     if (!isCurrentVerifiedWegovyProduct(product, medication.masterDrugId)) return [];
     const amount = semaglutideStrengthMg(product);
     if (amount === undefined) return [];
-    const useCase: DoseRuleV2["useCase"] = amount === 0.25 ? "initiation" : "continuation";
+    // 0.25 mg is initiation but can also be held for another four weeks when
+    // escalation is delayed for tolerability, so it must remain continuation-capable.
+    const useCase: DoseRuleV2["useCase"] = amount === 0.25 ? "either" : "continuation";
     return [weeklyRule(medication, product, amount, useCase)];
   });
 }
@@ -187,7 +201,7 @@ export function buildReviewedWegovyMashTitrationProtocolsV2(inventory: Pick<Deci
     ].map(([current, next]) => ({
       currentDose: [{ ingredientKey: medication.masterDrugId, amount: current!, unit: "mg" }],
       nextDose: [{ ingredientKey: medication.masterDrugId, amount: next!, unit: "mg" }],
-      reason: "WEGOVY injection MASH label: advance after 4 weeks on the current escalation dose when tolerated.",
+      reason: "WEGOVY injection MASH label: advance after 4 weeks on the current escalation dose when tolerated; delay escalation for 4 weeks when the current dose is not tolerated.",
     })),
     evidence: [wegovy2026LabelEvidenceV2, aasldSemaglutideMash2025EvidenceV2],
     reviewState: "approved",
@@ -211,9 +225,128 @@ function isGlp1Group(value: string | undefined) {
   return ["glp_1_receptor_agonist", "dual_gip_glp_1_receptor_agonist", "fixed_ratio_combination"].includes(value ?? "");
 }
 
-/** Initiation gate for product-bound WEGOVY MASH execution. Existing GLP-1 or
- * semaglutide treatment is never silently converted to WEGOVY; it requires a
- * separate medication-reconciliation/continuation decision. */
+function currentWegovyMedication(item: CurrentMedicationV2, medication: KnowledgeMedicationV2) {
+  const extended = item as IntervalAwareCurrentMedicationV2;
+  return normalized(item.genericName).includes("semaglutide") &&
+    normalized(extended.brandName) === "wegovy" &&
+    (!item.masterDrugId || item.masterDrugId === medication.masterDrugId);
+}
+
+function uniqueProductForStep(
+  products: readonly IranMarketProductV2[],
+  step: WegovyStepMgV2,
+  referencePresentationId?: string,
+) {
+  const candidates = products.filter((product) => semaglutideStrengthMg(product) === step);
+  if (referencePresentationId) {
+    const referenced = candidates.filter((product) => product.productId === referencePresentationId);
+    return referenced.length === 1 ? referenced[0] : undefined;
+  }
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+function continuationOutcome(input: {
+  current: CurrentMedicationV2;
+  medication: KnowledgeMedicationV2;
+  products: readonly IranMarketProductV2[];
+  evidence: EvidenceReferenceV2[];
+}): ReviewedWegovyMashOutcomeV2 {
+  const { current, medication, products, evidence } = input;
+  const issue = currentMedicationIntervalIssueV2(current);
+  if (issue) return { status: "needs_data", reasons: [`Current WEGOVY interval is invalid: ${issue}`], evidence };
+  const interval = currentMedicationAdministrationIntervalV2(current);
+  if (!interval || interval.source !== "explicit_interval") {
+    return { status: "needs_data", reasons: ["Exact WEGOVY continuation requires an explicit administration interval; legacy frequency-per-day data cannot represent once-weekly treatment."], evidence };
+  }
+  if (interval.administrationsPerPeriod !== 1 || interval.periodDays !== 7 || interval.perAdministrationDose.length !== 1) {
+    return { status: "needs_data", reasons: ["Documented WEGOVY continuation schedule must resolve to exactly one administration every 7 days."], evidence };
+  }
+  const currentDose = interval.perAdministrationDose[0];
+  if (!currentDose || normalized(currentDose.unit) !== "mg" || (currentDose.ingredientKey !== medication.masterDrugId && current.masterDrugId === medication.masterDrugId)) {
+    return { status: "needs_data", reasons: ["Current WEGOVY per-administration dose is not mapped to the semaglutide MasterDrug in mg."], evidence };
+  }
+  const step = WEGOVY_STEPS_MG.find((value) => Math.abs(value - currentDose.amount) < 1e-9);
+  if (step === undefined) return { status: "needs_data", reasons: [`Documented WEGOVY dose ${currentDose.amount} mg is outside the reviewed MASH escalation/maintenance stages.`], evidence };
+  const currentProduct = uniqueProductForStep(products, step, interval.referencePresentationId);
+  if (!currentProduct) {
+    return { status: "needs_data", reasons: [`Current ${step} mg WEGOVY presentation is missing or ambiguous; exact current-market product reconciliation is required.`], evidence };
+  }
+
+  if (!current.adherence || current.adherence === "unknown") {
+    return { status: "needs_data", reasons: ["Current WEGOVY adherence must be documented before autonomous continuation/escalation."], evidence };
+  }
+  if (current.adherence === "partial" || current.adherence === "poor") {
+    return { status: "conditional", reasons: ["Current WEGOVY adherence is not good; dose-stage timing cannot be advanced autonomously."], evidence };
+  }
+  if (!current.tolerance || current.tolerance === "unknown") {
+    return { status: "needs_data", reasons: ["Current WEGOVY tolerability must be documented before autonomous continuation/escalation."], evidence };
+  }
+  if (current.tolerance === "intolerant") {
+    return { status: "conditional", reasons: ["Current WEGOVY is documented as intolerant; clinician review is required before holding, reducing, or discontinuing therapy."], evidence };
+  }
+  if (interval.daysOnCurrentDose === undefined) {
+    return { status: "needs_data", reasons: ["daysOnCurrentDose is required; total medication durationDays is not a substitute for time on the current WEGOVY stage."], evidence };
+  }
+
+  const phase = interval.therapyPhase;
+  if (step <= 1 && phase === "maintenance") {
+    return { status: "needs_data", reasons: [`${step} mg WEGOVY is an initiation/escalation dose, not a MASH maintenance dose.`], evidence };
+  }
+  if (step === 1.7 && !phase) {
+    return { status: "needs_data", reasons: ["1.7 mg WEGOVY requires explicit therapyPhase because it can represent week 13-16 escalation or a maintenance fallback after 2.4 mg intolerance."], evidence };
+  }
+  if (step === 1.7 && phase === "initiation") {
+    return { status: "needs_data", reasons: ["1.7 mg WEGOVY cannot be documented as the initiation phase."], evidence };
+  }
+  if (step === 2.4 && phase && phase !== "maintenance") {
+    return { status: "needs_data", reasons: ["2.4 mg WEGOVY is the recommended MASH maintenance dose; the documented therapyPhase is inconsistent."], evidence };
+  }
+
+  let targetStep = step;
+  let reason: string;
+  if (step === 2.4) {
+    if (current.tolerance === "limited") {
+      return { status: "conditional", reasons: ["Tolerability at 2.4 mg is limited; the MASH label allows reduction to 1.7 mg when 2.4 mg is not tolerated, so clinician-specific benefit-risk review is required."], evidence };
+    }
+    reason = "Exact WEGOVY 2.4 mg once-weekly maintenance is documented with good adherence and tolerability.";
+  } else if (step === 1.7 && phase === "maintenance") {
+    if (current.tolerance === "limited") {
+      return { status: "conditional", reasons: ["Tolerability remains limited at the 1.7 mg maintenance fallback; autonomous continuation or re-escalation is not allowed."], evidence };
+    }
+    reason = "Exact WEGOVY 1.7 mg maintenance fallback is documented and tolerated; re-escalation to 2.4 mg remains a clinician consideration rather than an automatic step.";
+  } else if (interval.daysOnCurrentDose < 28) {
+    reason = `Current WEGOVY ${step} mg escalation stage has ${interval.daysOnCurrentDose} documented day(s); continue the same once-weekly stage until at least 28 days before considering escalation.`;
+  } else if (current.tolerance === "limited") {
+    reason = `Tolerability is limited at WEGOVY ${step} mg; hold the same once-weekly stage and delay escalation rather than increasing automatically.`;
+  } else {
+    const index = WEGOVY_STEPS_MG.indexOf(step);
+    const next = WEGOVY_STEPS_MG[index + 1];
+    if (next === undefined) {
+      reason = `Continue WEGOVY ${step} mg once weekly.`;
+    } else {
+      targetStep = next;
+      reason = `WEGOVY ${step} mg has been taken for at least 28 days with good adherence and tolerability in an escalation phase; advance to ${next} mg once weekly.`;
+    }
+  }
+
+  const targetProduct = targetStep === step
+    ? currentProduct
+    : uniqueProductForStep(products, targetStep);
+  if (!targetProduct) {
+    return { status: "conditional", reasons: [`Target WEGOVY ${targetStep} mg current-market presentation is missing or ambiguous; autonomous product selection is not allowed.`], evidence };
+  }
+  return {
+    status: "pass",
+    reasons: [reason],
+    evidence,
+    doseRuleId: doseRuleIdForStep(targetStep, targetProduct.productId),
+    requiredProductId: targetProduct.productId,
+  };
+}
+
+/** Product-bound WEGOVY MASH gate for initiation and exact current-treatment
+ * continuation. Generic semaglutide/Ozempic and other GLP-1 therapies never
+ * inherit this pathway and remain medication-reconciliation decisions. */
 export function evaluateReviewedWegovyMashProtocolV2(input: {
   patient: WegovyPatientContextV2;
   medication: KnowledgeMedicationV2;
@@ -251,34 +384,47 @@ export function evaluateReviewedWegovyMashProtocolV2(input: {
   if (patient.pregnancy) return { status: "conditional", reasons: ["For MASH during pregnancy, WEGOVY requires explicit clinician benefit-risk assessment; autonomous execution is not allowed."], evidence };
 
   const active = activeCurrentMedications(patient);
+  const exactWegovy = active.filter((item) => currentWegovyMedication(item, medication));
   const activeSemaglutideOrGlp1 = active.filter((item) => normalized(item.genericName).includes("semaglutide") || isGlp1Group(item.therapyGroup));
+
+  if (exactWegovy.length > 1) {
+    return { status: "conditional", reasons: ["Multiple active WEGOVY entries are documented; exact medication reconciliation is required before continuation."], evidence };
+  }
+  if (exactWegovy.length === 1) {
+    const current = exactWegovy[0]!;
+    const otherGlp = activeSemaglutideOrGlp1.filter((item) => item !== current);
+    if (otherGlp.length) {
+      return { status: "conditional", reasons: ["WEGOVY is documented with another active semaglutide/GLP-1-based therapy; concomitant use must be reconciled before execution."], evidence };
+    }
+    return continuationOutcome({ current, medication, products, evidence });
+  }
+
   if (activeSemaglutideOrGlp1.length) {
     return {
       status: "conditional",
-      reasons: ["An active semaglutide-containing or GLP-1-based therapy is documented. The WEGOVY label does not recommend concomitant use; exact product/continuation reconciliation is required before MASH execution."],
+      reasons: ["An active semaglutide-containing or GLP-1-based therapy is documented, but it is not reconciled as exact WEGOVY. Generic semaglutide/Ozempic cannot be converted to the WEGOVY MASH pathway automatically."],
       evidence,
     };
   }
 
-  const requiredSteps = new Map<number, IranMarketProductV2>();
-  for (const product of products) {
-    const amount = semaglutideStrengthMg(product);
-    if (amount !== undefined && !requiredSteps.has(amount)) requiredSteps.set(amount, product);
-  }
-  const missing = WEGOVY_STEPS_MG.filter((step) => !requiredSteps.has(step));
-  if (missing.length) {
-    return {
-      status: "conditional",
-      reasons: [`Current verified Iran-market WEGOVY presentations do not cover the complete label escalation path; missing ${missing.join(", ")} mg.`],
-      evidence,
-    };
+  const requiredSteps = new Map<WegovyStepMgV2, IranMarketProductV2>();
+  for (const step of WEGOVY_STEPS_MG) {
+    const product = uniqueProductForStep(products, step);
+    if (!product) {
+      return {
+        status: "conditional",
+        reasons: [`Current verified Iran-market WEGOVY ${step} mg presentation is missing or ambiguous; the complete escalation path cannot be selected autonomously.`],
+        evidence,
+      };
+    }
+    requiredSteps.set(step, product);
   }
   const startProduct = requiredSteps.get(0.25)!;
   return {
     status: "pass",
     reasons: ["Exact current verified WEGOVY injection presentations cover the complete 0.25 -> 0.5 -> 1 -> 1.7 -> 2.4 mg escalation path."],
     evidence,
-    doseRuleId: `LABEL-WEGOVY-MASH-INIT-0_25:${startProduct.productId}`,
+    doseRuleId: doseRuleIdForStep(0.25, startProduct.productId),
     requiredProductId: startProduct.productId,
   };
 }
