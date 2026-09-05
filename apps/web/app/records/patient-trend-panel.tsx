@@ -108,7 +108,10 @@ export function PatientTrendPanel({
           const key = seriesKey(series);
           const geometry = chartGeometry(series);
           const isExpanded = expanded === key;
-          const latest = series.points.at(-1);
+          const confirmedPoints = series.points.filter(
+            (point) => point.verification === "confirmed",
+          );
+          const latestConfirmed = confirmedPoints[confirmedPoints.length - 1];
           const unverifiedCount = series.points.filter(
             (point) => point.verification === "unverified",
           ).length;
@@ -123,10 +126,10 @@ export function PatientTrendPanel({
                       (fa ? "واحد ثبت نشده" : "Unit not recorded")}
                   </small>
                 </div>
-                {latest && (
+                {latestConfirmed && (
                   <div className={styles.latest}>
-                    <b>{latest.value}</b>
-                    <span>{latest.unit}</span>
+                    <b>{latestConfirmed.value}</b>
+                    <span>{latestConfirmed.unit}</span>
                   </div>
                 )}
               </div>
