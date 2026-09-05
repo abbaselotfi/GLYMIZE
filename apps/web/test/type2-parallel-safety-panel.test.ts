@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { Type2ParallelSafetyProjectionV2 } from "@glymize/clinical-engine/type2-intake-v2";
-import { activeParallelSafetyCards } from "../app/type-2/type2-parallel-safety-panel";
+import { activeParallelSafetyCards } from "../app/type-2/type2-parallel-safety-model";
 
 function baseProjection(): Type2ParallelSafetyProjectionV2 {
   return {
