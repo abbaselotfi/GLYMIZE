@@ -282,6 +282,7 @@ describe("Decision Graph v2 invariants", () => {
       {
         label: "CKD",
         objective: "kidney_protection" as const,
+        expectedStatus: "complete" as const,
         patient: {
           ...base.patient,
           glycemia: { currentHba1c: 7, targetHba1c: 7 },
@@ -291,6 +292,7 @@ describe("Decision Graph v2 invariants", () => {
       {
         label: "HF",
         objective: "heart_failure_protection" as const,
+        expectedStatus: "complete" as const,
         patient: {
           ...base.patient,
           glycemia: { currentHba1c: 7, targetHba1c: 7 },
@@ -300,6 +302,8 @@ describe("Decision Graph v2 invariants", () => {
       {
         label: "ASCVD",
         objective: "ascvd_protection" as const,
+        expectedStatus: "no_fully_eligible_regimen" as const,
+        additionalUnresolved: "lipid_risk_reduction" as const,
         patient: {
           ...base.patient,
           glycemia: { currentHba1c: 7, targetHba1c: 7 },
@@ -348,7 +352,16 @@ describe("Decision Graph v2 invariants", () => {
         result.treatmentPlan?.components.some((component) => component.masterDrugId === "WD-TEST"),
         item.label,
       ).toBe(true);
-      expect(result.status, item.label).toBe("complete");
+      if (item.additionalUnresolved) {
+        expect(
+          result.objectives.some(
+            (objective) => objective.id === item.additionalUnresolved && objective.level === "mandatory",
+          ),
+          item.label,
+        ).toBe(true);
+        expect(result.treatmentPlan?.unresolvedObjectives, item.label).toContain(item.additionalUnresolved);
+      }
+      expect(result.status, item.label).toBe(item.expectedStatus);
     }
   });
 
@@ -385,4 +398,5 @@ describe("Decision Graph v2 invariants", () => {
     expect(result.primary?.components[0]?.genericCostBenchmark?.referenceProductId).toBe("P-GENERIC-REFERENCE");
     expect(result.primary?.components[0]?.selectedProduct?.productId).toBe("P-GENERIC-REFERENCE");
     expect(result.primary?.components[0]?.selectedProductCost?.normalized30DayTreatmentCostToman).toBe(240_000);
-  });});
+  });
+});

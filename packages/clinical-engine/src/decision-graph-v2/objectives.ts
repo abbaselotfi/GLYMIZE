@@ -1,3 +1,4 @@
+import { resolveCardiovascularRiskObjectivesV2 } from "./cardiovascular-objectives.js";
 import type {
   ClinicalObjectiveV2,
   ClinicalStateV2,
@@ -75,6 +76,10 @@ export function resolveClinicalObjectivesV2(
       reason: "ASCVD فعال است؛ انتخاب باید شواهد outcome قلبی‌عروقی را پوشش دهد.",
       evidence: [],
     });
+  }
+
+  for (const objective of resolveCardiovascularRiskObjectivesV2(request)) {
+    add(objective);
   }
 
   if ((request.patient.anthropometrics?.bmi ?? 0) >= 30) {
