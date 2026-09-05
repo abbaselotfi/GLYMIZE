@@ -133,7 +133,8 @@ describe("IWGDF/IDSA 2023 diabetic-foot escalation boundary", () => {
     }));
     expect(result.diabeticFootPathway.state).toBe("uninfected_ulcer");
     expect(result.diabeticFootPathway.antibioticExecution).toBe(false);
-    expect(result.trace.at(-1)?.nodeId).toBe("diabetic-foot-safety-escalation");
-    expect(result.trace.at(-1)?.summary).toContain("antibioticExecution=false");
+    const footTrace = result.trace.find((item) => item.nodeId === "diabetic-foot-safety-escalation");
+    expect(footTrace).toBeDefined();
+    expect(footTrace?.summary).toContain("antibioticExecution=false");
   });
 });

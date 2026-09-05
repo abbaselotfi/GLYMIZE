@@ -1,6 +1,10 @@
 import { resolveDiabeticFootPathwayV2, type DiabeticFootContextV2 } from "./diabetic-foot-escalation.js";
 import { runDecisionGraphV2 } from "./engine.js";
 import {
+  resolveNutritionSupportBoundaryV2,
+  type NutritionSupportContextV2,
+} from "./nutrition-support-boundary.js";
+import {
   resolveRetinopathySpecialistEscalationV2,
   type RetinopathyContextV2,
   type SpecialistEscalationV2,
@@ -11,21 +15,24 @@ export type DecisionGraphRequestWithSpecialistContextsV2 = Omit<DecisionGraphReq
   patient: DecisionGraphRequestV2["patient"] & {
     retinopathy?: RetinopathyContextV2;
     diabeticFoot?: DiabeticFootContextV2;
+    nutritionSupport?: NutritionSupportContextV2;
   };
 };
 
 export type DecisionGraphResultWithSpecialistPathwaysV2 = DecisionGraphResultV2 & {
   specialistEscalations: SpecialistEscalationV2[];
   diabeticFootPathway: ReturnType<typeof resolveDiabeticFootPathwayV2>;
+  nutritionSupportPathway: ReturnType<typeof resolveNutritionSupportBoundaryV2>;
 };
 
 /**
- * Additive execution wrapper for specialist/escalation pathways that must never
- * become medication-ranking authority in the general Decision Graph.
+ * Additive execution wrapper for specialist/escalation/safety pathways that must
+ * never become medication-ranking authority in the general Decision Graph.
  *
- * The core treatment result is preserved; specialist pathways are appended as
- * separate channels. Ophthalmology and diabetic-foot triage therefore cannot
- * manufacture medication candidates, doses, or a second ranking authority.
+ * The core treatment result is preserved; parallel pathways are appended as
+ * separate channels. Ophthalmology, diabetic-foot triage and generic nutrition
+ * support therefore cannot manufacture medication candidates, doses, or a
+ * second ranking authority.
  */
 export function runDecisionGraphV2WithSpecialistEscalations(
   request: DecisionGraphRequestWithSpecialistContextsV2,
@@ -34,9 +41,14 @@ export function runDecisionGraphV2WithSpecialistEscalations(
   const core = policy ? runDecisionGraphV2(request, policy) : runDecisionGraphV2(request);
   const retinopathy = resolveRetinopathySpecialistEscalationV2(request);
   const diabeticFootPathway = resolveDiabeticFootPathwayV2(request);
+  const nutritionSupportPathway = resolveNutritionSupportBoundaryV2(request);
 
   const missingData = [...core.missingData];
-  for (const item of [...retinopathy.missingData, ...diabeticFootPathway.missingData]) {
+  for (const item of [
+    ...retinopathy.missingData,
+    ...diabeticFootPathway.missingData,
+    ...nutritionSupportPathway.missingData,
+  ]) {
     if (!missingData.some((existing) => existing.key === item.key)) missingData.push(item);
   }
 
@@ -45,6 +57,7 @@ export function runDecisionGraphV2WithSpecialistEscalations(
     missingData,
     specialistEscalations: retinopathy.escalations,
     diabeticFootPathway,
+    nutritionSupportPathway,
     trace: [
       ...core.trace,
       {
@@ -70,6 +83,13 @@ export function runDecisionGraphV2WithSpecialistEscalations(
           ...diabeticFootPathway.escalations.map((item) => item.reason),
         ],
         evidence: diabeticFootPathway.evidence,
+      },
+      {
+        nodeId: "nutrition-support-safety-boundary",
+        status: nutritionSupportPathway.missingData.length ? "needs_data" : "passed",
+        summary: `Nutrition-support pathway=${nutritionSupportPathway.state}; prescriptionExecution=false.`,
+        details: nutritionSupportPathway.actions,
+        evidence: nutritionSupportPathway.evidence,
       },
     ],
   };
