@@ -71,6 +71,41 @@ type Type2AssessmentWithParallelSafety = Type2AssessmentResult & {
   parallelSafety?: Type2ParallelSafetyProjectionV2;
 };
 
+type DecisionGraphExecutionForUi = {
+  action: "start" | "continue" | "continue_with_dose_reconciliation";
+  dosePlan?: {
+    displayStartDose: string;
+    scheduleText?: string;
+    titrationText?: string;
+    targetDoseText?: string;
+    maximumDoseText?: string;
+    clinicianConfirmationRequired: true;
+  };
+  selectedProduct?: {
+    productId: string;
+    genericName: string;
+    brandName?: string;
+    dosageFormGroup: string;
+    route: string;
+    purchaseUnitLabel: string;
+  };
+  selectedProductCost?: {
+    productId: string;
+    purchaseUnitsNeeded30Days: number;
+    cashPurchaseCostToman: number;
+    normalized30DayTreatmentCostToman: number;
+    carryoverInventoryValueToman: number;
+  };
+  recommendationOnly: true;
+  clinicianConfirmationRequired: true;
+};
+
+type DecisionGraphMedicationForUi = Type2AssessmentResult["medications"][number] & {
+  decisionGraphAuthority?: true;
+  decisionGraphRank?: number;
+  decisionGraphExecution?: DecisionGraphExecutionForUi;
+};
+
 const FACTORS: Array<{ key: Type2DecisionFactor; fa: string; en: string; hintFa: string; hintEn: string }> = [
   { key: "ascvd", fa: "ASCVD", en: "ASCVD", hintFa: "MI، سکته، PAD یا revascularization", hintEn: "MI, stroke, PAD, or revascularization" },
   { key: "heart_failure", fa: "نارسایی قلبی", en: "Heart failure", hintFa: "HFpEF یا HFrEF", hintEn: "HFpEF or HFrEF" },
@@ -140,6 +175,12 @@ function tomanRange(min?: number, max?: number, locale: "fa" | "en" = "fa") {
   if (min === undefined || max === undefined) return "—";
   if (min === max) return toman(min, locale);
   return `${toman(min, locale)} – ${toman(max, locale)}`;
+}
+
+function decisionGraphActionLabel(action: DecisionGraphExecutionForUi["action"], fa: boolean) {
+  if (action === "start") return fa ? "شروع" : "Start";
+  if (action === "continue") return fa ? "ادامه" : "Continue";
+  return fa ? "ادامه پس از تطبیق دوز" : "Continue after dose reconciliation";
 }
 
 function costingUnitLabels(profile: ClinicianMedicationCostingProfile | undefined, fa: boolean) {
@@ -622,6 +663,11 @@ export default function Type2ScenariosClient() {
 
           {scenario.medications.length > 0 && <div className={styles.scenarioMeds}>{scenario.medications.map((medication, medIndex) => {
             const estimate = scenario.cost30Days[medIndex];
+            const graphMedication = medication as DecisionGraphMedicationForUi;
+            const execution = medication.outputStatus === "requires_approved_protocol"
+              ? undefined
+              : graphMedication.decisionGraphExecution;
+            const graphCostAuthoritative = Boolean(execution?.selectedProductCost);
             const profile = clinicianCostingProfileForMedication(
               medication.genericName,
               medication.brandRegistryCode,
@@ -630,18 +676,45 @@ export default function Type2ScenariosClient() {
             const plan = effectiveCostPlans[medication.genericMedicationId] ?? {};
             const profileHint = costingProfileHint(profile, fa);
             return <section className={styles.scenarioMed} key={medication.cardId ?? medication.genericMedicationId}>
-              <div className={styles.medTop}><div><b>{medication.displayName ?? medication.persianName}</b>{medication.selectedBrandName && <small>{fa ? "ژنریک" : "Generic"}: {medication.persianName}</small>}<small>{medication.therapeuticClass}</small></div><span>{medication.outputStatus === "requires_approved_protocol" ? (fa ? "نیازمند پروتکل" : "Protocol required") : `${medication.priorityScore}/100`}</span></div>
+              <div className={styles.medTop}><div><b>{medication.displayName ?? medication.persianName}</b>{medication.selectedBrandName && <small>{fa ? "ژنریک" : "Generic"}: {medication.persianName}</small>}<small>{medication.therapeuticClass}</small></div><span>{medication.outputStatus === "requires_approved_protocol"
+                ? (fa ? "نیازمند پروتکل" : "Protocol required")
+                : graphMedication.decisionGraphAuthority
+                  ? `DG · #${graphMedication.decisionGraphRank ?? "—"}`
+                  : `${medication.priorityScore}/100`}</span></div>
+
+              {execution && <div className={styles.costBox} data-decision-graph-execution="recommendation-only">
+                <div className={styles.costTitle}><div><b>{fa ? "اقدام و دوز پیشنهادی Decision Graph" : "Decision Graph action and dose"}</b><small>{fa ? "این projection از موتور می‌آید و نیازمند تأیید پزشک است." : "This projection comes from the engine and requires clinician confirmation."}</small></div><span>DG</span></div>
+                <div className={styles.costNumbers}>
+                  <div><small>{fa ? "اقدام" : "Action"}</small><b>{decisionGraphActionLabel(execution.action, fa)}</b></div>
+                  {execution.dosePlan?.displayStartDose && <div><small>{fa ? "دوز شروع/فعلی" : "Starting/current dose"}</small><b>{execution.dosePlan.displayStartDose}</b></div>}
+                  {execution.dosePlan?.scheduleText && <div><small>{fa ? "برنامه مصرف" : "Schedule"}</small><b>{execution.dosePlan.scheduleText}</b></div>}
+                  {execution.selectedProduct && <div><small>{fa ? "فرآورده NFI انتخاب‌شده" : "Selected NFI product"}</small><b>{execution.selectedProduct.brandName ?? execution.selectedProduct.genericName}</b></div>}
+                </div>
+                {execution.dosePlan?.titrationText && <p>{fa ? "تیتراسیون: " : "Titration: "}{execution.dosePlan.titrationText}</p>}
+                <p className={styles.costProfileHint} data-decision-graph-order-boundary="recommendation-only">{fa
+                  ? "این خروجی پیشنهاد Decision Graph است؛ دستور دارویی امضاشده یا Final Plan نیست و تا بازبینی/تأیید پزشک نباید به‌عنوان order اجرا شود."
+                  : "This is a Decision Graph recommendation, not a signed medication order or Final Plan, and must not be executed as an order until clinician review/confirmation."}</p>
+              </div>}
+
               <div className={styles.insuranceRow}>{medication.insuranceCoverages.length ? medication.insuranceCoverages.map((entry) => <span key={entry.provider}>✓ {INSURERS.find((item) => item.value === entry.provider)?.[fa ? "fa" : "en"] ?? entry.provider}: {formatCoveragePercent(entry.percent, locale)}%</span>) : <span>{fa ? "پوشش بیمه ثبت نشده" : "No recorded coverage"}</span>}</div>
               <div className={styles.financialCluster}>
               <MedicationMarketDetails brandRegistryCode={medication.brandRegistryCode} coverages={medication.insuranceCoverages} genericRegistryCode={medication.genericRegistryCode} locale={locale} marketBadge={medication.marketBadge} price={medication.price} priceRange={medication.priceRange} selectedBrands={medication.selectedBrands} />
 
               <div className={styles.costBox}>
-                <div className={styles.costTitle}><div><b>{fa ? "برآورد هزینه ۳۰روزه" : "30-day cost estimate"}</b><small>{fa ? "این ورودی‌ها برای هزینه‌اند، نه پیشنهاد دوز." : "These inputs are for costing, not dose recommendation."}</small></div><span>{estimate?.status === "calculated" ? "✓" : "…"}</span></div>
-                <div className={styles.costInputs}>
+                <div className={styles.costTitle}><div><b>{fa ? "برآورد هزینه ۳۰روزه" : "30-day cost estimate"}</b><small>{graphCostAuthoritative
+                  ? (fa ? "از دوز Decision Graph و فرآورده NFI انتخاب‌شده؛ ورودی دستی استفاده نمی‌شود." : "From the Decision Graph dose and selected NFI product; no manual dose/package input is used.")
+                  : (fa ? "این ورودی‌ها فقط fallback محاسبه هزینه‌اند، نه پیشنهاد دوز." : "These inputs are only a costing fallback, not a dose recommendation.")}</small></div><span>{estimate?.status === "calculated" ? "✓" : "…"}</span></div>
+                {!graphCostAuthoritative && <div className={styles.costInputs} data-cost-fallback="manual">
                   <label><span>{labels.dailyLabel}</span><input type="number" min="0" step="0.1" value={plan.dailyUnits ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], dailyUnits: numberOrUndefined(event.target.value), unitLabel: labels.unitLabel } }))} placeholder={fa ? "ورود پزشک" : "Clinician input"} /></label>
                   <label><span>{labels.packageLabel}</span><input type="number" min="0" step="0.1" value={plan.unitsPerPackage ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], unitsPerPackage: numberOrUndefined(event.target.value), unitLabel: labels.unitLabel, marketPackageVerified: false } }))} placeholder={profile?.autoFillEligible ? String(profile.packageMeasureQuantity ?? "") : (fa ? "انتخاب/ورود بسته" : "Select/enter package")} /></label>
-                </div>
-                <p className={styles.costProfileHint}>{profileHint}</p>
+                </div>}
+                {graphCostAuthoritative
+                  ? <p className={styles.costProfileHint} data-decision-graph-cost-authority="dose-and-nfi-product">{fa
+                    ? "هزینه ۳۰روزه از دوز تأییدپذیر Decision Graph و فرآورده NFI انتخاب‌شده محاسبه شده است؛ UI آن را دوباره از ورودی دستی محاسبه نمی‌کند."
+                    : "The 30-day cost was calculated from the clinician-confirmable Decision Graph dose and selected NFI product; the UI does not recompute it from manual inputs."}</p>
+                  : <p className={styles.costProfileHint}>{execution
+                    ? (fa ? `هزینه ساختاریافته Graph برای این انتخاب موجود نیست؛ ورودی‌های زیر فقط fallback هستند. ${profileHint}` : `Structured Graph cost is unavailable for this selection; the inputs below are fallback only. ${profileHint}`)
+                    : profileHint}</p>}
                 <div className={styles.costNumbers}>
                   <div><small>{fa ? "قیمت هر بسته" : "Retail/package"}</small><b>{estimate?.retailPerPackageMinToman !== undefined
                     ? `${tomanRange(estimate.retailPerPackageMinToman, estimate.retailPerPackageMaxToman, locale)} ${fa ? "تومان" : "Toman"}`
