@@ -28,7 +28,7 @@ describe("clinical engine multidomain capability boundary", () => {
     }
   });
 
-  it("marks MASH partially executable for reviewed product-bound initiation while keeping continuation/cost gaps explicit", () => {
+  it("records completed WEGOVY interval/titration execution while keeping insurer claim timing as the MASH gap", () => {
     for (const domain of ["liver", "masld_mash"] as const) {
       const capability = clinicalDomainCapability(domain);
       expect(capability.executionState).toBe("partially_executable");
@@ -36,7 +36,8 @@ describe("clinical engine multidomain capability boundary", () => {
       expect(capability.executableObjectives).toContain("liver_directed_therapy");
       expect(capability.boundary.toLocaleLowerCase()).toContain("resmetirom");
       expect(capability.boundary).toContain("WEGOVY");
-      expect(capability.nextGap?.toLocaleLowerCase()).toMatch(/interval|titration/);
+      expect(capability.boundary.toLocaleLowerCase()).toContain("continuation");
+      expect(capability.nextGap?.toLocaleLowerCase()).toMatch(/insurer.*claim|claim.*insurer/);
     }
   });
 
