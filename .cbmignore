@@ -1,0 +1,3 @@
+# Large runtime data file; not useful for code/dependency graph extraction.
+# Inspect directly when a task specifically concerns clinician market data.
+apps/web/public/data/glymize-clinician-market-v2.json
