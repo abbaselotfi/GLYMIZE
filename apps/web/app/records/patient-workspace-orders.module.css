@@ -1,0 +1,159 @@
+.panel {
+  margin-top: 18px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 16px;
+}
+
+.heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.heading div {
+  display: grid;
+  gap: 4px;
+}
+
+.heading span {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  opacity: 0.62;
+}
+
+.heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.heading > strong {
+  min-width: 34px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.07);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin: 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(17, 24, 39, 0.035);
+  line-height: 1.75;
+  font-size: 0.88rem;
+  opacity: 0.76;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTop > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.cardTop small {
+  font-size: 0.72rem;
+  opacity: 0.58;
+}
+
+.cardTop strong {
+  overflow-wrap: anywhere;
+}
+
+.state {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.065);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.card[data-state="completed"] .state,
+.card[data-state="result_received"] .state {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.card[data-state="in_progress"] .state {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.card[data-state="cancelled"] .state,
+.card[data-state="unable_to_process"] .state {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.details span {
+  padding: 5px 8px;
+  border-radius: 9px;
+  background: rgba(17, 24, 39, 0.045);
+  font-size: 0.78rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  opacity: 0.67;
+}
+
+.openButton {
+  justify-self: start;
+  border: 0;
+  border-radius: 10px;
+  padding: 7px 10px;
+  cursor: pointer;
+  background: rgba(17, 24, 39, 0.08);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.openButton:hover {
+  background: rgba(17, 24, 39, 0.12);
+}
+
+@media (max-width: 680px) {
+  .cardTop {
+    display: grid;
+  }
+
+  .state {
+    justify-self: start;
+  }
+}

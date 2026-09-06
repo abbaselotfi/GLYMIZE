@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const runtime = fs.readFileSync(
-  new URL("../src/platform-patient-record-v2.ts", import.meta.url),
+  new URL("../src/platform-patient-record-v2-core.ts", import.meta.url),
   "utf8",
 );
 const archiveRuntime = fs.readFileSync(

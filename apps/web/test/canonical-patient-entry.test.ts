@@ -18,9 +18,9 @@ const portalPage = readFileSync(
 describe("canonical patient entry", () => {
   it("routes every public patient CTA to /patient", () => {
     expect(landing.match(/data-actor="patient" href="\/patient"/g)).toHaveLength(1);
-    expect(landing).toContain('className={styles.secondaryCta}\n              href="/patient"');
+    expect(landing).toMatch(/className=\{styles\.secondaryCta\}\r?\n\s+href="\/patient"/);
     expect(landing).not.toContain('data-actor="patient" href="/portal"');
-    expect(landing).not.toContain('className={styles.secondaryCta}\n              href="/portal"');
+    expect(landing).not.toMatch(/className=\{styles\.secondaryCta\}\r?\n\s+href="\/portal"/);
   });
 
   it("keeps clinician and assistant entry on /account", () => {

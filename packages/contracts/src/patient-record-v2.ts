@@ -14,6 +14,11 @@ import type {
   PatientHandoffStatus,
   PatientHandoffVitals,
 } from "./patient-handoff.js";
+import type {
+  CareTeamOrderFulfillmentStatus,
+  PhysicianInvestigationOrder,
+  PhysicianMedicationOrder,
+} from "./physician-orders.js";
 
 export const patientIdentifierKinds = [
   "file_number",
@@ -341,10 +346,33 @@ export interface PatientTrendSeries {
   points: PatientTrendPoint[];
 }
 
+export type PatientWorkspaceOrderState =
+  | "pending"
+  | "in_progress"
+  | "result_received"
+  | "completed"
+  | "cancelled"
+  | "unable_to_process";
+
+export interface PatientWorkspaceOrderSummary {
+  orderId: string;
+  planId: string;
+  encounterId: string;
+  planVersion: number;
+  signedAt: string;
+  orderKind: "medication" | "investigation";
+  order: PhysicianMedicationOrder | PhysicianInvestigationOrder;
+  state: PatientWorkspaceOrderState;
+  latestFulfillmentStatus?: CareTeamOrderFulfillmentStatus;
+  latestFulfillmentAt?: string;
+  hasLinkedResult: boolean;
+}
+
 export interface PatientWorkspaceSnapshot {
   patient: PatientLongitudinalSummary;
   encounters: PatientEncounterSummary[];
   patientNotes: PhysicianNoteRevision[];
   trends: PatientTrendSeries[];
+  orders: PatientWorkspaceOrderSummary[];
   mode: PatientWorkspaceMode;
 }
