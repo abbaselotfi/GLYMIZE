@@ -1,5 +1,8 @@
 import type { Type2ConsiderationRequest, Type2MedicationConsideration } from "@glymize/contracts";
-import { TYPE2_DECISION_GRAPH_V2_AUTHORITY } from "./type2-decision-graph-compat.js";
+import {
+  TYPE2_DECISION_GRAPH_V2_AUTHORITY,
+  type Type2DecisionGraphExecutionProjectionV1,
+} from "./type2-decision-graph-compat.js";
 import {
   buildType2TreatmentScenarios as buildBaseScenarios,
   currentMedicationDailyUnits,
@@ -30,6 +33,7 @@ type DecisionGraphMedication = Type2MedicationConsideration & {
   decisionGraphRank?: number;
   decisionGraphComponentOrder?: number;
   decisionGraphRegimenId?: string;
+  decisionGraphExecution?: Type2DecisionGraphExecutionProjectionV1;
 };
 
 function boundedCost(estimate: Type2MonthlyCostEstimate): Type2MonthlyCostEstimate {
@@ -124,7 +128,65 @@ function isDecisionGraphAssessment(input: Type2ScenarioBuildInput) {
     );
 }
 
+/**
+ * Translate an already-computed Decision Graph product cost into the stable
+ * Scenario cost shape. This function never recomputes dose, package count or
+ * insurance eligibility. Conditional/unknown insurance is not presented as a
+ * definitive patient-share amount.
+ */
+export function decisionGraphMedication30DayCostV1(
+  medication: DecisionGraphMedication,
+  input: Type2ScenarioBuildInput,
+): Type2MonthlyCostEstimate | undefined {
+  const execution = medication.decisionGraphExecution;
+  const cost = execution?.selectedProductCost;
+  if (!execution || !cost) return undefined;
+
+  const selectedInsurance = input.insuranceProvider
+    ? cost.insurance.find((item) => item.provider === input.insuranceProvider)
+    : undefined;
+  const insuranceExact = selectedInsurance?.eligibility === "eligible" || selectedInsurance?.eligibility === "ineligible";
+  const insuranceConditional = selectedInsurance?.eligibility === "conditional";
+  const insuranceUnknown = selectedInsurance?.eligibility === "unknown";
+  const productPrice = execution.selectedProduct?.priceToman;
+  const normalizedTreatment = cost.normalized30DayTreatmentCostToman;
+  const carryover = cost.carryoverInventoryValueToman;
+  const insuranceBasis = !input.insuranceProvider
+    ? "بیمه‌ای برای نمایش سهم بیمار انتخاب نشده است."
+    : insuranceExact
+      ? `وضعیت بیمه ${selectedInsurance.eligibility} است و سهم ریالی از Rule ساختاریافته بیمه گرفته شد.`
+      : insuranceConditional
+        ? `پوشش بیمه conditional است${selectedInsurance.conditions.length ? `: ${selectedInsurance.conditions.join("؛ ")}` : "."} مبلغ if-eligible به‌عنوان سهم قطعی بیمار نمایش داده نمی‌شود.`
+        : insuranceUnknown
+          ? `Rule ساختاریافته کافی برای بیمه انتخاب‌شده موجود نیست${selectedInsurance.conditions.length ? `: ${selectedInsurance.conditions.join("؛ ")}` : "."} سهم بیمار/بیمه ساخته نمی‌شود.`
+          : "برای بیمه انتخاب‌شده برآورد ساختاریافته‌ای در خروجی Decision Graph وجود ندارد.";
+
+  return {
+    status: insuranceExact ? "calculated" : "retail_only",
+    days: 30,
+    ...(productPrice !== undefined ? { retailPerPackageToman: productPrice } : {}),
+    packagesFor30Days: cost.purchaseUnitsNeeded30Days,
+    retail30DaysToman: cost.cashPurchaseCostToman,
+    ...(insuranceExact
+      ? {
+          patient30DaysToman: selectedInsurance.patientCostIfEligibleToman,
+          insurer30DaysToman: selectedInsurance.insurerCostIfEligibleToman,
+        }
+      : {}),
+    ...(selectedInsurance?.displayCoveragePercent !== undefined
+      ? { coveragePercent: selectedInsurance.displayCoveragePercent }
+      : selectedInsurance?.rawCoveragePercent !== undefined
+        ? { coveragePercent: selectedInsurance.rawCoveragePercent }
+        : {}),
+    insuranceProvider: input.insuranceProvider,
+    calculationBasis: `Decision Graph v2: دوز approved + فرآورده NFI + تعداد بسته ۳۰روزه بدون محاسبه مجدد در Scenario. هزینه خرید نقدی ۳۰روزه ${cost.cashPurchaseCostToman} تومان است؛ ارزش نرمال‌شده درمان ۳۰روزه ${normalizedTreatment} تومان و ارزش موجودی باقی‌مانده ${carryover} تومان است. ${insuranceBasis}`,
+  };
+}
+
 function graphMedicationCost(medication: Type2MedicationConsideration, input: Type2ScenarioBuildInput) {
+  const graphCost = decisionGraphMedication30DayCostV1(medication as DecisionGraphMedication, input);
+  if (graphCost) return graphCost;
+
   return estimateType2Medication30DayCost({
     price: medication.price,
     priceRange: medication.priceRange,
