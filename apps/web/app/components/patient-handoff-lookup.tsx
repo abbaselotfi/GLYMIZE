@@ -186,7 +186,7 @@ export default function PatientHandoffLookup({ onApply }: { onApply: (record: Pa
       data-focused-workflow-patient-step="optional"
     >
       <div className={styles.copy}>
-        <span>STEP 1 · PATIENT · OPTIONAL</span>
+        <span>PATIENT · OPTIONAL FIRST STEP</span>
         <h2>{fa ? "بیمار را بارگذاری کنید — یا بدون پرونده ادامه دهید" : "Load a patient — or continue without a record"}</h2>
         <p>{fa ? "جست‌وجوی هوشمند، کد ملی معتبر را در اولویت می‌گذارد و در غیر این صورت شماره پرونده را بررسی می‌کند. نوع شناسه را نیز می‌توانید صریحاً مشخص کنید. این مرحله هیچ‌وقت مانع ادامه تصمیم‌یار نمی‌شود." : "Smart lookup prioritizes a checksum-valid national ID and otherwise resolves a practice file number. You can also override the identifier type explicitly. This step never blocks the decision-support workflow."}</p>
       </div>
