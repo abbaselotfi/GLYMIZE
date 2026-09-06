@@ -1,5 +1,6 @@
 import type {
   CurrentMedicationInput,
+  InsuranceProvider,
   PatientClinicalContext,
   Type2ConsiderationRequest,
   Type2CostPreference,
@@ -53,7 +54,27 @@ export type Type2StructuredClinicalContextV2 = PatientClinicalContext & {
 
 export type Type2StructuredConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "clinicalContext"> & {
   clinicalContext?: Type2StructuredClinicalContextV2;
+  /**
+   * Clinician-selected insurer for this assessment. When present, access/cost
+   * evaluation must use this provider only; coverage from another insurer must
+   * never satisfy an insured-only preference.
+   */
+  insuranceProvider?: InsuranceProvider;
 };
+
+export function resolveType2InsuranceProvidersV2(
+  request: Type2StructuredConsiderationRequestV2,
+): InsuranceProvider[] {
+  if (request.insuranceProvider) return [request.insuranceProvider];
+
+  const providers = new Set<InsuranceProvider>();
+  for (const coverages of Object.values(request.insuranceCoverageByMedicationId ?? {})) {
+    for (const coverage of coverages) {
+      if (coverage.runtimeEligibleForRanking !== false) providers.add(coverage.provider);
+    }
+  }
+  return [...providers];
+}
 
 function routePreference(value: Type2RoutePreference | undefined) {
   if (value === "oral_only") return "oral_only" as const;
@@ -144,6 +165,7 @@ export function type2StructuredIntakeToDecisionGraphV2(
     preferences: {
       routePreference: routePreference(request.routePreference),
       costPreference: costPreference(request.costPreference),
+      insuranceProviders: resolveType2InsuranceProvidersV2(request),
     },
     inventory,
   };
