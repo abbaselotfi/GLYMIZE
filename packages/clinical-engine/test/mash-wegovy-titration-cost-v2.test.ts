@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { composeTreatmentPlanV2 } from "../src/decision-graph-v2/composer.js";
 import { resolveDosePlanV2 } from "../src/decision-graph-v2/dose.js";
 import { enrichCandidateWithDoseMarketCostV2 } from "../src/decision-graph-v2/enrich.js";
+import {
+  scheduledInsuranceProjectionsV2,
+  type ClaimsAwareInsurancePolicyRuleV2,
+} from "../src/decision-graph-v2/insurance-claims.js";
 import { applyCoreClinicalRulesToInventoryV2 } from "../src/decision-graph-v2/inventory-rules.js";
 import {
   buildWegovyMashInitiationTitrationCostV2,
@@ -147,6 +151,23 @@ function fixture(marketProducts: IranMarketProductV2[] = products) {
   return { request, candidate };
 }
 
+function claimPolicy(productId: string): ClaimsAwareInsurancePolicyRuleV2 {
+  return {
+    id: `claims:${productId}`,
+    provider: "social_security",
+    productId,
+    masterDrugId,
+    coveragePercent: 50,
+    claimTiming: {
+      groupKey: "wegovy-mash-escalation",
+      windowDays: 30,
+      maxClaimsPerWindow: 2,
+      minimumDaysBetweenClaims: 28,
+      allowDistinctProductsWithinWindow: true,
+    },
+  };
+}
+
 describe("phase-aware WEGOVY MASH titration cost", () => {
   it("counts four 0.25 mg injections then the first 0.5 mg injection inside day 30", () => {
     const { request, candidate } = fixture();
@@ -207,7 +228,7 @@ describe("phase-aware WEGOVY MASH titration cost", () => {
     expect(treatmentPlan?.monthlyPatientCostToman).toBe(5_000_000);
   });
 
-  it("does not claim insured-only cost or coverage before phase claim timing is modeled", () => {
+  it("keeps insured-only fail-closed when phase claim timing is not explicitly reviewed", () => {
     const { request, candidate } = fixture();
     request.preferences.costPreference = "insured_only";
     request.preferences.insuranceProviders = ["social_security"];
@@ -216,6 +237,31 @@ describe("phase-aware WEGOVY MASH titration cost", () => {
     expect(enriched.monthlyPatientCostToman).toBeUndefined();
     expect(enriched.insuranceFit).toBe("unknown");
     expect(enriched.gate.status).toBe("exclude");
-    expect(enriched.cautions.join(" ")).toContain("claim timing");
+    expect(enriched.cautions.join(" ").toLocaleLowerCase()).toContain("claim timing");
+    expect(scheduledInsuranceProjectionsV2(enriched.components[0]!)[0]?.eligibility).toBe("unknown");
+  });
+
+  it("uses explicit compatible claim timing to make insured-only phase cost executable", () => {
+    const { request, candidate } = fixture();
+    request.preferences.costPreference = "insured_only";
+    request.preferences.insuranceProviders = ["social_security"];
+    request.inventory.insurancePolicies = [
+      claimPolicy("TEST-WEGOVY-0_25"),
+      claimPolicy("TEST-WEGOVY-0_5"),
+    ];
+
+    const enriched = enrichCandidateWithDoseMarketCostV2(request, candidate);
+    const insurance = scheduledInsuranceProjectionsV2(enriched.components[0]!);
+
+    expect(insurance).toHaveLength(1);
+    expect(insurance[0]?.eligibility).toBe("eligible");
+    expect(insurance[0]?.claims.map((claim) => [claim.productId, claim.claimDay])).toEqual([
+      ["TEST-WEGOVY-0_25", 1],
+      ["TEST-WEGOVY-0_5", 29],
+    ]);
+    expect(enriched.insuranceFit).toBe("eligible");
+    expect(enriched.gate.status).toBe("pass");
+    expect(enriched.monthlyPatientCostToman).toBe(4_000_000);
+    expect(enriched.reasons.join(" ")).toContain("insured-only");
   });
 });
