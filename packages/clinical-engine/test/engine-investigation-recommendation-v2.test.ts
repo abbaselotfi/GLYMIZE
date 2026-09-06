@@ -64,17 +64,13 @@ const marketProduct: IranMarketDrugProduct = {
 };
 
 function ckdRequest(eGfr?: number): Type2ConsiderationRequest {
+  const kidney = eGfr === undefined ? { ckd: true } : { ckd: true, eGfr };
   return {
     currentHba1c: 7.8,
     targetHba1c: 7,
     factors: ["ckd"],
-    eGfr,
-    clinicalContext: {
-      kidney: {
-        ckd: true,
-        eGfr,
-      },
-    },
+    ...(eGfr === undefined ? {} : { eGfr }),
+    clinicalContext: { kidney },
   };
 }
 
