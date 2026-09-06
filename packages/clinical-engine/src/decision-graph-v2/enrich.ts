@@ -6,6 +6,11 @@ import {
   lowestUsableScheduledPatientCostV2,
 } from "./insurance-claims.js";
 import {
+  attachWegovyMashContinuationCostV2,
+  buildWegovyMashContinuationWindowCostV2,
+  executableContinuationMonthlyCostV2,
+} from "./wegovy-continuation-cost.js";
+import {
   attachPhaseAwareTitrationCostV2,
   buildWegovyMashInitiationTitrationCostV2,
 } from "./wegovy-titration-cost.js";
@@ -175,6 +180,25 @@ function chooseDoseExecutionOption(
   })[0];
 }
 
+function scheduledClaimsForPlan(
+  phases: readonly { productId: string; claimDay: number }[],
+  purchases: readonly { productId: string; purchaseUnitsRequired: number }[],
+) {
+  const firstClaimDay = new Map<string, number>();
+  for (const phase of phases) {
+    const existing = firstClaimDay.get(phase.productId);
+    if (existing === undefined || phase.claimDay < existing) firstClaimDay.set(phase.productId, phase.claimDay);
+  }
+  return purchases.flatMap((purchase) => {
+    const claimDay = firstClaimDay.get(purchase.productId);
+    return claimDay === undefined ? [] : [{
+      productId: purchase.productId,
+      claimDay,
+      purchaseUnits: purchase.purchaseUnitsRequired,
+    }];
+  });
+}
+
 export function enrichCandidateWithDoseMarketCostV2(
   request: DecisionGraphRequestV2,
   candidate: RegimenCandidateV2,
@@ -204,17 +228,79 @@ export function enrichCandidateWithDoseMarketCostV2(
 
     const isWegovyMashRule = selected.plan.ruleId.startsWith("LABEL-WEGOVY-MASH-");
     if (isWegovyMashRule && hasActiveCurrentMedication(request, component.masterDrugId)) {
-      // The current dose may be part-way through a 28-day stage, so a 30-day
-      // projection must start from daysOnCurrentDose rather than pretending the
-      // selected strength applies for the whole window. Task 5 adds that exact
-      // continuation-window calculation; until then hide the misleading single-
-      // strength cost while preserving the clinical continuation dose plan.
+      // Current WEGOVY may sit part-way through a 28-day stage. Build the exact
+      // discrete continuation window here so insured-only safety is resolved in
+      // the same base enrichment pass rather than being undone by a later wrapper.
       component.selectedProductCost = undefined;
       component.genericCostBenchmark = undefined;
-      insuranceFits.push("unknown");
-      hasKnownCost = false;
-      dailyBurden += selected.plan.administrationsPerDay;
-      result.cautions.push("هزینه ۳۰روزه continuation WEGOVY تا محاسبه phase-aware بر اساس daysOnCurrentDose نمایش داده نمی‌شود؛ cost تک-strength جایگزین آن نشده است.");
+      const continuationPlan = buildWegovyMashContinuationWindowCostV2({ request, component, windowDays: 30 });
+      if (!continuationPlan) {
+        insuranceFits.push("unknown");
+        hasKnownCost = false;
+        dailyBurden += selected.plan.administrationsPerDay;
+        result.cautions.push("هزینه ۳۰روزه continuation WEGOVY از وضعیت فعلی قابل حل نیست؛ cost تک-strength جایگزین آن نشده است.");
+        continue;
+      }
+
+      attachWegovyMashContinuationCostV2(component, continuationPlan);
+      const scheduledClaims = scheduledClaimsForPlan(
+        continuationPlan.phases.map((phase) => ({ productId: phase.productId, claimDay: phase.firstAdministrationDay })),
+        continuationPlan.productPurchases,
+      );
+      const insuranceProjections = scheduledClaims.length === continuationPlan.productPurchases.length
+        ? estimateScheduledInsuranceClaimsV2({
+            windowDays: continuationPlan.windowDays,
+            claims: scheduledClaims,
+            products: request.inventory.marketProducts,
+            providers: request.preferences.insuranceProviders ?? [],
+            policies: request.inventory.insurancePolicies,
+            clinician: request.clinician,
+          })
+        : [];
+      attachScheduledInsuranceProjectionsV2(component, insuranceProjections);
+
+      if (continuationPlan.costAuthority === "executable") {
+        const exactCost = executableContinuationMonthlyCostV2(component);
+        if (exactCost) component.selectedProductCost = exactCost;
+        dailyBurden += continuationPlan.totalAdministrations / continuationPlan.windowDays;
+        const continuationInsuranceFit = bestScheduledInsuranceFitV2(insuranceProjections);
+        insuranceFits.push(continuationInsuranceFit);
+
+        if (request.preferences.costPreference === "insured_only") {
+          const insuredPatientCost = lowestUsableScheduledPatientCostV2(insuranceProjections);
+          if (insuredPatientCost === undefined) {
+            hasKnownCost = false;
+            result.cautions.push(
+              continuationInsuranceFit === "not_covered"
+                ? "برنامه continuation WEGOVY با Rule بیمه انتخاب‌شده سازگار نیست؛ هزینه insured-only نمایش داده نمی‌شود."
+                : "پوشش بیمه انتخاب‌شده برای continuation WEGOVY به‌طور صریح قابل اثبات نیست؛ هزینه insured-only نمایش داده نمی‌شود.",
+            );
+          } else {
+            totalPatientCost += insuredPatientCost;
+            result.reasons.push(
+              `هزینه insured-only continuation WEGOVY از claim schedule موجود محاسبه شد: سهم بیمار ${insuredPatientCost.toLocaleString("en-US")} تومان در ${continuationPlan.windowDays} روز.`,
+            );
+          }
+        } else {
+          totalPatientCost += continuationPlan.normalizedTreatmentValueToman;
+        }
+        result.reasons.push(
+          `هزینه continuation WEGOVY از برنامه دقیق ${continuationPlan.totalAdministrations} تزریق در ${continuationPlan.windowDays} روز محاسبه شد: ارزش مصرفی ${continuationPlan.normalizedTreatmentValueToman.toLocaleString("en-US")} تومان و خرید نقدی صفر-inventory ${continuationPlan.cashPurchaseCostToman.toLocaleString("en-US")} تومان.`,
+        );
+      } else {
+        // Future escalation remains a display-only projection even if insurer
+        // timing rules exist. Insurance can never promote unobserved tolerability
+        // into executable cost/ranking authority.
+        insuranceFits.push("unknown");
+        hasKnownCost = false;
+        component.selectedProductCost = undefined;
+        component.genericCostBenchmark = undefined;
+        dailyBurden += continuationPlan.totalAdministrations / continuationPlan.windowDays;
+        result.reasons.push(
+          `Projection مالی continuation WEGOVY: ${continuationPlan.totalAdministrations} تزریق در ${continuationPlan.windowDays} روز، ارزش مصرفی ${continuationPlan.normalizedTreatmentValueToman.toLocaleString("en-US")} تومان و خرید نقدی صفر-inventory ${continuationPlan.cashPurchaseCostToman.toLocaleString("en-US")} تومان.`,
+        );
+        result.cautions.push("این projection شامل escalation آینده با فرض ادامه تحمل درمان است؛ display-only است و وارد cost ranking یا بودجه قطعی نمی‌شود.");
+      }
       continue;
     }
 
@@ -235,15 +321,10 @@ export function enrichCandidateWithDoseMarketCostV2(
       attachPhaseAwareTitrationCostV2(component, phasePlan);
       dailyBurden += phasePlan.totalAdministrations / phasePlan.windowDays;
 
-      const firstClaimDay = new Map(phasePlan.phases.map((phase) => [phase.productId, phase.startDay]));
-      const scheduledClaims = phasePlan.productPurchases.flatMap((purchase) => {
-        const claimDay = firstClaimDay.get(purchase.productId);
-        return claimDay === undefined ? [] : [{
-          productId: purchase.productId,
-          claimDay,
-          purchaseUnits: purchase.purchaseUnitsRequired,
-        }];
-      });
+      const scheduledClaims = scheduledClaimsForPlan(
+        phasePlan.phases.map((phase) => ({ productId: phase.productId, claimDay: phase.startDay })),
+        phasePlan.productPurchases,
+      );
       const insuranceProjections = scheduledClaims.length === phasePlan.productPurchases.length
         ? estimateScheduledInsuranceClaimsV2({
             windowDays: phasePlan.windowDays,
@@ -265,7 +346,7 @@ export function enrichCandidateWithDoseMarketCostV2(
           result.cautions.push(
             phaseInsuranceFit === "not_covered"
               ? "برنامه چند-strength WEGOVY با Rule claim صریح بیمه انتخاب‌شده سازگار نیست؛ هزینه insured-only نمایش داده نمی‌شود."
-              : "Claim timing صریح و قابل استفاده برای تمام فازهای WEGOVY تأیید نشده است؛ هزینه insured-only نمایش داده نمی‌شود.",
+              : "claim timing صریح و قابل استفاده برای تمام فازهای WEGOVY تأیید نشده است؛ هزینه insured-only نمایش داده نمی‌شود.",
           );
         } else {
           totalPatientCost += insuredPatientCost;
