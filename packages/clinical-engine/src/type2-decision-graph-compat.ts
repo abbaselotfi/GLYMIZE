@@ -16,22 +16,50 @@ import {
 import { runDecisionGraphV2 } from "./decision-graph-v2/engine.js";
 import { buildDecisionGraphInventoryFromContractsV2 } from "./decision-graph-v2/inventory-adapter.js";
 import type {
+  ComposedTherapyActionV2,
+  ComposedTreatmentPlanV2,
   DecisionGraphRequestV2,
   DecisionGraphResultV2,
+  IranMarketProductV2,
+  ProductMonthlyCostV2,
   RecommendationV2,
+  ResolvedDosePlanV2,
 } from "./decision-graph-v2/types.js";
 
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
+export const TYPE2_DECISION_GRAPH_EXECUTION_PROJECTION_V1 = "GLYMIZE_DECISION_GRAPH_EXECUTION_PROJECTION_V1";
 
 export type IntervalAwareType2ConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "currentMedications"> & {
   currentMedications?: IntervalAwareCurrentMedicationInputV2[];
 };
+
+/**
+ * Additive compatibility projection of already-resolved Decision Graph v2
+ * execution metadata. It remains a recommendation and never becomes a signed
+ * physician order merely because a dose/product/cost was resolved by the graph.
+ */
+export interface Type2DecisionGraphExecutionProjectionV1 {
+  authority: typeof TYPE2_DECISION_GRAPH_EXECUTION_PROJECTION_V1;
+  action: ComposedTherapyActionV2;
+  sourceRegimenIds: string[];
+  sourceLanes: string[];
+  servesObjectives: string[];
+  dosePlan?: ResolvedDosePlanV2;
+  selectedProduct?: IranMarketProductV2;
+  selectedProductCost?: ProductMonthlyCostV2;
+  normalized30DayPatientCostToman?: number;
+  regimenInsuranceFit: RecommendationV2["insuranceFit"];
+  regimenMonthlyPatientCostToman?: number;
+  reasons: string[];
+  clinicianConfirmationRequired: true;
+}
 
 export interface Type2DecisionGraphMedicationProjection extends Type2MedicationConsideration {
   decisionGraphAuthority: true;
   decisionGraphRank: number;
   decisionGraphComponentOrder: number;
   decisionGraphRegimenId: string;
+  decisionGraphExecution?: Type2DecisionGraphExecutionProjectionV1;
 }
 
 export interface Type2DecisionGraphAssessmentResult extends Type2AssessmentResult {
@@ -258,10 +286,51 @@ function activeCurrentMedication(
   );
 }
 
-function projectionForRegimen(
+function treatmentPlanForRegimen(
+  result: DecisionGraphResultV2,
+  regimenId: string,
+): ComposedTreatmentPlanV2 | undefined {
+  if (result.treatmentPlan?.glycemicRegimenId === regimenId) return result.treatmentPlan;
+  return result.alternativeTreatmentPlans.find((plan) => plan.glycemicRegimenId === regimenId);
+}
+
+function executionProjectionForComponent(
+  regimen: RecommendationV2,
+  treatmentPlan: ComposedTreatmentPlanV2 | undefined,
+  masterDrugId: string,
+): Type2DecisionGraphExecutionProjectionV1 | undefined {
+  if (!treatmentPlan) return undefined;
+  const component = treatmentPlan.components.find((item) =>
+    item.masterDrugId === masterDrugId && item.sourceRegimenIds.includes(regimen.regimenId),
+  );
+  if (!component) return undefined;
+
+  return {
+    authority: TYPE2_DECISION_GRAPH_EXECUTION_PROJECTION_V1,
+    action: component.action,
+    sourceRegimenIds: [...component.sourceRegimenIds],
+    sourceLanes: [...component.sourceLanes],
+    servesObjectives: [...component.servesObjectives],
+    ...(component.dosePlan ? { dosePlan: structuredClone(component.dosePlan) } : {}),
+    ...(component.selectedProduct ? { selectedProduct: structuredClone(component.selectedProduct) } : {}),
+    ...(component.selectedProductCost ? { selectedProductCost: structuredClone(component.selectedProductCost) } : {}),
+    ...(component.normalized30DayPatientCostToman !== undefined
+      ? { normalized30DayPatientCostToman: component.normalized30DayPatientCostToman }
+      : {}),
+    regimenInsuranceFit: regimen.insuranceFit,
+    ...(regimen.monthlyPatientCostToman !== undefined
+      ? { regimenMonthlyPatientCostToman: regimen.monthlyPatientCostToman }
+      : {}),
+    reasons: [...component.reasons],
+    clinicianConfirmationRequired: true,
+  };
+}
+
+export function projectDecisionGraphRegimenToType2V2(
   regimen: RecommendationV2,
   rank: number,
   input: BuildType2DecisionGraphAssessmentInput,
+  treatmentPlan?: ComposedTreatmentPlanV2,
 ): Type2DecisionGraphMedicationProjection[] {
   const evidence = regimen.evidenceSummary.length ? regimen.evidenceSummary : regimen.evidence;
   const sourceUrl = evidence[0]?.url ?? "about:blank";
@@ -278,6 +347,11 @@ function projectionForRegimen(
     );
     const reasons = unique([...regimen.whySelected, ...regimen.reasons, ...component.availability.reasons]);
     const cautions = unique(regimen.cautions);
+    const decisionGraphExecution = executionProjectionForComponent(
+      regimen,
+      treatmentPlan,
+      component.masterDrugId,
+    );
     return {
       genericMedicationId: medication?.id ?? `master-${component.masterDrugId.toLocaleLowerCase()}`,
       genericName: medication?.canonicalName ?? component.genericName,
@@ -305,6 +379,7 @@ function projectionForRegimen(
       decisionGraphRank: rank,
       decisionGraphComponentOrder: componentIndex,
       decisionGraphRegimenId: regimen.regimenId,
+      ...(decisionGraphExecution ? { decisionGraphExecution } : {}),
     };
   });
 }
@@ -340,7 +415,13 @@ export function buildType2AssessmentFromDecisionGraphV2(
       sourceUrl: evidence[0]?.url ?? "about:blank",
       sourceReference,
     },
-    medications: regimens.flatMap((regimen, index) => projectionForRegimen(regimen, index + 1, input)),
+    medications: regimens.flatMap((regimen, index) =>
+      projectDecisionGraphRegimenToType2V2(
+        regimen,
+        index + 1,
+        input,
+        treatmentPlanForRegimen(result, regimen.regimenId),
+      )),
     decisionGraphAuthority: true,
     decisionGraphStatus: result.status,
     decisionGraphEngine: result.engine,
