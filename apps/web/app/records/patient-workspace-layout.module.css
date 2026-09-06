@@ -1,0 +1,48 @@
+.shell {
+  width: 100%;
+  --patient-workspace-max-width: 1380px;
+  --patient-workspace-columns: minmax(0, 1.4fr) minmax(340px, 0.8fr);
+  --patient-workspace-gap: 13px;
+  --patient-workspace-card-padding: 17px;
+  --patient-workspace-preview-padding: 18px;
+  --patient-workspace-preview-position: sticky;
+  --patient-workspace-preview-top: 86px;
+  --patient-workspace-preview-max-height: calc(100vh - 110px);
+  --patient-workspace-detail-gap: 16px;
+  --patient-workspace-row-padding: 10px;
+}
+
+.shell[data-patient-workspace-layout="focused_workflow"] {
+  --patient-workspace-max-width: 1120px;
+  --patient-workspace-columns: minmax(0, 1fr);
+  --patient-workspace-gap: 12px;
+  --patient-workspace-preview-position: static;
+  --patient-workspace-preview-top: auto;
+  --patient-workspace-preview-max-height: none;
+}
+
+.shell[data-patient-workspace-layout="compact_cards"] {
+  --patient-workspace-max-width: 1380px;
+  --patient-workspace-gap: 9px;
+  --patient-workspace-card-padding: 12px;
+  --patient-workspace-preview-padding: 13px;
+  --patient-workspace-detail-gap: 11px;
+  --patient-workspace-row-padding: 7px;
+}
+
+.shell[data-patient-workspace-layout="command_center"] {
+  --patient-workspace-max-width: 1680px;
+  --patient-workspace-columns: minmax(0, 1.15fr) minmax(460px, 1fr);
+  --patient-workspace-gap: 16px;
+  --patient-workspace-card-padding: 18px;
+  --patient-workspace-preview-padding: 20px;
+}
+
+@media (max-width: 980px) {
+  .shell {
+    --patient-workspace-columns: minmax(0, 1fr);
+    --patient-workspace-preview-position: static;
+    --patient-workspace-preview-top: auto;
+    --patient-workspace-preview-max-height: none;
+  }
+}
