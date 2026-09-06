@@ -75,16 +75,26 @@ export function PatientWorkspaceOrders({
   const fa = locale === "fa";
 
   return (
-    <section className={styles.panel} aria-labelledby="patient-workspace-orders-title">
+    <section
+      className={styles.panel}
+      aria-labelledby="patient-workspace-orders-title"
+      data-workspace-order-authority="signed-final-plan"
+    >
       <div className={styles.heading}>
         <div>
-          <span>{fa ? "برنامه امضاشده پزشک" : "SIGNED PHYSICIAN PLAN"}</span>
+          <span>{fa ? "دستورات امضاشده پس از ویزیت" : "POST-VISIT SIGNED ORDERS"}</span>
           <h3 id="patient-workspace-orders-title">
-            {fa ? "دستورها و وضعیت پیگیری" : "Orders and follow-up status"}
+            {fa ? "دستورهای نهایی و وضعیت پیگیری" : "Final orders and follow-up status"}
           </h3>
         </div>
         <strong>{orders.length}</strong>
       </div>
+
+      <p className={styles.boundary}>
+        {fa
+          ? "این بخش فقط از برنامه نهایی امضاشده پزشک می‌آید. فهرست داروهای ثبت‌شده در جزئیات ویزیت، تطبیق دارویی پیش از ویزیت است و نسخه یا دستور امضاشده محسوب نمی‌شود."
+          : "This section comes only from the physician's signed Final Plan. The medication list recorded in the visit details is pre-visit medication reconciliation and is not a signed prescription or order."}
+      </p>
 
       {orders.length === 0 ? (
         <p className={styles.empty}>
