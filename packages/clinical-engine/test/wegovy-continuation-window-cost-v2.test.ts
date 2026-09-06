@@ -7,6 +7,10 @@ import { enrichCandidateWithDoseMarketCostV2 as enrichBaseV2 } from "../src/deci
 import { enrichCandidateWithDoseMarketCostV2 } from "../src/decision-graph-v2/enrich-wegovy-continuation.js";
 import { resolveDosePlanV2 } from "../src/decision-graph-v2/dose.js";
 import {
+  scheduledInsuranceProjectionsV2,
+  type ClaimsAwareInsurancePolicyRuleV2,
+} from "../src/decision-graph-v2/insurance-claims.js";
+import {
   attachWegovyMashContinuationCostV2,
   buildWegovyMashContinuationWindowCostV2,
   executableContinuationMonthlyCostV2,
@@ -16,6 +20,7 @@ import type {
   ClinicalStateV2,
   DecisionGraphRequestV2,
   DoseRuleV2,
+  InsurancePolicyRuleV2,
   IranMarketProductV2,
   RegimenCandidateV2,
   ResolvedDosePlanV2,
@@ -183,6 +188,30 @@ function candidate(req: DecisionGraphRequestV2, target: Step): RegimenCandidateV
   };
 }
 
+function financialPolicy(step: Step): InsurancePolicyRuleV2 {
+  return {
+    id: `financial:${productId(step)}`,
+    provider: "social_security",
+    productId: productId(step),
+    masterDrugId,
+    coveragePercent: 50,
+  };
+}
+
+function claimPolicy(step: Step, minimumDaysBetweenClaims = 14): ClaimsAwareInsurancePolicyRuleV2 {
+  return {
+    ...financialPolicy(step),
+    id: `claims:${productId(step)}`,
+    claimTiming: {
+      groupKey: "wegovy-continuation-strength-switch",
+      windowDays: 30,
+      maxClaimsPerWindow: 2,
+      minimumDaysBetweenClaims,
+      allowDistinctProductsWithinWindow: true,
+    },
+  };
+}
+
 describe("WEGOVY continuation-window phase-aware cost", () => {
   it("requires a valid next-administration anchor for interval costing", () => {
     const invalid = resolveCurrentMedicationAdministrationV2({
@@ -254,7 +283,7 @@ describe("WEGOVY continuation-window phase-aware cost", () => {
     expect(enriched.cautions.join(" ")).toContain("display-only");
   });
 
-  it("restores exact maintenance cost into the live candidate without changing insurance authority", () => {
+  it("restores exact maintenance cost into the live candidate without changing insurance authority when no insurer is selected", () => {
     const med = current({ step: 2.4, daysOnCurrentDose: 60, therapyPhase: "maintenance", nextAdministrationInDays: 0 });
     const req = request(med);
     const enriched = enrichCandidateWithDoseMarketCostV2(req, candidate(req, 2.4));
@@ -264,6 +293,46 @@ describe("WEGOVY continuation-window phase-aware cost", () => {
     expect(enriched.insuranceFit).toBe("unknown");
     expect(wegovyMashContinuationCostV2(enriched.components[0]!)?.costAuthority).toBe("executable");
     expect(enriched.cautions.join(" ")).not.toContain("cost تک-strength جایگزین آن نشده است");
+  });
+
+  it("uses ordinary product insurance for executable single-claim maintenance", () => {
+    const med = current({ step: 2.4, daysOnCurrentDose: 60, therapyPhase: "maintenance", nextAdministrationInDays: 0 });
+    const req = request(med);
+    req.preferences.costPreference = "insured_only";
+    req.preferences.insuranceProviders = ["social_security"];
+    req.inventory.insurancePolicies = [financialPolicy(2.4)];
+
+    const enriched = enrichCandidateWithDoseMarketCostV2(req, candidate(req, 2.4));
+    const insurance = scheduledInsuranceProjectionsV2(enriched.components[0]!);
+
+    expect(insurance).toHaveLength(1);
+    expect(insurance[0]?.eligibility).toBe("eligible");
+    expect(insurance[0]?.claims).toEqual([{ productId: productId(2.4), claimDay: 1, purchaseUnits: 2 }]);
+    expect(enriched.insuranceFit).toBe("eligible");
+    expect(enriched.gate.status).toBe("pass");
+    expect(enriched.monthlyPatientCostToman).toBe(4_000_000);
+  });
+
+  it("never lets valid multi-claim insurance promote unobserved future escalation into ranking authority", () => {
+    const med = current({ step: 0.5, daysOnCurrentDose: 14, therapyPhase: "escalation", nextAdministrationInDays: 0 });
+    const req = request(med);
+    req.preferences.costPreference = "insured_only";
+    req.preferences.insuranceProviders = ["social_security"];
+    req.inventory.insurancePolicies = [claimPolicy(0.5), claimPolicy(1)];
+
+    const enriched = enrichCandidateWithDoseMarketCostV2(req, candidate(req, 0.5));
+    const insurance = scheduledInsuranceProjectionsV2(enriched.components[0]!);
+
+    expect(insurance[0]?.eligibility).toBe("eligible");
+    expect(insurance[0]?.claims.map((claim) => [claim.productId, claim.claimDay])).toEqual([
+      [productId(0.5), 1],
+      [productId(1), 15],
+    ]);
+    expect(wegovyMashContinuationCostV2(enriched.components[0]!)?.costAuthority).toBe("conditional_projection");
+    expect(enriched.insuranceFit).toBe("unknown");
+    expect(enriched.monthlyPatientCostToman).toBeUndefined();
+    expect(enriched.gate.status).toBe("exclude");
+    expect(enriched.cautions.join(" ")).toContain("display-only");
   });
 
   it("treats an already-authorized move from 1.7 mg escalation to 2.4 mg as stable maintenance costing", () => {
