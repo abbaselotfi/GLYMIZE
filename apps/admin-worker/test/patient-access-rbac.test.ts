@@ -18,7 +18,7 @@ const migration = fs.readFileSync(
 );
 const platform = fs.readFileSync(new URL("../src/platform-index.ts", import.meta.url), "utf8");
 const records = fs.readFileSync(
-  new URL("../src/platform-patient-record-v2.ts", import.meta.url),
+  new URL("../src/platform-patient-record-v2-core.ts", import.meta.url),
   "utf8",
 );
 const portal = fs.readFileSync(

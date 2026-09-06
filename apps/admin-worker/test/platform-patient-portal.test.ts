@@ -46,7 +46,7 @@ const reviewUi = fs.readFileSync(
   "utf8",
 );
 const recordRuntime = fs.readFileSync(
-  new URL("../src/platform-patient-record-v2.ts", import.meta.url),
+  new URL("../src/platform-patient-record-v2-core.ts", import.meta.url),
   "utf8",
 );
 
