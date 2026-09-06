@@ -1,4 +1,5 @@
 import type {
+  EngineInvestigationRecommendation,
   GenericMedication,
   IranMarketDrugProduct,
   MasterDrugRegistryEntry,
@@ -6,6 +7,7 @@ import type {
   Type2ConsiderationRequest,
 } from "@glymize/contracts";
 import { buildType2Assessment as buildLegacyType2Assessment } from "./index.js";
+import { resolveEngineInvestigationRecommendations } from "./investigation-recommendations.js";
 import {
   filterHardExcludedLegacyType2Assessment,
 } from "./type2-hard-exclusion-compat.js";
@@ -24,6 +26,11 @@ export interface Type2DecisionGraphRuntimeCatalog {
 export type Type2RuntimeAssessmentResultV2 = Type2AssessmentResult & {
   /** Non-ranking safety/referral channels shared by API and static-browser runtimes. */
   parallelSafety: Type2ParallelSafetyProjectionV2;
+  /**
+   * Approved-rule missing-data suggestions. These are recommendations only and
+   * are not PhysicianInvestigationOrder objects until explicit physician action.
+   */
+  investigationRecommendations: EngineInvestigationRecommendation[];
 };
 
 let runtimeCatalog: Type2DecisionGraphRuntimeCatalog | undefined;
@@ -43,7 +50,7 @@ export function type2DecisionGraphRuntimeConfigured() {
   return Boolean(runtimeCatalog?.masterRegistry.length);
 }
 
-function withParallelSafety(
+function withRuntimeSafetyChannels(
   assessment: Type2AssessmentResult,
   request: Type2ConsiderationRequest,
 ): Type2RuntimeAssessmentResultV2 {
@@ -52,6 +59,7 @@ function withParallelSafety(
     parallelSafety: resolveType2ParallelSafetyProjectionV2(
       request as Type2StructuredConsiderationRequestV2,
     ),
+    investigationRecommendations: resolveEngineInvestigationRecommendations(request),
   };
 }
 
@@ -65,10 +73,11 @@ function withParallelSafety(
  * `requires_approved_protocol` review options; those options receive no Decision
  * Graph rank and cannot become executable until a reviewed rule/protocol exists.
  *
- * The stable Type2 assessment fields remain intact. `parallelSafety` is an
- * additive, non-ranking channel resolved by the same reviewed pathway code in
- * every runtime. It never participates in medication scoring, graph rank, dose
- * execution, or scenario ordering.
+ * The stable Type2 assessment fields remain intact. `parallelSafety` and
+ * `investigationRecommendations` are additive, non-ranking channels. Neither may
+ * participate in medication scoring, graph rank, dose execution or scenario
+ * ordering. Investigation recommendations are projected only from an approved,
+ * valid rule pack and remain distinct from physician-authored orders.
  *
  * The legacy builder remains only as an explicit compatibility fallback for
  * non-browser/test consumers that have not configured runtime catalogue data.
@@ -81,13 +90,13 @@ export function buildType2Assessment(
 ): Type2RuntimeAssessmentResultV2 {
   if (!runtimeCatalog?.masterRegistry.length) {
     const legacyAssessment = buildLegacyType2Assessment(medications, request);
-    return withParallelSafety(
+    return withRuntimeSafetyChannels(
       filterHardExcludedLegacyType2Assessment(legacyAssessment, medications, request),
       request,
     );
   }
 
-  return withParallelSafety(
+  return withRuntimeSafetyChannels(
     buildType2AssessmentWithWorldDrugCoverageV2({
       medications,
       request,
