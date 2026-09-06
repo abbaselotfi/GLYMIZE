@@ -19,6 +19,23 @@ function Invoke-Git {
     return $output
 }
 
+function Resolve-CbmExecutable {
+    $command = Get-Command codebase-memory-mcp -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    if ($env:LOCALAPPDATA) {
+        $defaultInstall = Join-Path $env:LOCALAPPDATA 'Programs\codebase-memory-mcp\codebase-memory-mcp.exe'
+        if (Test-Path -LiteralPath $defaultInstall -PathType Leaf) {
+            Write-Host "codebase-memory-mcp was not in PATH; using installed binary: $defaultInstall" -ForegroundColor Yellow
+            return $defaultInstall
+        }
+    }
+
+    throw 'codebase-memory-mcp is not available in PATH and was not found in the standard Windows install location under %LOCALAPPDATA%\Programs\codebase-memory-mcp.'
+}
+
 if (-not $RoadmapReviewed) {
     throw 'Roadmap review is mandatory. Read the applicable GLYMIZE Roadmap(s), then rerun with -RoadmapReviewed.'
 }
@@ -26,15 +43,15 @@ if (-not $RoadmapReviewed) {
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw 'git is not available in PATH.'
 }
-if (-not (Get-Command codebase-memory-mcp -ErrorAction SilentlyContinue)) {
-    throw 'codebase-memory-mcp is not available in PATH.'
-}
+
+$cbm = Resolve-CbmExecutable
 
 $repoRoot = (Invoke-Git rev-parse --show-toplevel | Select-Object -First 1).Trim()
 Set-Location $repoRoot
 
 Write-Host "GLYMIZE ROADMAP + GRAPH GATE [$Phase]" -ForegroundColor Cyan
 Write-Host "Repository: $repoRoot"
+Write-Host "CBM binary: $cbm"
 
 Invoke-Git fetch origin main | Out-Null
 $originMain = (Invoke-Git rev-parse origin/main | Select-Object -First 1).Trim()
@@ -56,7 +73,7 @@ if ($Phase -eq 'pre') {
 }
 
 function Get-CbmProject {
-    $lines = @(& codebase-memory-mcp cli list_projects --format json)
+    $lines = @(& $cbm cli list_projects --format json)
     if ($LASTEXITCODE -ne 0) {
         throw 'Codebase Memory list_projects failed.'
     }
@@ -72,7 +89,7 @@ function Get-CbmProject {
 $project = Get-CbmProject
 if (-not $project) {
     Write-Host 'No local graph found for this checkout; creating a full persistent index...' -ForegroundColor Yellow
-    & codebase-memory-mcp cli --progress index_repository --repo-path $repoRoot --mode full --persistence true
+    & $cbm cli --progress index_repository --repo-path $repoRoot --mode full --persistence true
     if ($LASTEXITCODE -ne 0) { throw 'Initial Codebase Memory index failed.' }
     $project = Get-CbmProject
     if (-not $project) { throw 'Codebase Memory project was not discoverable after indexing.' }
@@ -82,17 +99,17 @@ $projectName = [string]$project.name
 Write-Host "CBM project: $projectName"
 
 Write-Host 'Capturing changes BEFORE refresh...' -ForegroundColor Cyan
-& codebase-memory-mcp cli detect_changes --project $projectName
+& $cbm cli detect_changes --project $projectName
 if ($LASTEXITCODE -ne 0) { throw 'Codebase Memory detect_changes failed.' }
 
 Write-Host 'Current index status:' -ForegroundColor Cyan
-& codebase-memory-mcp cli index_status --project $projectName
+& $cbm cli index_status --project $projectName
 if ($LASTEXITCODE -ne 0) { throw 'Codebase Memory index_status failed.' }
 
 $shouldRefresh = ($Phase -eq 'pre') -or $GraphRelevant
 if ($shouldRefresh) {
     Write-Host 'Refreshing persistent graph from the final/current source state...' -ForegroundColor Cyan
-    & codebase-memory-mcp cli --progress index_repository --repo-path $repoRoot --mode full --persistence true
+    & $cbm cli --progress index_repository --repo-path $repoRoot --mode full --persistence true
     if ($LASTEXITCODE -ne 0) { throw 'Codebase Memory refresh failed.' }
 
     $project = Get-CbmProject
@@ -100,7 +117,7 @@ if ($shouldRefresh) {
     $projectName = [string]$project.name
 
     Write-Host 'Post-refresh index status:' -ForegroundColor Cyan
-    & codebase-memory-mcp cli index_status --project $projectName
+    & $cbm cli index_status --project $projectName
     if ($LASTEXITCODE -ne 0) { throw 'Post-refresh Codebase Memory index_status failed.' }
 }
 
