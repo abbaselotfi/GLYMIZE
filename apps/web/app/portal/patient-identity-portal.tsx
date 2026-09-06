@@ -320,7 +320,7 @@ export default function PatientIdentityPortal({
               <span>{fa ? "مرا به خاطر بسپار" : "Remember me"}</span>
             </label>
           ) : null}
-          <button className={styles.primary} type="submit" disabled={busy || !nationalIdValid || !passwordValid}>
+          <button className={styles.primary} type="submit" disabled={busy || nationalId.length !== 10 || !passwordValid}>
             {busy ? (fa ? "در حال بررسی…" : "Checking…") : mode === "login" ? (fa ? "ورود امن" : "Secure sign in") : (fa ? "ساخت حساب بدون لینک" : "Create unlinked account")}
           </button>
         </form>
