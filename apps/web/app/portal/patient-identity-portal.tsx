@@ -1,11 +1,13 @@
 "use client";
 
-import type {
-  GlobalPatientAccountSummary,
-  PatientIdentityCapabilities,
-  PatientPracticeContext,
-  PatientVerifiedLegacyLinkSummary,
-  ReferralRedemption,
+import {
+  toAsciiDigits,
+  validateIranianNationalId,
+  type GlobalPatientAccountSummary,
+  type PatientIdentityCapabilities,
+  type PatientPracticeContext,
+  type PatientVerifiedLegacyLinkSummary,
+  type ReferralRedemption,
 } from "@glymize/contracts";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -39,6 +41,10 @@ type Props = {
   onUseLegacy: () => void;
 };
 
+function normalizeNationalIdInput(value: string) {
+  return toAsciiDigits(value).replace(/\D/g, "").slice(0, 10);
+}
+
 export default function PatientIdentityPortal({
   capabilities,
   legacyPortalEnabled,
@@ -64,6 +70,9 @@ export default function PatientIdentityPortal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  const nationalIdValid = nationalId.length === 10 && validateIranianNationalId(nationalId);
+  const passwordValid = password.length >= 10 && password.length <= 128;
 
   async function loadPatientHome(nextAccount: GlobalPatientAccountSummary) {
     setAccount(nextAccount);
@@ -112,9 +121,28 @@ export default function PatientIdentityPortal({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setBusy(true);
     setError("");
     setMessage("");
+
+    if (!nationalIdValid) {
+      setError(
+        fa
+          ? "کد ملی واردشده معتبر نیست. لطفاً هر ۱۰ رقم را بررسی کنید."
+          : "The National ID is not valid. Check all 10 digits.",
+      );
+      return;
+    }
+
+    if (!passwordValid) {
+      setError(
+        fa
+          ? "رمز عبور باید بین ۱۰ تا ۱۲۸ کاراکتر باشد."
+          : "Password must be between 10 and 128 characters.",
+      );
+      return;
+    }
+
+    setBusy(true);
     try {
       if (mode === "register") {
         await registerPatientIdentity({ nationalId, password });
@@ -135,11 +163,17 @@ export default function PatientIdentityPortal({
       setError(
         code === "invalid_credentials"
           ? fa ? "کد ملی یا رمز عبور صحیح نیست." : "National ID or password is incorrect."
-          : code === "registration_unavailable"
-            ? fa ? "ثبت‌نام با این اطلاعات در دسترس نیست." : "Registration is unavailable for these details."
-            : code === "rate_limited"
-              ? fa ? "تعداد تلاش‌ها زیاد است؛ کمی بعد دوباره امتحان کنید." : "Too many attempts; try again later."
-              : code,
+          : code === "account_already_exists"
+            ? fa ? "برای این کد ملی قبلاً حساب ساخته شده است؛ از بخش ورود استفاده کنید." : "An account already exists for this National ID; use Sign in."
+            : code === "registration_unavailable"
+              ? fa ? "ثبت‌نام با این اطلاعات انجام نشد. اطلاعات واردشده را بررسی کنید." : "Registration could not be completed. Check the supplied details."
+              : code === "self_registration_disabled"
+                ? fa ? "ثبت‌نام بیمار در حال حاضر غیرفعال است." : "Patient registration is currently disabled."
+                : code === "identity_service_not_configured"
+                  ? fa ? "سرویس هویت بیمار در حال حاضر آماده نیست." : "The patient identity service is not currently available."
+                  : code === "rate_limited"
+                    ? fa ? "تعداد تلاش‌ها زیاد است؛ کمی بعد دوباره امتحان کنید." : "Too many attempts; try again later."
+                    : code,
       );
     } finally {
       setBusy(false);
@@ -261,11 +295,24 @@ export default function PatientIdentityPortal({
         <form onSubmit={(event) => void submit(event)}>
           <label>
             <span>{fa ? "کد ملی" : "National ID"}</span>
-            <input inputMode="numeric" autoComplete="username" value={nationalId} onChange={(event) => setNationalId(event.target.value.replace(/\D/g, "").slice(0, 10))} />
+            <input
+              inputMode="numeric"
+              autoComplete="username"
+              value={nationalId}
+              maxLength={10}
+              aria-invalid={nationalId.length === 10 && !nationalIdValid}
+              onChange={(event) => setNationalId(normalizeNationalIdInput(event.target.value))}
+            />
           </label>
           <label>
             <span>{fa ? "رمز عبور" : "Password"}</span>
-            <input type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} />
+            <input
+              type="password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              value={password}
+              maxLength={128}
+              onChange={(event) => setPassword(event.target.value)}
+            />
           </label>
           {mode === "login" ? (
             <label className={styles.remember}>
@@ -273,7 +320,7 @@ export default function PatientIdentityPortal({
               <span>{fa ? "مرا به خاطر بسپار" : "Remember me"}</span>
             </label>
           ) : null}
-          <button className={styles.primary} type="submit" disabled={busy || nationalId.length !== 10 || password.length < 10}>
+          <button className={styles.primary} type="submit" disabled={busy || nationalId.length !== 10 || !passwordValid}>
             {busy ? (fa ? "در حال بررسی…" : "Checking…") : mode === "login" ? (fa ? "ورود امن" : "Secure sign in") : (fa ? "ساخت حساب بدون لینک" : "Create unlinked account")}
           </button>
         </form>
