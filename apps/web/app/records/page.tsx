@@ -1,5 +1,10 @@
 import RecordsClient from "./records-client";
+import { PatientWorkspaceLayout } from "./patient-workspace-layout";
 
 export default function RecordsPage() {
-  return <RecordsClient />;
+  return (
+    <PatientWorkspaceLayout>
+      <RecordsClient />
+    </PatientWorkspaceLayout>
+  );
 }
