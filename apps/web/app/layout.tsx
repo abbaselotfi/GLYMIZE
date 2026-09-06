@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { withBasePath } from "../lib/base-path";
-import AppShell from "./components/app-shell";
+import RouteAwareShell from "./components/route-aware-shell";
 import "./globals.css";
 import "./internal-shell.css";
 import "./theme-overrides.css";
@@ -46,7 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fa" dir="rtl" data-glymize-theme="clinical" data-glymize-mode="light">
       <body>
-        <AppShell>{children}</AppShell>
+        <RouteAwareShell>{children}</RouteAwareShell>
       </body>
     </html>
   );
