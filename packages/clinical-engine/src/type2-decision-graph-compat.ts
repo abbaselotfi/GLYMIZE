@@ -1,5 +1,6 @@
 import type {
   GenericMedication,
+  InsuranceProvider,
   IranMarketDrugProduct,
   MasterDrugRegistryEntry,
   MedicationTherapyGroup,
@@ -25,12 +26,15 @@ import type {
   RecommendationV2,
   ResolvedDosePlanV2,
 } from "./decision-graph-v2/types.js";
+import { resolveType2InsuranceProvidersV2 } from "./type2-intake-v2.js";
 
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
 export const TYPE2_DECISION_GRAPH_EXECUTION_PROJECTION_V1 = "GLYMIZE_DECISION_GRAPH_EXECUTION_PROJECTION_V1";
 
 export type IntervalAwareType2ConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "currentMedications"> & {
   currentMedications?: IntervalAwareCurrentMedicationInputV2[];
+  /** Clinician-selected insurer used for access/cost preference evaluation. */
+  insuranceProvider?: InsuranceProvider;
 };
 
 /**
@@ -157,18 +161,19 @@ function currentMedicationsV2(
   });
 }
 
+/** Compatibility export; insurer resolution authority lives in type2-intake-v2. */
+export function resolveType2InsuranceProvidersForDecisionGraphV2(
+  request: IntervalAwareType2ConsiderationRequestV2,
+): InsuranceProvider[] {
+  return resolveType2InsuranceProvidersV2(request);
+}
+
 function graphRequest(
   input: BuildType2DecisionGraphAssessmentInput,
   inventory: DecisionGraphRequestV2["inventory"],
 ): DecisionGraphRequestV2 {
   const { request, medications, masterRegistry } = input;
   const context = request.clinicalContext;
-  const providerSet = new Set<string>();
-  for (const coverages of Object.values(request.insuranceCoverageByMedicationId ?? {})) {
-    for (const coverage of coverages) {
-      if (coverage.runtimeEligibleForRanking !== false) providerSet.add(coverage.provider);
-    }
-  }
 
   return {
     patient: {
@@ -214,7 +219,7 @@ function graphRequest(
           : request.costPreference === "moderate"
             ? "moderate"
             : "no_constraint",
-      insuranceProviders: [...providerSet],
+      insuranceProviders: resolveType2InsuranceProvidersForDecisionGraphV2(request),
     },
     inventory,
   };
