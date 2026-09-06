@@ -489,6 +489,7 @@ export default function Type2ScenariosClient() {
       clinicalContext: clinicalContextPayload(),
       costPreference,
       routePreference,
+      insuranceProvider,
       hyperglycemiaSymptoms,
       catabolicFeatures,
       factors,
@@ -617,7 +618,7 @@ export default function Type2ScenariosClient() {
             <div className={styles.subhead}><div><b>{fa ? "اولویت مرتب‌سازی سناریوها" : "Scenario ordering priority"}</b><small>{fa ? "ایمنی و اندیکاسیون همیشه Hard Gate باقی می‌مانند؛ این انتخاب فقط ترتیب گزینه‌های بالینی قابل قبول را تغییر می‌دهد." : "Safety and indication remain hard gates; this only reorders clinically acceptable scenarios."}</small></div></div>
             <div className={styles.choiceGrid}>{SCENARIO_SORTS.map((item) => <label className={scenarioSortMode === item.value ? styles.choiceActive : styles.choice} key={item.value}><input type="radio" name="scenario-sort" checked={scenarioSortMode === item.value} onChange={() => setScenarioSortMode(item.value)} /><span>{fa ? item.fa : item.en}</span></label>)}</div>
             <div className={styles.twoCols}>
-              <label className={styles.selectField}><span>{fa ? "بیمه بیمار برای محاسبه هزینه" : "Patient insurer for cost estimate"}</span><select value={insuranceProvider} onChange={(event) => setInsuranceProvider(event.target.value as InsuranceProvider)}>{INSURERS.map((item) => <option value={item.value} key={item.value}>{fa ? item.fa : item.en}</option>)}</select></label>
+              <label className={styles.selectField}><span>{fa ? "بیمه بیمار برای ارزیابی دسترسی و هزینه" : "Patient insurer for access and cost evaluation"}</span><select value={insuranceProvider} onChange={(event) => { setInsuranceProvider(event.target.value as InsuranceProvider); setAssessment(null); }}>{INSURERS.map((item) => <option value={item.value} key={item.value}>{fa ? item.fa : item.en}</option>)}</select></label>
               <label className={styles.selectField}><span>{fa ? "مسیر مصرف" : "Route preference"}</span><select value={routePreference} onChange={(event) => { setRoutePreference(event.target.value as Type2RoutePreference); setAssessment(null); }}><option value="oral_and_injectable">{fa ? "خوراکی و تزریقی" : "Oral and injectable"}</option><option value="oral_only">{fa ? "فقط خوراکی" : "Oral only"}</option></select></label>
             </div>
             <div className={styles.alertChecks}>
