@@ -132,6 +132,7 @@ export async function registerPatientIdentity(
     body: JSON.stringify(input),
   });
   if (!response.ok) {
+    if (response.status === 409) throw new Error("account_already_exists");
     throw new Error(await errorOf(response, "PATIENT_IDENTITY_REGISTRATION_FAILED"));
   }
   return response.json() as Promise<PatientIdentityRegistrationResult>;
