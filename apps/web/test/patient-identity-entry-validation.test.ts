@@ -23,8 +23,9 @@ describe("patient identity entry validation", () => {
   it("wires the patient form to the shared Iranian national-ID validator", () => {
     expect(portal).toContain("toAsciiDigits(value)");
     expect(portal).toContain("validateIranianNationalId(nationalId)");
-    expect(portal).toContain("disabled={busy || !nationalIdValid || !passwordValid}");
+    expect(portal).toContain("disabled={busy || nationalId.length !== 10 || !passwordValid}");
     expect(portal).toContain("maxLength={128}");
+    expect(portal).toContain("کد ملی واردشده معتبر نیست");
   });
 
   it("distinguishes duplicate registration from malformed registration", () => {
