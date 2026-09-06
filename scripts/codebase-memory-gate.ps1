@@ -73,7 +73,8 @@ if ($Phase -eq 'pre') {
 }
 
 function Get-CbmProject {
-    $lines = @(& $cbm cli list_projects --format json)
+    # CBM 0.10.8 list_projects already emits a JSON object; it does not support --format.
+    $lines = @(& $cbm cli list_projects)
     if ($LASTEXITCODE -ne 0) {
         throw 'Codebase Memory list_projects failed.'
     }
