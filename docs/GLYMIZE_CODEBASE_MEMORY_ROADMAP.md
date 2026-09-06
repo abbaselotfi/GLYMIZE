@@ -42,18 +42,17 @@ The first local full index created on 2026-09-06 with Codebase Memory MCP `0.10.
 
 That first local index is retained only as a **provisional historical baseline** because the exact local Git SHA was not proven against `origin/main` before indexing.
 
-The canonical shared graph is instead generated from the exact GitHub `main` checkout by `.github/workflows/codebase-memory-snapshot.yml` and published to the dedicated repository branch:
+The canonical shared graph is instead generated from the exact GitHub `main` checkout by `.github/workflows/codebase-memory-snapshot.yml` and published inside the private GLYMIZE GitHub repository as release assets under the moving tag/release:
 
-`codebase-memory-snapshot`
+`codebase-memory-latest`
 
-That branch is machine-managed and force-refreshed to keep only the latest shared snapshot rather than accumulating a new multi-megabyte binary blob in normal `main` history.
+The release contains:
 
-The shared snapshot branch contains at least:
+- `codebase-memory-snapshot.tar.gz` containing `.codebase-memory/graph.db.zst`, `artifact.json`, `.gitattributes` when emitted, and `snapshot-source.json`;
+- `codebase-memory-snapshot.sha256`;
+- `snapshot-source.json` with the exact source `main` SHA, Codebase Memory version, and workflow run provenance.
 
-- `.codebase-memory/graph.db.zst`;
-- `.codebase-memory/artifact.json`;
-- `.codebase-memory/.gitattributes` when emitted by Codebase Memory;
-- `snapshot-source.json` with the source `main` SHA and generator metadata.
+This keeps the graph shared and recoverable from GitHub without adding multi-megabyte binary rewrites to normal Git history or creating a non-source branch that could trigger Cloudflare preview deployment.
 
 The project name/path shown by `list_projects` is machine-specific and must be resolved dynamically. `C-Users-abbas-GLYMIZE-RC-AUTHFIX-0903bdb` and `C:\Users\abbas\GLYMIZE-RC-AUTHFIX-0903bdb` are workstation references, not portable identifiers.
 
@@ -79,14 +78,7 @@ After the ROADMAP gate and before implementation:
 4. Check Codebase Memory availability and project/index status.
 5. Run `detect_changes` **before any refresh** so changes since the last index are not erased from the delta view.
 6. If the graph is missing, stale, or not aligned to the current source, refresh it before implementation. Prefer incremental refresh when correctness is clear; use a full re-index when the graph is missing, corrupted, schema-incompatible, or incremental correctness is uncertain.
-7. Use graph tools to identify the relevant architecture before broad file reading. Appropriate tools include:
-   - `get_architecture`;
-   - `search_graph`;
-   - `query_graph`;
-   - `trace_path`;
-   - `get_code_snippet`;
-   - `search_code`;
-   - `detect_changes`.
+7. Use graph tools to identify the relevant architecture before broad file reading. Appropriate tools include `get_architecture`, `search_graph`, `query_graph`, `trace_path`, `get_code_snippet`, `search_code`, and `detect_changes`.
 8. Establish a pre-change blast-radius hypothesis: expected files, packages, routes, contracts, migrations and tests.
 9. Directly inspect every security-, authorization-, clinical-authority-, migration-, encryption-, patient-isolation-, order-authority-, or deployment-critical source identified by the graph.
 10. Only then define the smallest implementation scope.
@@ -137,10 +129,10 @@ Policy:
 
 - local graph refresh is allowed whenever the PRE/POST gates require it;
 - GitHub Actions regenerates the canonical snapshot from exact `main` source after graph-relevant `main` changes and on manual dispatch;
-- the generated binary snapshot is published to the machine-managed `codebase-memory-snapshot` branch;
-- that branch is force-refreshed so old binary snapshots do not bloat normal repository history;
+- the generated snapshot is published to the private GitHub Release/tag `codebase-memory-latest`;
+- the tag is moved to the exact source SHA and release assets are replaced with `--clobber`, so only the current canonical shared snapshot is retained as the normal bootstrap target;
 - `main` keeps the workflow, scripts, `.cbmignore`, Roadmap contract and PR/CI enforcement;
-- a local developer/agent may bootstrap from the shared snapshot and then apply incremental local differences.
+- a local developer/agent may bootstrap from the shared release snapshot and then apply incremental local differences.
 
 If the snapshot workflow fails, the source merge remains the authority, but the Graph Gate becomes degraded/YELLOW until the shared snapshot is repaired.
 
