@@ -1,5 +1,11 @@
 import { calculateProductMonthlyCostV2, chooseGenericCostBenchmarkV2 } from "./cost.js";
 import {
+  attachScheduledInsuranceProjectionsV2,
+  bestScheduledInsuranceFitV2,
+  estimateScheduledInsuranceClaimsV2,
+  lowestUsableScheduledPatientCostV2,
+} from "./insurance-claims.js";
+import {
   attachPhaseAwareTitrationCostV2,
   buildWegovyMashInitiationTitrationCostV2,
 } from "./wegovy-titration-cost.js";
@@ -219,8 +225,8 @@ export function enrichCandidateWithDoseMarketCostV2(
       // crosses into 0.5 mg on day 29. Remove it even if the composite plan fails.
       component.selectedProductCost = undefined;
       component.genericCostBenchmark = undefined;
-      insuranceFits.push("unknown");
       if (!phasePlan) {
+        insuranceFits.push("unknown");
         hasKnownCost = false;
         result.cautions.push("هزینه شروع WEGOVY چندمرحله‌ای قابل حل نیست؛ موتور از نمایش هزینه ۳۰روزه تک-strength خودداری کرد.");
         dailyBurden += selected.plan.administrationsPerDay;
@@ -228,9 +234,45 @@ export function enrichCandidateWithDoseMarketCostV2(
       }
       attachPhaseAwareTitrationCostV2(component, phasePlan);
       dailyBurden += phasePlan.totalAdministrations / phasePlan.windowDays;
+
+      const firstClaimDay = new Map(phasePlan.phases.map((phase) => [phase.productId, phase.startDay]));
+      const scheduledClaims = phasePlan.productPurchases.flatMap((purchase) => {
+        const claimDay = firstClaimDay.get(purchase.productId);
+        return claimDay === undefined ? [] : [{
+          productId: purchase.productId,
+          claimDay,
+          purchaseUnits: purchase.purchaseUnitsRequired,
+        }];
+      });
+      const insuranceProjections = scheduledClaims.length === phasePlan.productPurchases.length
+        ? estimateScheduledInsuranceClaimsV2({
+            windowDays: phasePlan.windowDays,
+            claims: scheduledClaims,
+            products: request.inventory.marketProducts,
+            providers: request.preferences.insuranceProviders ?? [],
+            policies: request.inventory.insurancePolicies,
+            clinician: request.clinician,
+          })
+        : [];
+      attachScheduledInsuranceProjectionsV2(component, insuranceProjections);
+      const phaseInsuranceFit = bestScheduledInsuranceFitV2(insuranceProjections);
+      insuranceFits.push(phaseInsuranceFit);
+
       if (request.preferences.costPreference === "insured_only") {
-        hasKnownCost = false;
-        result.cautions.push("پوشش بیمه برای شروع چند-strength WEGOVY تا زمان مدل‌سازی claim timing هر فاز ناشناخته است؛ هزینه insured-only نمایش داده نمی‌شود.");
+        const insuredPatientCost = lowestUsableScheduledPatientCostV2(insuranceProjections);
+        if (insuredPatientCost === undefined) {
+          hasKnownCost = false;
+          result.cautions.push(
+            phaseInsuranceFit === "not_covered"
+              ? "برنامه چند-strength WEGOVY با Rule claim صریح بیمه انتخاب‌شده سازگار نیست؛ هزینه insured-only نمایش داده نمی‌شود."
+              : "Claim timing صریح و قابل استفاده برای تمام فازهای WEGOVY تأیید نشده است؛ هزینه insured-only نمایش داده نمی‌شود.",
+          );
+        } else {
+          totalPatientCost += insuredPatientCost;
+          result.reasons.push(
+            `هزینه insured-only شروع WEGOVY فقط از claim schedule صریح بیمه محاسبه شد: سهم بیمار ${insuredPatientCost.toLocaleString("en-US")} تومان در ${phasePlan.windowDays} روز.`,
+          );
+        }
       } else {
         totalPatientCost += phasePlan.normalizedTreatmentValueToman;
       }
