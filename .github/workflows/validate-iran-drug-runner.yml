@@ -34,5 +34,11 @@ jobs:
       - name: Compile consensus pipeline
         run: python -m py_compile tools/iran-drug-runner/consensus_pipeline.py
 
-      - name: Test Phase 4 multidomain scope merge
-        run: python tools/iran-drug-runner/test_multidomain_scope.py
+      - name: Test normalizer and consensus pipeline
+        run: |
+          python tools/iran-drug-runner/test_normalize_bundle.py
+          python tools/iran-drug-runner/test_normalize_bundle_runtime.py
+          python tools/iran-drug-runner/test_source_consensus.py
+          python tools/iran-drug-runner/test_consensus_pipeline.py
+          python tools/iran-drug-runner/test_finalize_latest_for_import.py
+          python tools/iran-drug-runner/test_multidomain_scope.py
