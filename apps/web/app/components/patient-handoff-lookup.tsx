@@ -12,6 +12,9 @@ import {
   lookupPatientHandoff as lookupLegacyPatientHandoff,
 } from "../../lib/patient-handoff-client";
 import {
+  lookupPatientHandoffForReview,
+} from "../../lib/care-team-record-client";
+import {
   openPatientRecordArchiveItem,
 } from "../../lib/patient-record-archive-client";
 import {
@@ -74,9 +77,68 @@ export default function PatientHandoffLookup({ onApply }: { onApply: (record: Pa
     setSkipped(false);
 
     try {
+      if (lookupMode === "auto") {
+        // Preserve the established physician review boundary: Patient Record v2
+        // is checked first and legacy remains a read-only fallback. This helper
+        // performs no implicit legacy promotion or patient/encounter writes.
+        const v2Result = await lookupPatientHandoffForReview(normalized);
+
+        if (v2Result.resolution === "legacy") {
+          const legacy = await lookupLegacyPatientHandoff(
+            normalized,
+            v2Result.patientCodeKind,
+          );
+          if (!legacy.found || !legacy.record) {
+            setStatus(fa ? "پرونده آماده‌ای با این شناسه پیدا نشد." : "No prepared record was found for this identifier.");
+            return;
+          }
+          setSelection({
+            resolution: "legacy_handoff",
+            record: legacy.record,
+            identifierDisplay: legacy.record.patientCodeDisplay,
+          });
+          setStatus(fa
+            ? "handoff قدیمی به‌صورت read-only پیدا شد؛ از این مسیر هیچ promotion خودکاری انجام نمی‌شود."
+            : "A legacy handoff was found read-only; this workflow never performs automatic promotion.");
+          return;
+        }
+
+        if (v2Result.resolution === "patient_record_v2") {
+          const resolved = await resolvePatient({ identifier: normalized });
+          if (!resolved.patient) {
+            setStatus(fa ? "پرونده طولی بیمار قابل بازیابی نیست." : "The longitudinal patient record could not be resolved.");
+            return;
+          }
+          const resolvedKind = resolved.resolvedKind as PatientCodeKind;
+          const identifierDisplay =
+            v2Result.record?.patientCodeDisplay ??
+            resolved.matchedIdentifier?.displayMask ??
+            patientIdentifierDisplay(resolved.patient, resolvedKind);
+          setSelection({
+            resolution: "patient_record_v2",
+            patient: resolved.patient,
+            ...(v2Result.record ? { record: v2Result.record } : {}),
+            identifierDisplay,
+          });
+          setStatus(v2Result.record
+            ? ""
+            : (fa
+                ? "بیمار پیدا شد، اما ویزیت آماده‌شده توسط Care Team وجود ندارد. می‌توانید دستی ادامه دهید یا بیمار را به Care Team هدایت کنید."
+                : "Patient found, but there is no Care Team visit ready for physician review. Continue manually or guide the patient to Care Team."));
+          return;
+        }
+
+        setStatus(fa
+          ? "بیماری با این شناسه پیدا نشد. می‌توانید به Care Team هدایت کنید یا بدون پرونده ادامه دهید."
+          : "No patient was found. Guide to Care Team or continue without a patient record.");
+        return;
+      }
+
+      // Explicit identifier override intentionally bypasses automatic kind
+      // inference but keeps the same Patient Record v2 read authority.
       const resolved = await resolvePatient({
         identifier: normalized,
-        ...(lookupMode === "auto" ? {} : { kind: lookupMode }),
+        kind: lookupMode,
       });
 
       if (resolved.patient) {
