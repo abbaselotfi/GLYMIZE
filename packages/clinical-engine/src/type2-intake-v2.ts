@@ -117,6 +117,7 @@ export function type2StructuredIntakeToDecisionGraphV2(
 ): DecisionGraphRequestWithSpecialistContextsV2 {
   const context = request.clinicalContext;
   const pregnancy = context?.pregnancy ?? request.factors.includes("pregnancy");
+  const insuranceProviders = resolveType2InsuranceProvidersV2(request);
 
   return {
     patient: {
@@ -165,7 +166,7 @@ export function type2StructuredIntakeToDecisionGraphV2(
     preferences: {
       routePreference: routePreference(request.routePreference),
       costPreference: costPreference(request.costPreference),
-      insuranceProviders: resolveType2InsuranceProvidersV2(request),
+      ...(insuranceProviders.length ? { insuranceProviders } : {}),
     },
     inventory,
   };
