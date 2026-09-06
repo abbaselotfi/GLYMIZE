@@ -1,30 +1,31 @@
 {
-    "name":  "@glymize/web",
-    "version":  "0.1.0",
-    "private":  true,
-    "scripts":  {
-                    "build":  "node scripts/next.cjs build --webpack \u0026\u0026 node scripts/split-market-static-assets.mjs",
-                    "dev":  "node scripts/next.cjs dev --webpack",
-                    "lint":  "biome lint --diagnostic-level=error .",
-                    "start":  "next start --port 3000",
-                    "test":  "vitest run",
-                    "test:e2e":  "playwright test",
-                    "typecheck":  "node scripts/next.cjs typegen \u0026\u0026 tsc -p tsconfig.json --noEmit"
-                },
-    "dependencies":  {
-                         "@glymize/clinical-engine":  "workspace:*",
-                         "@glymize/contracts":  "workspace:*",
-                         "next":  "16.2.12",
-                         "pdfjs-dist":  "6.1.200",
-                         "react":  "19.2.8",
-                         "react-dom":  "19.2.8",
-                         "read-excel-file":  "9.3.5",
-                         "tesseract.js":  "7.0.0"
-                     },
-    "devDependencies":  {
-                            "@playwright/test":  "1.62.1",
-                            "@types/react":  "19.2.17",
-                            "@types/react-dom":  "19.2.3",
-                            "vitest":  "4.1.10"
-                        }
+  "name": "@glymize/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/next.cjs build --webpack && node scripts/split-market-static-assets.mjs",
+    "build:rc": "node scripts/build-rc.mjs",
+    "dev": "node scripts/next.cjs dev --webpack",
+    "lint": "biome lint --diagnostic-level=error .",
+    "start": "next start --port 3000",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "node scripts/next.cjs typegen && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@glymize/clinical-engine": "workspace:*",
+    "@glymize/contracts": "workspace:*",
+    "next": "16.2.12",
+    "pdfjs-dist": "6.1.200",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "read-excel-file": "9.3.5",
+    "tesseract.js": "7.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "vitest": "4.1.10"
+  }
 }
