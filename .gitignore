@@ -17,6 +17,9 @@ tools/iran-drug-runner/input/
 tools/iran-drug-runner/runs/
 tools/iran-drug-runner/output/
 
+# Local Codebase Memory cache; canonical shared snapshot is published as a private GitHub Release asset.
+.codebase-memory/
+
 # GLYMIZE local patient-handoff preview data / secrets
 apps/api/.local-data/
 .glymize-local-secrets.ps1
