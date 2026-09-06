@@ -1,0 +1,115 @@
+name: Publish Codebase Memory snapshot
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - 'tools/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.base.json'
+      - 'turbo.json'
+      - '.cbmignore'
+      - 'AGENTS.md'
+      - 'docs/GLYMIZE_CODEBASE_MEMORY_ROADMAP.md'
+      - 'docs/GLYMIZE_CLINICAL_PRODUCT_ROADMAP.md'
+      - '.github/workflows/codebase-memory-snapshot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codebase-memory-snapshot
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CBM_VERSION: '0.10.8'
+      SNAPSHOT_TAG: codebase-memory-latest
+    steps:
+      - name: Checkout exact main source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" \
+            /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify generator version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+
+      - name: Build canonical persistent graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp cli --progress index_repository \
+            --repo-path "$GITHUB_WORKSPACE" \
+            --mode full \
+            --persistence true
+          test -s .codebase-memory/graph.db.zst
+          test -s .codebase-memory/artifact.json
+          codebase-memory-mcp cli list_projects
+
+      - name: Package snapshot with source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > snapshot-source.json <<EOF
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "source_ref": "${GITHUB_REF_NAME}",
+            "source_sha": "${GITHUB_SHA}",
+            "codebase_memory_version": "${CBM_VERSION}",
+            "generated_by": "github-actions",
+            "workflow_run_id": "${GITHUB_RUN_ID}"
+          }
+          EOF
+          tar -czf codebase-memory-snapshot.tar.gz .codebase-memory snapshot-source.json
+          sha256sum codebase-memory-snapshot.tar.gz > codebase-memory-snapshot.sha256
+
+      - name: Publish private GitHub Release snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "$SNAPSHOT_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$SNAPSHOT_TAG" --force
+
+          notes="Canonical GLYMIZE Codebase Memory snapshot generated from main SHA ${GITHUB_SHA} with codebase-memory-mcp ${CBM_VERSION}. The tarball contains .codebase-memory/graph.db.zst, artifact metadata, and snapshot-source.json."
+
+          if gh release view "$SNAPSHOT_TAG" >/dev/null 2>&1; then
+            gh release edit "$SNAPSHOT_TAG" --title "GLYMIZE Codebase Memory — latest" --notes "$notes"
+          else
+            gh release create "$SNAPSHOT_TAG" --target "$GITHUB_SHA" --title "GLYMIZE Codebase Memory — latest" --notes "$notes"
+          fi
+
+          gh release upload "$SNAPSHOT_TAG" \
+            codebase-memory-snapshot.tar.gz \
+            codebase-memory-snapshot.sha256 \
+            snapshot-source.json \
+            --clobber

@@ -17,6 +17,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Enforce Roadmap and Graph Gate declarations
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+          if ! grep -Fq -- '- [x] Roadmap review: PASS' <<<"$body"; then
+            echo 'Missing required checked PR declaration: - [x] Roadmap review: PASS' >&2
+            exit 1
+          fi
+          if ! grep -Fq -- '- [x] Graph gate: PASS' <<<"$body"; then
+            echo 'Missing required checked PR declaration: - [x] Graph gate: PASS' >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v7
 

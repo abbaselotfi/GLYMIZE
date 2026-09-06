@@ -1,0 +1,2 @@
+# Large static market data is not useful to the dependency/call graph and timed out during the initial full scan.
+apps/web/public/data/glymize-clinician-market-v2.json
