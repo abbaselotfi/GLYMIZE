@@ -62,8 +62,8 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     executableObjectives: ["liver_directed_therapy"],
     minimumSafeInputs: ["MASLD/MASH confirmation", "fibrosis stage", "cirrhosis/decompensation", "weight for resmetirom", "product-specific interaction/contraindication screening", "current medication reconciliation"],
     evidenceAuthorities: ["EASL-EASD-EASO MASLD 2024", "AASLD resmetirom 2024", "REZDIFFRA current regulatory label", "AASLD semaglutide MASH 2025", "WEGOVY current regulatory label"],
-    boundary: "The liver lane executes only explicitly protocolized products and phenotypes: reviewed resmetirom and product-bound WEGOVY initiation for adult noncirrhotic F2-F3 MASH. Other liver medicines remain review-only.",
-    nextGap: "Add interval-aware current-medication reconciliation and multi-step titration costing before claiming WEGOVY continuation and initiation-cost execution as complete.",
+    boundary: "The liver lane executes only explicitly protocolized products and phenotypes: reviewed resmetirom plus product-bound WEGOVY initiation and interval-aware continuation for adult noncirrhotic F2-F3 MASH. Phase-aware non-insured treatment cost is implemented; other liver medicines remain review-only.",
+    nextGap: "Model insurer claim timing across multi-strength WEGOVY initiation/continuation windows before treating insured-only phase-aware cost as executable.",
   },
   {
     domain: "obesity",
@@ -118,8 +118,8 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     executableObjectives: ["liver_directed_therapy"],
     minimumSafeInputs: ["adult status", "confirmed MASH", "F2/F3 fibrosis", "explicit noncirrhotic state", "actual body weight when resmetirom is considered", "WEGOVY MTC/MEN2/hypersensitivity/gastroparesis/pancreatitis screen", "current GLP-1/semaglutide reconciliation"],
     evidenceAuthorities: ["EASL-EASD-EASO MASLD 2024", "AASLD resmetirom 2024", "REZDIFFRA current regulatory label", "AASLD semaglutide MASH 2025", "WEGOVY current regulatory label"],
-    boundary: "Resmetirom and product-bound WEGOVY initiation are executable only for the reviewed adult F2-F3 noncirrhotic phenotype after their product-specific safety and Iran-market gates pass; other MASH medicines remain review-only.",
-    nextGap: "Represent weekly current-medication intervals and multi-step titration cost phases before enabling WEGOVY continuation/cost execution.",
+    boundary: "Resmetirom and product-bound WEGOVY initiation/continuation are executable only for the reviewed adult F2-F3 noncirrhotic phenotype after product-specific safety, exact weekly interval/stage reconciliation, and Iran-market gates pass. Future escalation cost remains conditional/display-only until the future stage is observed; other MASH medicines remain review-only.",
+    nextGap: "Add insurer claim-timing semantics for multi-strength WEGOVY windows before insured-only phase-aware cost can become execution-grade.",
   },
   {
     domain: "neuropathy",
