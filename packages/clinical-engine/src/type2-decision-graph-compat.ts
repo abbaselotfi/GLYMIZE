@@ -26,6 +26,7 @@ import type {
   RecommendationV2,
   ResolvedDosePlanV2,
 } from "./decision-graph-v2/types.js";
+import { resolveType2InsuranceProvidersV2 } from "./type2-intake-v2.js";
 
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
 export const TYPE2_DECISION_GRAPH_EXECUTION_PROJECTION_V1 = "GLYMIZE_DECISION_GRAPH_EXECUTION_PROJECTION_V1";
@@ -160,23 +161,11 @@ function currentMedicationsV2(
   });
 }
 
-/**
- * Resolves insurer preference for the authoritative graph. An explicit clinician
- * selection wins over every coverage row so a different insurer can never
- * satisfy an insured-only request by accident. Omission preserves compatibility
- * for callers that still provide coverage rows without a selected insurer.
- */
+/** Compatibility export; insurer resolution authority lives in type2-intake-v2. */
 export function resolveType2InsuranceProvidersForDecisionGraphV2(
   request: IntervalAwareType2ConsiderationRequestV2,
 ): InsuranceProvider[] {
-  if (request.insuranceProvider) return [request.insuranceProvider];
-  const providerSet = new Set<InsuranceProvider>();
-  for (const coverages of Object.values(request.insuranceCoverageByMedicationId ?? {})) {
-    for (const coverage of coverages) {
-      if (coverage.runtimeEligibleForRanking !== false) providerSet.add(coverage.provider);
-    }
-  }
-  return [...providerSet];
+  return resolveType2InsuranceProvidersV2(request);
 }
 
 function graphRequest(
