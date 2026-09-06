@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { NotFoundException } from "@nestjs/common";
 import { buildType2Assessment, buildType2MedicationConsiderations } from "@glymize/clinical-engine";
+import type { Type2StructuredConsiderationRequestV2 } from "@glymize/clinical-engine/type2-intake-v2";
 import type {
   AdminNotification,
   CatalogImportRequest,
@@ -14,13 +15,22 @@ import type {
   MedicationMarketDataInput,
   MedicationChecklistItem,
   MedicationBrand,
-  Type2ConsiderationRequest,
   UpdateMedicationInsuranceInput,
   UpdateMedicationBrandInput,
   UpdateMedicationVisibilityInput
 } from "@glymize/contracts";
 import { ada2026Type2GenericSeed, type2ProtocolSeed } from "./ada-2026-type2-seed.js";
 import { globalReferenceCatalogue, globalReferenceCatalogueSources } from "./global-reference-catalog.js";
+
+function rankableType2InsuranceCoverages(
+  coverages: InsuranceCoverage[],
+  selectedProvider?: Type2StructuredConsiderationRequestV2["insuranceProvider"],
+) {
+  return coverages.filter((coverage) =>
+    coverage.runtimeEligibleForRanking !== false &&
+    (!selectedProvider || coverage.provider === selectedProvider)
+  );
+}
 
 @Injectable()
 export class CatalogService {
@@ -39,12 +49,17 @@ export class CatalogService {
     return type2ProtocolSeed;
   }
 
-  listType2MedicationConsiderations(request: Type2ConsiderationRequest) {
+  listType2MedicationConsiderations(request: Type2StructuredConsiderationRequestV2) {
     const visible = this.genericMedications.filter((medication) => this.isGenericMedicationVisible(medication));
     const presentations = Object.fromEntries(visible.map((medication) => [medication.id, this.resolveMedicationDisplays(medication)]));
     const insuranceCoverageByMedicationId = Object.fromEntries(visible.map((medication) => [
       medication.id,
-      this.mergeInsuranceCoverages(presentations[medication.id]!.flatMap((presentation) => presentation.insuranceCoverages))
+      rankableType2InsuranceCoverages(
+        this.mergeInsuranceCoverages(
+          presentations[medication.id]!.flatMap((presentation) => presentation.insuranceCoverages)
+        ),
+        request.insuranceProvider,
+      )
     ]));
     const assessment = buildType2Assessment(visible, { ...request, insuranceCoverageByMedicationId });
     return {
@@ -56,7 +71,13 @@ export class CatalogService {
           insuranceCoverages: [],
           brandPriority: 0
         }])
-          .filter((presentation) => request.costPreference !== "insured_only" || presentation.insuranceCoverages.length > 0)
+          .filter((presentation) =>
+            request.costPreference !== "insured_only" ||
+            rankableType2InsuranceCoverages(
+              presentation.insuranceCoverages,
+              request.insuranceProvider,
+            ).length > 0
+          )
           .map((presentation) => ({
             ...medication,
             ...presentation
