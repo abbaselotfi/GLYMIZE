@@ -25,9 +25,11 @@ describe("Focused Workflow optional Patient step", () => {
     expect(formPosition).toBeGreaterThan(patientStepPosition);
   });
 
-  it("uses Patient Record v2 smart resolution with explicit identifier override", () => {
+  it("uses the established v2-first review boundary for smart lookup and explicit identifier override when requested", () => {
+    expect(patientStepSource).toContain("lookupPatientHandoffForReview");
+    expect(patientStepSource).toContain('if (lookupMode === "auto")');
+    expect(patientStepSource).toContain('v2Result.resolution === "legacy"');
     expect(patientStepSource).toContain("resolvePatient({");
-    expect(patientStepSource).toContain('lookupMode === "auto"');
     expect(patientStepSource).toContain('<option value="national_id">');
     expect(patientStepSource).toContain('<option value="file_number">');
     expect(patientStepSource).toContain('<option value="other">');
@@ -38,6 +40,7 @@ describe("Focused Workflow optional Patient step", () => {
   });
 
   it("keeps legacy compatibility read-only and never silently promotes from the physician workflow", () => {
+    expect(patientStepSource).toContain("lookupPatientHandoffForReview");
     expect(patientStepSource).toContain("lookupLegacyPatientHandoff");
     expect(patientStepSource).toContain('resolution: "legacy_handoff"');
     expect(patientStepSource).toContain("this workflow never performs automatic promotion");
