@@ -1,3 +1,4 @@
+import type { Type2DecisionFactor } from "@glymize/contracts";
 import { activeGuidelineSources } from "./guideline-registry.js";
 
 export type ClinicalRulePackStatus = "draft" | "in_review" | "approved" | "retired";
@@ -36,21 +37,56 @@ export interface Type2RuleParameters {
   weights: Type2RuleWeights;
 }
 
+export const clinicalInvestigationDataKeys = [
+  "kidney.eGfr",
+  "kidney.uacrMgG",
+  "kidney.potassiumMmolL",
+  "cardiovascular.lvefPercent",
+  "liver.fibrosisStage",
+  "liver.liverStiffnessKpa",
+  "liver.astUeL",
+  "liver.altUeL",
+  "liver.plateletCount10e9L",
+  "anthropometrics.weightKg",
+  "anthropometrics.heightCm",
+] as const;
+export type ClinicalInvestigationDataKey = (typeof clinicalInvestigationDataKeys)[number];
+
+export const clinicalInvestigationTriggerFactors = [
+  "ascvd",
+  "heart_failure",
+  "ckd",
+  "hypoglycemia_risk",
+  "weight_priority",
+  "insulin_pathway",
+  "masld_mash",
+  "frailty",
+  "pregnancy",
+  "diabetic_foot",
+] as const satisfies readonly Type2DecisionFactor[];
+
 export interface ClinicalInvestigationRuleAction {
   kind: "request_investigation";
-  requiredDataKey: string;
+  requiredDataKey: ClinicalInvestigationDataKey;
   investigationKey: string;
   reasonCode: string;
   timing: "now" | "before_next_visit" | "at_next_visit" | "routine";
   priority: "routine" | "priority" | "urgent";
   blocksDecision: boolean;
+  /**
+   * Explicit applicability gate. Missing data alone is never enough to create an
+   * investigation recommendation; the approved rule must name the clinical
+   * factor that makes the datum relevant for the current decision.
+   */
+  requiresFactor: Type2DecisionFactor;
 }
 
 export interface ClinicalRuleDefinition {
   id: string;
   domain: string;
   descriptionFa: string;
-  descriptionEn: string;  sourceIds: string[];
+  descriptionEn: string;
+  sourceIds: string[];
   engineEffect: string;
   missingDataActions?: ClinicalInvestigationRuleAction[];
 }
@@ -184,6 +220,8 @@ let activeRulePack: ClinicalRulePack = structuredClone(bundledClinicalRulePack);
 export function validateClinicalRulePack(pack: ClinicalRulePack): string[] {
   const errors: string[] = [];
   const knownSources = new Set(activeGuidelineSources.map((source) => source.id));
+  const knownInvestigationDataKeys = new Set<string>(clinicalInvestigationDataKeys);
+  const knownInvestigationFactors = new Set<string>(clinicalInvestigationTriggerFactors);
 
   if (pack.schemaVersion !== 1) errors.push("Unsupported clinical rule-pack schema version.");
   if (!pack.id.trim() || !pack.version.trim()) errors.push("Rule-pack id and version are required.");
@@ -206,20 +244,22 @@ export function validateClinicalRulePack(pack: ClinicalRulePack): string[] {
     ruleIds.add(rule.id);
     if (!rule.sourceIds.length) errors.push(`Clinical rule ${rule.id} has no evidence source.`);
     for (const sourceId of rule.sourceIds) {
-  if (!knownSources.has(sourceId)) errors.push(`Clinical rule ${rule.id} references unknown source ${sourceId}.`);
-}
-for (const action of rule.missingDataActions ?? []) {
-  if (
-    action.kind !== "request_investigation" ||
-    !action.requiredDataKey.trim() ||
-    !action.investigationKey.trim() ||
-    !action.reasonCode.trim()
-  ) {
-    errors.push(
-      `Clinical rule ${rule.id} has an invalid missing-data investigation action.`,
-    );
-  }
-}
+      if (!knownSources.has(sourceId)) errors.push(`Clinical rule ${rule.id} references unknown source ${sourceId}.`);
+    }
+    for (const action of rule.missingDataActions ?? []) {
+      if (
+        action.kind !== "request_investigation" ||
+        !action.requiredDataKey.trim() ||
+        !action.investigationKey.trim() ||
+        !action.reasonCode.trim() ||
+        !knownInvestigationDataKeys.has(action.requiredDataKey) ||
+        !knownInvestigationFactors.has(action.requiresFactor)
+      ) {
+        errors.push(
+          `Clinical rule ${rule.id} has an invalid missing-data investigation action.`,
+        );
+      }
+    }
   }
   return errors;
 }
