@@ -56,11 +56,15 @@ if ($Phase -eq 'pre') {
 }
 
 function Get-CbmProject {
-    $raw = (& codebase-memory-mcp cli list_projects --format json | Out-String).Trim()
+    $lines = @(& codebase-memory-mcp cli list_projects --format json)
     if ($LASTEXITCODE -ne 0) {
         throw 'Codebase Memory list_projects failed.'
     }
-    $parsed = $raw | ConvertFrom-Json
+    $jsonLine = $lines | Where-Object { ([string]$_).TrimStart().StartsWith('{') } | Select-Object -Last 1
+    if (-not $jsonLine) {
+        throw 'Codebase Memory list_projects did not return a JSON object.'
+    }
+    $parsed = ([string]$jsonLine) | ConvertFrom-Json
     $rootNormalized = $repoRoot.Replace('\', '/')
     return @($parsed.projects | Where-Object { ([string]$_.root_path).Replace('\', '/') -eq $rootNormalized }) | Select-Object -First 1
 }
