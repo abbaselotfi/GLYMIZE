@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "node scripts/next.cjs build --webpack && node scripts/split-market-static-assets.mjs",
+    "build": "node scripts/build-web.mjs",
     "build:rc": "node scripts/build-rc.mjs",
     "dev": "node scripts/next.cjs dev --webpack",
     "lint": "biome lint --diagnostic-level=error .",
