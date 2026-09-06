@@ -15,7 +15,7 @@ const type2Source = fs.readFileSync(
 describe("Focused Workflow optional Patient step", () => {
   it("keeps Patient as the first optional workflow step rather than a gate", () => {
     expect(patientStepSource).toContain('data-focused-workflow-patient-step="optional"');
-    expect(patientStepSource).toContain("STEP 1 · PATIENT · OPTIONAL");
+    expect(patientStepSource).toContain("PATIENT · OPTIONAL FIRST STEP");
     expect(patientStepSource).toContain("Continue without patient record");
     expect(patientStepSource).toContain("The Type 2 workflow remains fully available.");
 
