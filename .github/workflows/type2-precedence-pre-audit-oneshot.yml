@@ -25,13 +25,13 @@ jobs:
         run: |
           set -euo pipefail
           echo '=== buildType2MedicationConsiderations ==='
-          rg -n --hidden --glob '!.git/**' 'buildType2MedicationConsiderations' . || true
+          grep -RIn --exclude-dir=.git --exclude='*.map' 'buildType2MedicationConsiderations' . || true
           echo '=== buildLegacyType2Assessment ==='
-          rg -n --hidden --glob '!.git/**' 'buildLegacyType2Assessment' . || true
+          grep -RIn --exclude-dir=.git --exclude='*.map' 'buildLegacyType2Assessment' . || true
           echo '=== scoreMedication ==='
-          rg -n --hidden --glob '!.git/**' 'scoreMedication' packages apps || true
+          grep -RIn --exclude-dir=.git --exclude='*.map' 'scoreMedication' packages apps || true
           echo '=== legacy priorityScore ==='
-          rg -n --hidden --glob '!.git/**' 'priorityScore' packages/clinical-engine/src apps/web/app/type-2 apps/web/lib || true
+          grep -RIn --exclude-dir=.git --exclude='*.map' 'priorityScore' packages/clinical-engine/src apps/web/app/type-2 apps/web/lib || true
 
       - name: Install pinned Codebase Memory
         shell: bash
