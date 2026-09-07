@@ -15,6 +15,7 @@ import {
   slotLockingEnabled,
 } from "./platform-scheduling-slots";
 import { schedulingAppointmentsRoute } from "./platform-scheduling-appointments";
+import { type2ClaimPolicyRoute } from "./platform-type2-claim-policy";
 import { assistantCredentialLogin, credentialLogin } from "./platform-v3-login";
 import { profileCredential } from "./platform-v3-profile-password";
 import type { V3Env } from "./platform-v3-base";
@@ -135,6 +136,9 @@ export default {
 
     const schedulingAvailability = await schedulingAvailabilityRoute(request, env);
     if (schedulingAvailability) return schedulingAvailability;
+
+    const type2ClaimPolicy = await type2ClaimPolicyRoute(request, env);
+    if (type2ClaimPolicy) return type2ClaimPolicy;
 
     // WS-2/WS-3: patient portal + clinician portal review namespace.
     // Fails closed unless PATIENT_PORTAL_V1_ENABLED === "true".

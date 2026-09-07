@@ -7,6 +7,8 @@ export * from "./objectives.js";
 export * from "./availability.js";
 export * from "./dose.js";
 export * from "./insurance.js";
+export * from "./insurance-claims.js";
+export * from "./reviewed-insurance-policy-merge.js";
 export * from "./cost.js";
 export * from "./regimens.js";
 export * from "./gates.js";
