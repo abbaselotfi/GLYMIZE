@@ -127,8 +127,9 @@ export const type2SpecialistInputCatalogV2 = {
     description: "Pregnancy-diabetes specialist-team context",
   },
   "safety.product_specific_screen": {
-    requestSupport: "not_represented",
-    description: "Product-specific contraindication/interaction screening not yet represented by a complete Type 2 request field set",
+    requestSupport: "request_composite",
+    requestPath: "clinicalContext.productSafetyScreens",
+    description: "Product-bound safety-response envelopes can be carried by the Type 2 request, but request presence does not establish a complete or executable contraindication/interaction screen until a separately reviewed versioned criterion registry is bound",
   },
   "hypertension.established_treatment_context": {
     requestSupport: "runtime_derived",
