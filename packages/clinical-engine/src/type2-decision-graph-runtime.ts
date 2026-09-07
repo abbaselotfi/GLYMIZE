@@ -6,6 +6,7 @@ import type {
   Type2AssessmentResult,
   Type2ConsiderationRequest,
 } from "@glymize/contracts";
+import type { InsuranceClaimTimingPolicyV2 } from "./decision-graph-v2/insurance-claim-timing-policy.js";
 import { buildType2Assessment as buildLegacyType2Assessment } from "./index.js";
 import { resolveEngineInvestigationRecommendations } from "./investigation-recommendations.js";
 import {
@@ -21,6 +22,11 @@ import { buildType2AssessmentWithWorldDrugCoverageV2 } from "./type2-worlddrug-r
 export interface Type2DecisionGraphRuntimeCatalog {
   masterRegistry: readonly MasterDrugRegistryEntry[];
   marketProducts: readonly IranMarketDrugProduct[];
+  /**
+   * Reviewed claim-timing supplements from the authenticated runtime boundary.
+   * These never create financial coverage without an independent market policy.
+   */
+  insuranceClaimTimingPolicies?: readonly InsuranceClaimTimingPolicyV2[];
 }
 
 export type Type2RuntimeAssessmentResultV2 = Type2AssessmentResult & {
@@ -39,6 +45,7 @@ export function configureType2DecisionGraphRuntimeCatalog(catalog: Type2Decision
   runtimeCatalog = {
     masterRegistry: [...catalog.masterRegistry],
     marketProducts: [...catalog.marketProducts],
+    insuranceClaimTimingPolicies: [...(catalog.insuranceClaimTimingPolicies ?? [])],
   };
 }
 
@@ -67,11 +74,15 @@ function withRuntimeSafetyChannels(
  * Live Type 2 authority entrypoint.
  *
  * Browser runtime configures the approved WorldDrug master registry plus the
- * current Iran market snapshot before the first consideration request. Decision
- * Graph v2 remains the only executable/ranking authority. The WorldDrug coverage
- * projection may append current-market, patient-context-relevant medicines as
- * `requires_approved_protocol` review options; those options receive no Decision
- * Graph rank and cannot become executable until a reviewed rule/protocol exists.
+ * current Iran market snapshot before the first consideration request. Reviewed
+ * claim-timing supplements may additionally arrive from the authenticated
+ * Cloudflare runtime boundary; they are merged only onto independently valid
+ * financial insurance policies inside Decision Graph inventory assembly.
+ * Decision Graph v2 remains the only executable/ranking authority. The WorldDrug
+ * coverage projection may append current-market, patient-context-relevant
+ * medicines as `requires_approved_protocol` review options; those options receive
+ * no Decision Graph rank and cannot become executable until a reviewed
+ * rule/protocol exists.
  *
  * The stable Type2 assessment fields remain intact. `parallelSafety` and
  * `investigationRecommendations` are additive, non-ranking channels. Neither may
@@ -102,6 +113,7 @@ export function buildType2Assessment(
       request,
       masterRegistry: runtimeCatalog.masterRegistry,
       marketProducts: runtimeCatalog.marketProducts,
+      insuranceClaimTimingPolicies: runtimeCatalog.insuranceClaimTimingPolicies,
     }),
     request,
   );
