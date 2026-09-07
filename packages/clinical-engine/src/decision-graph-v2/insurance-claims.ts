@@ -11,7 +11,7 @@ import type {
  * than one product claim inside the same treatment window.
  *
  * This is deliberately not inferred from ordinary NFI coverage rows. A caller
- * must supply a reviewed internal InsurancePolicyRuleV2 carrying this metadata
+ * must supply a reviewed internal policy supplement carrying this metadata
  * before a multi-claim schedule can become usable for `insured_only`.
  */
 export interface InsuranceClaimTimingRuleV2 {
@@ -22,8 +22,14 @@ export interface InsuranceClaimTimingRuleV2 {
   allowDistinctProductsWithinWindow: boolean;
 }
 
+/**
+ * `claimTiming` is supplemental authority only. It never makes a policy
+ * financially covered by itself; inventory assembly must merge it onto an
+ * independently valid financial insurance policy.
+ */
 export type ClaimsAwareInsurancePolicyRuleV2 = InsurancePolicyRuleV2 & {
   claimTiming?: InsuranceClaimTimingRuleV2;
+  claimTimingPolicyId?: string;
 };
 
 export interface ScheduledInsuranceClaimV2 {
@@ -62,8 +68,20 @@ function policyForProduct(
   return policies.find((policy) => policy.provider === provider && policy.masterDrugId === product.masterDrugId);
 }
 
+function claimsAware(policy: InsurancePolicyRuleV2 | undefined) {
+  return policy as ClaimsAwareInsurancePolicyRuleV2 | undefined;
+}
+
 function timingRule(policy: InsurancePolicyRuleV2 | undefined) {
-  return (policy as ClaimsAwareInsurancePolicyRuleV2 | undefined)?.claimTiming;
+  return claimsAware(policy)?.claimTiming;
+}
+
+function sourcePolicyIds(policies: readonly (InsurancePolicyRuleV2 | undefined)[]) {
+  return [...new Set(policies.flatMap((policy) => {
+    if (!policy) return [];
+    const timingId = claimsAware(policy)?.claimTimingPolicyId;
+    return timingId && timingId !== policy.id ? [policy.id, timingId] : [policy.id];
+  }))];
 }
 
 function sameTimingRule(left: InsuranceClaimTimingRuleV2, right: InsuranceClaimTimingRuleV2) {
@@ -115,7 +133,8 @@ function unknownProjection(input: {
  *
  * Single-claim schedules reuse the ordinary product insurance authority and do
  * not require extra timing metadata. Multi-claim schedules fail closed unless
- * every selected product resolves to an explicit, consistent claim-timing rule.
+ * every selected product resolves to an explicit, consistent claim-timing rule
+ * that has already been merged onto an independent financial policy.
  */
 export function estimateScheduledInsuranceClaimsV2(input: {
   windowDays: number;
@@ -145,7 +164,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
 
   return providers.map((provider): ScheduledInsuranceProjectionV2 => {
     const policiesForClaims = claims.map((claim) => policyForProduct(productById.get(claim.productId)!, provider, policies));
-    const sourcePolicyIds = [...new Set(policiesForClaims.flatMap((policy) => policy ? [policy.id] : []))];
+    const policyIds = sourcePolicyIds(policiesForClaims);
 
     if (policiesForClaims.some((policy) => !policy)) {
       return unknownProjection({
@@ -154,7 +173,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
         claims,
         cashCostToman,
         condition: "Rule بیمه‌ای ساختاریافته برای تمام claimهای این برنامه درمانی موجود نیست.",
-        sourcePolicyIds,
+        sourcePolicyIds: policyIds,
       });
     }
 
@@ -167,7 +186,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
           claims,
           cashCostToman,
           condition: "Claim timing صریح برای برنامه چند-claim ثبت نشده است؛ پوشش insured-only قابل اثبات نیست.",
-          sourcePolicyIds,
+          sourcePolicyIds: policyIds,
         });
       }
       const first = timingRules[0]!;
@@ -178,7 +197,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
           claims,
           cashCostToman,
           condition: "Claim timing بیمه برای محصولات این برنامه ناقص یا ناسازگار است.",
-          sourcePolicyIds,
+          sourcePolicyIds: policyIds,
         });
       }
       if (first.windowDays !== windowDays) {
@@ -188,7 +207,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
           claims,
           cashCostToman,
           condition: `Claim timing فقط برای پنجره ${first.windowDays} روزه تأیید شده و به پنجره ${windowDays} روزه تعمیم داده نمی‌شود.`,
-          sourcePolicyIds,
+          sourcePolicyIds: policyIds,
         });
       }
       if (claims.length > first.maxClaimsPerWindow) {
@@ -200,7 +219,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
           patientCostIfEligibleToman: cashCostToman,
           insurerCostIfEligibleToman: 0,
           conditions: [`تعداد claimها (${claims.length}) از سقف تأییدشده ${first.maxClaimsPerWindow} در ${windowDays} روز بیشتر است.`],
-          sourcePolicyIds,
+          sourcePolicyIds: policyIds,
         };
       }
       if (!first.allowDistinctProductsWithinWindow && new Set(claims.map((claim) => claim.productId)).size > 1) {
@@ -212,7 +231,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
           patientCostIfEligibleToman: cashCostToman,
           insurerCostIfEligibleToman: 0,
           conditions: ["Rule claim بیمه تغییر محصول/strength را در این پنجره مجاز نمی‌داند."],
-          sourcePolicyIds,
+          sourcePolicyIds: policyIds,
         };
       }
       for (let index = 1; index < claims.length; index += 1) {
@@ -226,7 +245,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
             patientCostIfEligibleToman: cashCostToman,
             insurerCostIfEligibleToman: 0,
             conditions: [`فاصله ${gap} روزه بین claimها از حداقل تأییدشده ${first.minimumDaysBetweenClaims} روز کمتر است.`],
-            sourcePolicyIds,
+            sourcePolicyIds: policyIds,
           };
         }
       }
@@ -255,7 +274,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
         claims,
         cashCostToman,
         condition: "برآورد مالی بیمه برای تمام محصولات برنامه قابل محاسبه نیست.",
-        sourcePolicyIds,
+        sourcePolicyIds: policyIds,
       });
     }
 
@@ -267,7 +286,7 @@ export function estimateScheduledInsuranceClaimsV2(input: {
       patientCostIfEligibleToman: estimates.reduce((sum, estimate) => sum + estimate.patientCostIfEligibleToman, 0),
       insurerCostIfEligibleToman: estimates.reduce((sum, estimate) => sum + estimate.insurerCostIfEligibleToman, 0),
       conditions: [...new Set(estimates.flatMap((estimate) => estimate.conditions))],
-      sourcePolicyIds,
+      sourcePolicyIds: policyIds,
     };
   });
 }
