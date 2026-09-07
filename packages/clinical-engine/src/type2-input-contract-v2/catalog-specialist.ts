@@ -131,7 +131,8 @@ export const type2SpecialistInputCatalogV2 = {
     description: "Product-specific contraindication/interaction screening not yet represented by a complete Type 2 request field set",
   },
   "hypertension.established_treatment_context": {
-    requestSupport: "not_represented",
-    description: "Established hypertension-treatment context beyond a single encounter BP",
+    requestSupport: "runtime_derived",
+    requestPath: "currentMedications[].therapyGroup -> active antihypertensive treatment context",
+    description: "Established hypertension-treatment context derived only from active current medication with a trusted catalogue therapy group (RAAS blocker, antihypertensive, or mineralocorticoid receptor antagonist); a BP reading or free-text medicine name alone cannot create it",
   },
 } as const satisfies Record<string, Type2ClinicalInputDefinitionV2>;

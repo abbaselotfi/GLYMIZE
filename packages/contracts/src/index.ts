@@ -581,6 +581,8 @@ export type CurrentMedicationStatus = "active" | "held" | "stopped";
 /** Current patient therapy is required to distinguish initiation from optimization. */
 export interface CurrentMedicationInput {
   genericMedicationId?: string;
+  /** Trusted catalogue therapy classification. Never derive this from a free-text medicine name. */
+  therapyGroup?: MedicationTherapyGroup;
   referencePresentationId?: string;
   genericName: string;
   brandName?: string;

@@ -130,6 +130,36 @@ describe("active Type 2 medication intake model", () => {
     expect(medication?.brandName).toBeUndefined();
   });
 
+  it("derives therapy group only from an exact trusted catalogue identity", () => {
+    const catalog = [{
+      id: "losartan-id",
+      canonicalName: "Losartan",
+      persianName: "لوزارتان",
+      therapyGroup: "raas_blocker" as const,
+    }];
+
+    const [trusted] = type2CurrentMedicationPayload([{
+      id: "row-trusted",
+      genericMedicationId: "losartan-id",
+      genericName: "Losartan",
+      doseAmount: "50",
+      doseUnit: "mg",
+      frequencyPerDay: "1",
+      status: "active",
+    }], catalog);
+    expect(trusted?.therapyGroup).toBe("raas_blocker");
+
+    const [freeText] = type2CurrentMedicationPayload([{
+      id: "row-free-text",
+      genericName: "Losartan",
+      doseAmount: "50",
+      doseUnit: "mg",
+      frequencyPerDay: "1",
+      status: "active",
+    }], catalog);
+    expect(freeText?.therapyGroup).toBeUndefined();
+  });
+
   it("wires the scenario shell to the dedicated reconciliation row component", () => {
     const scenarioSource = readFileSync(new URL("../app/type-2/type2-scenarios-client.tsx", import.meta.url), "utf8");
     const rowSource = readFileSync(new URL("../app/type-2/type2-current-medication-row.tsx", import.meta.url), "utf8");

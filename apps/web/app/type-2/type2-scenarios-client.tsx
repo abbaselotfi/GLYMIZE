@@ -402,7 +402,7 @@ export default function Type2ScenariosClient() {
     const request: Type2StructuredConsiderationRequestV2 & { activeClinicalDomains?: MedicationClinicalDomain[] } = {
       currentHba1c: current,
       targetHba1c: target,
-      currentMedications: type2CurrentMedicationPayload(medications),
+      currentMedications: type2CurrentMedicationPayload(medications, catalog),
       clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains, patientAge }),
       costPreference,
       routePreference,

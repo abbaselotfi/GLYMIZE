@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { hasEstablishedHypertensionTreatmentContextV2 } from "../src/decision-graph-v2/cardiovascular-objectives.js";
 import {
   resolveDiabeticFootPathwayV2,
   resolveNutritionSupportBoundaryV2,
@@ -145,6 +146,25 @@ describe("Type 2 structured intake v2", () => {
       painfulSymptoms: true,
       atypicalFeaturesPresent: false,
     });
+  });
+
+  it("carries trusted therapy group into the established hypertension treatment-context gate", () => {
+    const trusted = type2StructuredIntakeToDecisionGraphV2(request({
+      currentMedications: [{
+        genericMedicationId: "losartan-id",
+        genericName: "Losartan",
+        therapyGroup: "raas_blocker",
+        status: "active",
+      }],
+    }), inventory);
+    expect(trusted.patient.currentMedications?.[0]?.therapyGroup).toBe("raas_blocker");
+    expect(hasEstablishedHypertensionTreatmentContextV2(trusted)).toBe(true);
+
+    const freeTextOnly = type2StructuredIntakeToDecisionGraphV2(request({
+      currentMedications: [{ genericName: "Losartan", status: "active" }],
+    }), inventory);
+    expect(freeTextOnly.patient.currentMedications?.[0]?.therapyGroup).toBeUndefined();
+    expect(hasEstablishedHypertensionTreatmentContextV2(freeTextOnly)).toBe(false);
   });
 
   it("preserves current medication names for pregnancy medication reconciliation without fabricating dose identity", () => {

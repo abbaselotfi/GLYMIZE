@@ -45,7 +45,10 @@ describe("clinical engine multidomain capability boundary", () => {
     expect(intervalReconciliation.requestPath).toBe("currentMedications");
     expect(intervalReconciliation.description.toLocaleLowerCase()).toContain("never inferred");
     expect(type2ClinicalInputDefinitionV2("safety.product_specific_screen").requestSupport).toBe("not_represented");
-    expect(type2ClinicalInputDefinitionV2("hypertension.established_treatment_context").requestSupport).toBe("not_represented");
+    const hypertensionContext = type2ClinicalInputDefinitionV2("hypertension.established_treatment_context");
+    expect(hypertensionContext.requestSupport).toBe("runtime_derived");
+    expect(hypertensionContext.requestPath).toContain("currentMedications");
+    expect(hypertensionContext.description.toLocaleLowerCase()).toContain("free-text");
   });
 
   it("describes the pregnancy fallback as adapter-derived rather than a fabricated direct form field", () => {
