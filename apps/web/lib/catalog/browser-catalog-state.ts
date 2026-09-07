@@ -14,10 +14,16 @@ import type {
 import { getAdminSession, isAdminApiConfigured, publishAdminCatalog } from "../admin-auth";
 import { withBasePath } from "../base-path";
 import { loadClinicianMarketV2 } from "../clinician-market-v2";
+import { runtimeAuthEventName } from "../runtime-client";
 import {
   cachedType2DecisionGraphMarketProducts,
   loadType2DecisionGraphMarketProducts,
 } from "../type2-decision-graph-market";
+import {
+  cachedType2InsuranceClaimTimingPolicies,
+  clearType2InsuranceClaimTimingPolicyCacheForTests,
+  loadType2InsuranceClaimTimingPolicies,
+} from "../type2-insurance-policy-runtime";
 
 const storageKey = "glymize-browser-catalog-v2";
 
@@ -112,6 +118,7 @@ function configureDecisionGraph(state: BrowserCatalogState) {
   configureType2DecisionGraphRuntimeCatalog({
     masterRegistry: state.masterRegistry,
     marketProducts,
+    insuranceClaimTimingPolicies: cachedType2InsuranceClaimTimingPolicies(),
   });
 }
 
@@ -122,9 +129,21 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
   let publishTimer: ReturnType<typeof setTimeout> | null = null;
   let publishBatchDepth = 0;
   let pendingPublishState: BrowserCatalogState | null = null;
+  let runtimePolicyListenerInstalled = false;
 
   function read() {
     return stateCache;
+  }
+
+  function installRuntimePolicyListener() {
+    if (runtimePolicyListenerInstalled || typeof window === "undefined") return;
+    runtimePolicyListenerInstalled = true;
+    window.addEventListener(runtimeAuthEventName(), () => {
+      clearType2InsuranceClaimTimingPolicyCacheForTests();
+      void loadType2InsuranceClaimTimingPolicies({ force: true }).then(() => {
+        configureDecisionGraph(stateCache);
+      });
+    });
   }
 
   function schedulePublish(state: BrowserCatalogState) {
@@ -169,12 +188,14 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
 
   async function ensure() {
     if (stateLoaded || typeof window === "undefined") return;
+    installRuntimePolicyListener();
     if (statePromise) return statePromise;
     statePromise = (async () => {
       try {
         await Promise.all([
           loadClinicianMarketV2(),
           loadType2DecisionGraphMarketProducts(),
+          loadType2InsuranceClaimTimingPolicies(),
         ]);
       } catch (error) {
         console.warn(
