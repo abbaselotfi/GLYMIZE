@@ -20,13 +20,17 @@ describe("Type 2 capability/UI input coverage contract", () => {
     expect(type2UiInputCoverageV2["current_medication.interval_stage_reconciliation"].note?.toLocaleLowerCase()).toContain("never inferred");
     expect(type2UiInputCoverageV2["current_medication.interval_stage_reconciliation"].note?.toLocaleLowerCase()).toContain("partial");
 
+    expect(type2UiInputCoverageV2["cardiovascular.nyha_class"].state).toBe("not_collected");
+    expect(type2UiInputCoverageV2["cardiovascular.nyha_class"].surface).toBe("none");
+
     for (const id of [
-      "cardiovascular.nyha_class",
       "cardiovascular.systolic_bp",
       "cardiovascular.diastolic_bp",
     ] as const) {
-      expect(type2UiInputCoverageV2[id].state).toBe("not_collected");
-      expect(type2UiInputCoverageV2[id].surface).toBe("none");
+      expect(type2UiInputCoverageV2[id].state).toBe("collected");
+      expect(type2UiInputCoverageV2[id].surface).toBe("structured_form");
+      expect(type2UiInputCoverageV2[id].note?.toLocaleLowerCase()).toContain("explicit encounter");
+      expect(type2UiInputCoverageV2[id].note?.toLocaleLowerCase()).toContain("never promoted");
     }
   });
 
@@ -63,11 +67,11 @@ describe("Type 2 capability/UI input coverage contract", () => {
     expect(type2UiInputGapsV2).toEqual(expect.arrayContaining([
       "core.age_years",
       "cardiovascular.nyha_class",
-      "cardiovascular.systolic_bp",
-      "cardiovascular.diastolic_bp",
       "safety.product_specific_screen",
       "hypertension.established_treatment_context",
     ]));
+    expect(type2UiInputGapsV2).not.toContain("cardiovascular.systolic_bp");
+    expect(type2UiInputGapsV2).not.toContain("cardiovascular.diastolic_bp");
     expect(type2UiInputGapsV2).not.toContain("medication_safety.maoi_exposure");
     expect(type2UiInputGapsV2).not.toContain("medication_safety.substantial_alcohol_use");
     expect(type2UiInputGapsV2).not.toContain("medication_safety.pregabalin_hypersensitivity");

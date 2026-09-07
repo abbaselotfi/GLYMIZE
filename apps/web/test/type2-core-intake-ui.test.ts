@@ -52,12 +52,33 @@ describe("active Type 2 core intake model", () => {
     expect(result.pregnancyCare).toBeUndefined();
   });
 
-  it("does not fabricate BP or NYHA data that the active draft does not represent", () => {
+  it("merges explicit hypertension BP without overwriting existing cardiovascular facts", () => {
+    const result = type2ClinicalContextFromActiveIntake({
+      context: context({ lvef: "35" }),
+      structuredContext: {
+        ...emptyType2StructuredIntakeDraft,
+        systolicBloodPressure: "148",
+        diastolicBloodPressure: "86",
+      },
+      factors: ["ascvd", "heart_failure"],
+      worldDrugDomains: ["hypertension"],
+    });
+
+    expect(result.cardiovascular).toEqual(expect.objectContaining({
+      ascvd: true,
+      heartFailure: true,
+      lvefPercent: 35,
+      systolicBloodPressure: 148,
+      diastolicBloodPressure: 86,
+    }));
+  });
+
+  it("does not fabricate BP or NYHA data that the active draft leaves absent", () => {
     const result = type2ClinicalContextFromActiveIntake({
       context: context({ lvef: "35" }),
       structuredContext: { ...emptyType2StructuredIntakeDraft },
       factors: ["heart_failure"],
-      worldDrugDomains: [],
+      worldDrugDomains: ["hypertension"],
     });
 
     expect(result.cardiovascular?.lvefPercent).toBe(35);

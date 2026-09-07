@@ -94,10 +94,11 @@ export default function Type2StructuredContextFields({
   const fa = locale === "fa";
   const footActive = factors.includes("diabetic_foot");
   const pregnancyActive = factors.includes("pregnancy");
+  const hypertensionActive = worldDrugDomains.includes("hypertension");
   const neuropathyActive = worldDrugDomains.includes("neuropathy");
   const retinopathyActive = worldDrugDomains.includes("retinopathy");
   const nutritionActive = worldDrugDomains.includes("nutrition_support");
-  const anyStructuredDomain = footActive || pregnancyActive || neuropathyActive || retinopathyActive || nutritionActive;
+  const anyStructuredDomain = footActive || pregnancyActive || hypertensionActive || neuropathyActive || retinopathyActive || nutritionActive;
 
   if (!anyStructuredDomain) return null;
 
@@ -113,6 +114,37 @@ export default function Type2StructuredContextFields({
           </small>
         </div>
       </div>
+
+      {hypertensionActive ? (
+        <div data-testid="hypertension-blood-pressure-fields">
+          <div className={styles.subhead}>
+            <div>
+              <b>{fa ? "فشارخون ثبت‌شده" : "Recorded blood pressure"}</b>
+              <small>
+                {fa
+                  ? "یک قرائت منفرد به‌تنهایی تشخیص فشارخون را اثبات نمی‌کند؛ موتور برای شروع درمان جدید همچنان به زمینه درمانی/تأیید لازم متکی است."
+                  : "A single reading does not establish hypertension; the engine still requires the represented treatment/confirmation context before new BP-drug support."}
+              </small>
+            </div>
+          </div>
+          <div className={styles.twoCols}>
+            <NumberField
+              label={fa ? "فشار سیستولیک" : "Systolic blood pressure"}
+              unit="mmHg"
+              placeholder="138"
+              value={draft.systolicBloodPressure}
+              onChange={(value) => onChange({ systolicBloodPressure: value })}
+            />
+            <NumberField
+              label={fa ? "فشار دیاستولیک" : "Diastolic blood pressure"}
+              unit="mmHg"
+              placeholder="84"
+              value={draft.diastolicBloodPressure}
+              onChange={(value) => onChange({ diastolicBloodPressure: value })}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {pregnancyActive ? (
         <div data-testid="pregnancy-structured-fields">

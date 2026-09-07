@@ -14,14 +14,49 @@ describe("Type 2 structured intake UI model", () => {
   it("does not turn domain activation into a diagnosis", () => {
     const context = structuredClinicalContextFromDraft(draft(), {
       factors: ["diabetic_foot", "pregnancy"],
-      worldDrugDomains: ["neuropathy", "retinopathy", "nutrition_support"],
+      worldDrugDomains: ["hypertension", "neuropathy", "retinopathy", "nutrition_support"],
     });
+    expect(context.cardiovascular).toBeUndefined();
     expect(context.diabeticFoot).toBeUndefined();
     expect(context.pregnancyCare).toBeUndefined();
     expect(context.neuropathy).toBeUndefined();
     expect(context.medicationSafety).toBeUndefined();
     expect(context.retinopathy).toBeUndefined();
     expect(context.nutritionSupport).toBeUndefined();
+  });
+
+  it("projects explicit BP readings only while the hypertension domain is active", () => {
+    const active = structuredClinicalContextFromDraft(draft({
+      systolicBloodPressure: "142",
+      diastolicBloodPressure: "88",
+    }), { factors: [], worldDrugDomains: ["hypertension"] });
+    expect(active.cardiovascular).toEqual({
+      systolicBloodPressure: 142,
+      diastolicBloodPressure: 88,
+    });
+
+    const inactive = structuredClinicalContextFromDraft(draft({
+      systolicBloodPressure: "142",
+      diastolicBloodPressure: "88",
+    }), { factors: [], worldDrugDomains: [] });
+    expect(inactive.cardiovascular).toBeUndefined();
+  });
+
+  it("keeps blank or malformed BP facts absent instead of inventing a diagnosis", () => {
+    const blank = structuredClinicalContextFromDraft(draft(), {
+      factors: [],
+      worldDrugDomains: ["hypertension"],
+    });
+    expect(blank.cardiovascular).toBeUndefined();
+
+    const malformed = structuredClinicalContextFromDraft(draft({
+      systolicBloodPressure: "not-a-number",
+      diastolicBloodPressure: "82",
+    }), { factors: [], worldDrugDomains: ["hypertension"] });
+    expect(malformed.cardiovascular).toEqual({
+      systolicBloodPressure: undefined,
+      diastolicBloodPressure: 82,
+    });
   });
 
   it("projects only explicit diabetic-foot infection facts", () => {
@@ -167,12 +202,20 @@ describe("Type 2 structured context field surface", () => {
   const source = readFileSync(sourcePath, "utf8");
 
   it("renders named conditional panels and warns that domain selection is not diagnosis", () => {
+    expect(source).toContain('data-testid="hypertension-blood-pressure-fields"');
     expect(source).toContain('data-testid="pregnancy-structured-fields"');
     expect(source).toContain('data-testid="diabetic-foot-structured-fields"');
     expect(source).toContain('data-testid="retinopathy-structured-fields"');
     expect(source).toContain('data-testid="neuropathy-structured-fields"');
     expect(source).toContain('data-testid="nutrition-structured-fields"');
     expect(source).toContain("Selecting a domain is not a diagnosis");
+  });
+
+  it("renders explicit BP readings with a no-diagnosis guardrail", () => {
+    expect(source).toContain("systolicBloodPressure");
+    expect(source).toContain("diastolicBloodPressure");
+    expect(source).toContain("A single reading does not establish hypertension");
+    expect(source).toContain('worldDrugDomains.includes("hypertension")');
   });
 
   it("keeps pregnancy type and foot infection severity as explicit clinician inputs", () => {
