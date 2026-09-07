@@ -19,15 +19,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Patch UI and tests
+      - name: Wire dedicated medication row into scenario shell
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-
-          scenario = Path('apps/web/app/type-2/type2-scenarios-client.tsx')
-          source = scenario.read_text()
+          path = Path("apps/web/app/type-2/type2-scenarios-client.tsx")
+          source = path.read_text()
           old_import = '''import {
             newType2MedicationRow,
             type2CurrentMedicationPayload,
@@ -42,9 +41,8 @@ jobs:
           import Type2CurrentMedicationRow from "./type2-current-medication-row";
           import base from "./type2-v2.module.css";'''
           if source.count(old_import) != 1:
-              raise SystemExit('expected current-medication import block exactly once')
+              raise SystemExit("expected current-medication import block exactly once")
           source = source.replace(old_import, new_import)
-
           old_rows = '''              {medications.map((item, index) => <div className={styles.currentMed} key={item.id}>
                 <div className={styles.medIndex}>{index + 1}</div>
                 <label><span>{fa ? "دارو" : "Medicine"}</span><input list="type2-drugs" value={item.genericName} onChange={(event) => updateMedicationName(item.id, event.target.value)} placeholder="Metformin" /></label>
@@ -63,216 +61,9 @@ jobs:
                 onRemove={() => setMedications((current) => current.filter((row) => row.id !== item.id))}
               />)}'''
           if source.count(old_rows) != 1:
-              raise SystemExit('expected inline current-medication rows exactly once')
-          scenario.write_text(source.replace(old_rows, new_rows))
-
-          Path('apps/web/app/type-2/type2-current-medication-row.tsx').write_text('''"use client";
-
-import type {
-  Type2MedicationRow,
-  Type2MedicationTherapyPhase,
-} from "./type2-current-medication-ui";
-import styles from "./type2-current-medication-row.module.css";
-
-const UNITS = ["mg", "g", "mcg", "unit", "mL", "tablet", "capsule", "actuation", "vial", "ampoule", "pen"] as const;
-
-interface Props {
-  item: Type2MedicationRow;
-  index: number;
-  locale: "fa" | "en";
-  onChange: (patch: Partial<Type2MedicationRow>) => void;
-  onNameChange: (value: string) => void;
-  onRemove: () => void;
-}
-
-export default function Type2CurrentMedicationRow({ item, index, locale, onChange, onNameChange, onRemove }: Props) {
-  const fa = locale === "fa";
-  const phase = item.therapyPhase ?? "";
-
-  return <div className={styles.card}>
-    <div className={styles.primaryRow}>
-      <div className={styles.medIndex}>{index + 1}</div>
-      <label><span>{fa ? "دارو" : "Medicine"}</span><input list="type2-drugs" value={item.genericName} onChange={(event) => onNameChange(event.target.value)} placeholder="Metformin" /></label>
-      <label><span>{fa ? "برند، در صورت ثبت" : "Brand, if documented"}</span><input value={item.brandName ?? ""} onChange={(event) => onChange({ brandName: event.target.value })} placeholder="Wegovy" /></label>
-      <label><span>{fa ? "دوز هر نوبت" : "Dose per administration"}</span><input type="number" min="0" step="0.1" value={item.doseAmount} onChange={(event) => onChange({ doseAmount: event.target.value })} /></label>
-      <label><span>{fa ? "واحد" : "Unit"}</span><select value={item.doseUnit} onChange={(event) => onChange({ doseUnit: event.target.value })}>{UNITS.map((unit) => <option key={unit}>{unit}</option>)}</select></label>
-      <label><span>{fa ? "دفعات/روز برای درمان روزانه" : "Times/day for daily therapy"}</span><input type="number" min="0" max="12" step="0.5" value={item.frequencyPerDay} onChange={(event) => onChange({ frequencyPerDay: event.target.value })} /></label>
-      <button className={styles.remove} type="button" aria-label={fa ? "حذف دارو" : "Remove medicine"} onClick={onRemove}>×</button>
-    </div>
-
-    <details className={styles.reconciliation}>
-      <summary>{fa ? "تطبیق فاصله مصرف و مرحله درمان" : "Interval and treatment-stage reconciliation"}</summary>
-      <p>{fa
-        ? "فقط اطلاعاتی را وارد کنید که صریحاً در پرونده/شرح‌حال ثبت شده‌اند. مرحله درمان از نام دارو یا دوز حدس زده نمی‌شود. برای درمان‌های فاصله‌ای، تعداد مصرف در بازه و طول بازه را جداگانه ثبت کنید."
-        : "Enter only explicitly documented facts. Treatment phase is never inferred from medicine name or dose. For interval therapies, record administrations per period and the period length separately."}</p>
-      <div className={styles.detailGrid}>
-        <label><span>{fa ? "تعداد مصرف در بازه" : "Administrations per period"}</span><input type="number" min="0" step="any" value={item.administrationsPerPeriod ?? ""} onChange={(event) => onChange({ administrationsPerPeriod: event.target.value })} placeholder="1" /></label>
-        <label><span>{fa ? "طول بازه (روز)" : "Period length (days)"}</span><input type="number" min="0" step="any" value={item.administrationPeriodDays ?? ""} onChange={(event) => onChange({ administrationPeriodDays: event.target.value })} placeholder="7" /></label>
-        <label><span>{fa ? "روزهای سپری‌شده روی دوز فعلی" : "Days on current dose"}</span><input type="number" min="0" step="1" value={item.daysOnCurrentDose ?? ""} onChange={(event) => onChange({ daysOnCurrentDose: event.target.value })} placeholder="28" /></label>
-        <label><span>{fa ? "مرحله درمانِ ثبت‌شده" : "Documented treatment phase"}</span><select value={phase} onChange={(event) => onChange({ therapyPhase: event.target.value as Type2MedicationTherapyPhase })}><option value="">{fa ? "نامشخص / ثبت نشده" : "Unknown / not documented"}</option><option value="initiation">{fa ? "شروع" : "Initiation"}</option><option value="escalation">{fa ? "افزایش مرحله‌ای" : "Escalation"}</option><option value="maintenance">{fa ? "نگهدارنده" : "Maintenance"}</option></select></label>
-        <label><span>{fa ? "روز تا نوبت بعدی" : "Days until next administration"}</span><input type="number" min="0" step="1" value={item.nextAdministrationInDays ?? ""} onChange={(event) => onChange({ nextAdministrationInDays: event.target.value })} placeholder="3" /></label>
-        <label><span>{fa ? "مدت کل مصرف دارو (روز)" : "Total medication duration (days)"}</span><input type="number" min="0" step="1" value={item.durationDays ?? ""} onChange={(event) => onChange({ durationDays: event.target.value })} /></label>
-      </div>
-      <small>{fa
-        ? "اگر فقط بخشی از interval ثبت شده باشد، GLYMIZE آن را کامل نمی‌کند؛ Decision Graph داده ناقص را به‌صورت fail-closed بررسی می‌کند."
-        : "If only part of an interval is documented, GLYMIZE does not complete it; the Decision Graph evaluates the partial data fail-closed."}</small>
-    </details>
-  </div>;
-}
-''')
-
-          Path('apps/web/app/type-2/type2-current-medication-row.module.css').write_text('''.card{display:grid;gap:8px;padding:10px;border-radius:16px;background:#f8fbfc;border:1px solid #e7eef1}.primaryRow{display:grid;grid-template-columns:32px minmax(145px,1.8fr) minmax(120px,1.2fr) minmax(110px,1fr) 90px minmax(115px,1fr) 32px;gap:8px;align-items:end}.primaryRow label,.detailGrid label{display:grid;gap:5px}.primaryRow label>span,.detailGrid label>span{font-size:13px;font-weight:750;color:#516472}.primaryRow input,.primaryRow select,.detailGrid input,.detailGrid select{width:100%;border:1px solid #dce6ea;border-radius:10px;background:#fff;padding:9px;font:inherit;min-width:0;color:inherit}.medIndex{width:30px;height:36px;display:grid;place-items:center;border-radius:10px;background:#e8f5f5;color:#16717b;font-weight:900}.remove{height:36px;border:0;border-radius:10px;background:#fff0f0;color:#a94646;font-size:20px;cursor:pointer}.reconciliation{border-top:1px solid #e4ecef;padding-top:8px}.reconciliation summary{cursor:pointer;color:#246e78;font-size:12px;font-weight:850}.reconciliation p{margin:9px 0;color:#617681;font-size:12px;line-height:1.7}.reconciliation>small{display:block;margin-top:8px;color:#6c7d87;font-size:11px;line-height:1.65}.detailGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}@media(max-width:1100px){.primaryRow{grid-template-columns:32px repeat(3,minmax(0,1fr))}.primaryRow label:first-of-type{grid-column:2 / -1}.remove{grid-column:4}.detailGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:760px){.primaryRow{grid-template-columns:30px 1fr 1fr}.primaryRow label:first-of-type{grid-column:2 / -1}.primaryRow label:nth-of-type(2){grid-column:2 / -1}.remove{grid-column:3}.detailGrid{grid-template-columns:1fr}}
-''')
-
-          Path('apps/web/test/type2-current-medication-ui.test.ts').write_text('''import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
-import { type2CurrentMedicationPayload } from "../app/type-2/type2-current-medication-ui";
-
-describe("active Type 2 medication intake model", () => {
-  it("projects a represented daily regimen without changing dose semantics", () => {
-    expect(type2CurrentMedicationPayload([{
-      id: "row-1",
-      genericMedicationId: "metformin",
-      genericName: " Metformin ",
-      doseAmount: "500",
-      doseUnit: "mg",
-      frequencyPerDay: "2",
-      status: "active",
-    }])).toEqual([expect.objectContaining({
-      genericMedicationId: "metformin",
-      genericName: "Metformin",
-      doseAmount: 500,
-      doseUnit: "mg",
-      frequencyPerDay: 2,
-      totalDailyDose: 1000,
-      totalDailyDoseUnit: "mg",
-      status: "active",
-    })]);
-  });
-
-  it("carries explicitly documented interval and stage facts without deriving them", () => {
-    const [medication] = type2CurrentMedicationPayload([{
-      id: "row-1",
-      genericName: "Semaglutide",
-      brandName: " Wegovy ",
-      doseAmount: "0.5",
-      doseUnit: "mg",
-      frequencyPerDay: "",
-      administrationsPerPeriod: "1",
-      administrationPeriodDays: "7",
-      daysOnCurrentDose: "28",
-      therapyPhase: "escalation",
-      nextAdministrationInDays: "3",
-      durationDays: "70",
-      status: "active",
-    }]);
-
-    expect(medication).toMatchObject({
-      genericName: "Semaglutide",
-      brandName: "Wegovy",
-      doseAmount: 0.5,
-      doseUnit: "mg",
-      administrationsPerPeriod: 1,
-      administrationPeriodDays: 7,
-      daysOnCurrentDose: 28,
-      therapyPhase: "escalation",
-      nextAdministrationInDays: 3,
-      durationDays: 70,
-    });
-    expect(medication?.frequencyPerDay).toBeUndefined();
-    expect(medication?.totalDailyDose).toBeUndefined();
-  });
-
-  it("never infers weekly interval or treatment phase from Wegovy name or dose", () => {
-    const [medication] = type2CurrentMedicationPayload([{
-      id: "row-1",
-      genericName: "Semaglutide",
-      brandName: "Wegovy",
-      doseAmount: "1.7",
-      doseUnit: "mg",
-      frequencyPerDay: "",
-      status: "active",
-    }]);
-
-    expect(medication?.administrationsPerPeriod).toBeUndefined();
-    expect(medication?.administrationPeriodDays).toBeUndefined();
-    expect(medication?.daysOnCurrentDose).toBeUndefined();
-    expect(medication?.therapyPhase).toBeUndefined();
-    expect(medication?.nextAdministrationInDays).toBeUndefined();
-  });
-
-  it("preserves a partial explicit interval so the engine can fail closed", () => {
-    const [medication] = type2CurrentMedicationPayload([{
-      id: "row-1",
-      genericName: "Semaglutide",
-      doseAmount: "0.5",
-      doseUnit: "mg",
-      frequencyPerDay: "",
-      administrationsPerPeriod: "1",
-      administrationPeriodDays: "",
-      status: "active",
-    }]);
-
-    expect(medication?.administrationsPerPeriod).toBe(1);
-    expect(medication?.administrationPeriodDays).toBeUndefined();
-    expect(medication?.frequencyPerDay).toBeUndefined();
-    expect(medication?.totalDailyDose).toBeUndefined();
-  });
-
-  it("keeps incomplete daily dose data partial instead of inventing a daily total", () => {
-    const [medication] = type2CurrentMedicationPayload([{
-      id: "row-1",
-      genericName: "Semaglutide",
-      doseAmount: "1",
-      doseUnit: "mg",
-      frequencyPerDay: "",
-      status: "active",
-    }]);
-
-    expect(medication?.doseAmount).toBe(1);
-    expect(medication?.frequencyPerDay).toBeUndefined();
-    expect(medication?.totalDailyDose).toBeUndefined();
-  });
-
-  it("drops empty medication rows and blank brand identity", () => {
-    expect(type2CurrentMedicationPayload([{
-      id: "row-empty",
-      genericName: "  ",
-      doseAmount: "500",
-      doseUnit: "mg",
-      frequencyPerDay: "2",
-      status: "active",
-    }])).toEqual([]);
-
-    const [medication] = type2CurrentMedicationPayload([{
-      id: "row-brand",
-      genericName: "Metformin",
-      brandName: "   ",
-      doseAmount: "500",
-      doseUnit: "mg",
-      frequencyPerDay: "2",
-      status: "active",
-    }]);
-    expect(medication?.brandName).toBeUndefined();
-  });
-
-  it("wires the scenario shell to the dedicated reconciliation row component", () => {
-    const scenarioSource = readFileSync(new URL("../app/type-2/type2-scenarios-client.tsx", import.meta.url), "utf8");
-    const rowSource = readFileSync(new URL("../app/type-2/type2-current-medication-row.tsx", import.meta.url), "utf8");
-    expect(scenarioSource).toContain('import Type2CurrentMedicationRow from "./type2-current-medication-row"');
-    expect(scenarioSource).toContain("<Type2CurrentMedicationRow");
-    expect(scenarioSource).not.toContain("medications.map((item, index) => <div className={styles.currentMed}");
-    expect(rowSource).toContain("administrationsPerPeriod");
-    expect(rowSource).toContain("administrationPeriodDays");
-    expect(rowSource).toContain("daysOnCurrentDose");
-    expect(rowSource).toContain("therapyPhase");
-    expect(rowSource).toContain("nextAdministrationInDays");
-    expect(rowSource).toContain("brandName");
-  });
-});
-''')
+              raise SystemExit("expected inline current-medication rows exactly once")
+          path.write_text(source.replace(old_rows, new_rows))
           PY
-
           rm -f .github/workflows/implement-type2-current-medication-reconciliation.yml
 
       - name: Install pnpm
@@ -299,18 +90,14 @@ describe("active Type 2 medication intake model", () => {
       - name: Lint web
         run: pnpm --filter @glymize/web lint
 
-      - name: Commit implementation and remove one-shot workflow
+      - name: Commit shell wiring and remove one-shot workflow
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/web/app/type-2/type2-current-medication-ui.ts \
-                  apps/web/app/type-2/type2-current-medication-row.tsx \
-                  apps/web/app/type-2/type2-current-medication-row.module.css \
-                  apps/web/app/type-2/type2-scenarios-client.tsx \
-                  apps/web/test/type2-current-medication-ui.test.ts
+          git add apps/web/app/type-2/type2-scenarios-client.tsx
           git add -u .github/workflows/implement-type2-current-medication-reconciliation.yml
           git diff --cached --check
-          git commit -m "Complete Type 2 current medication reconciliation UI"
+          git commit -m "Wire Type 2 medication reconciliation row"
           git push origin HEAD:${GITHUB_REF_NAME}
