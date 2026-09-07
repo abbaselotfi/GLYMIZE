@@ -15,6 +15,7 @@ import {
   resolveNutritionSupportBoundaryV2,
   type NutritionSupportContextV2,
 } from "./decision-graph-v2/nutrition-support-boundary.js";
+import type { ProductSpecificSafetyScreenV2 } from "./decision-graph-v2/product-safety-screen.js";
 import {
   resolvePregnancyDiabetesPathwayV2,
   type PregnancyDiabetesContextV2,
@@ -50,6 +51,12 @@ export type Type2StructuredClinicalContextV2 = PatientClinicalContext & {
   diabeticFoot?: DiabeticFootContextV2;
   nutritionSupport?: NutritionSupportContextV2;
   pregnancyCare?: PregnancyDiabetesContextV2;
+  /**
+   * Product-bound safety response envelopes. These are intake facts only and do
+   * not establish completeness or execution authority without a reviewed
+   * criterion registry bound elsewhere in the Decision Graph.
+   */
+  productSafetyScreens?: ProductSpecificSafetyScreenV2[];
 };
 
 export type Type2StructuredConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "clinicalContext"> & {
@@ -163,6 +170,7 @@ export function type2StructuredIntakeToDecisionGraphV2(
       diabeticFoot: context?.diabeticFoot,
       nutritionSupport: context?.nutritionSupport,
       pregnancyCare: context?.pregnancyCare,
+      productSafetyScreens: context?.productSafetyScreens,
     },
     preferences: {
       routePreference: routePreference(request.routePreference),
