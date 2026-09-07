@@ -1,0 +1,155 @@
+name: POST Type 2 input-contract Codebase Memory gate
+
+on:
+  push:
+    branches:
+      - feat/type2-capability-ui-input-contract-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  graph-gate:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CBM_VERSION: '0.10.8'
+      SNAPSHOT_TAG: codebase-memory-latest
+    steps:
+      - name: Checkout final task branch
+        uses: actions/checkout@v7
+        with:
+          ref: feat/type2-capability-ui-input-contract-20260907
+          fetch-depth: 0
+
+      - name: Verify task branch contains current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git merge-base HEAD origin/main)" = "$(git rev-parse origin/main)"
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "origin/main=$(git rev-parse origin/main)"
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" \
+            /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify generator version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+
+      - name: Bootstrap canonical main graph snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/cbm-snapshot
+          gh release download "$SNAPSHOT_TAG" \
+            --pattern 'codebase-memory-snapshot.tar.gz' \
+            --dir /tmp/cbm-snapshot
+          tar -xzf /tmp/cbm-snapshot/codebase-memory-snapshot.tar.gz -C "$GITHUB_WORKSPACE"
+          test -s .codebase-memory/graph.db.zst
+          test -s .codebase-memory/artifact.json
+          test -s .codebase-memory/adr.md
+          echo '=== canonical artifact metadata ==='
+          cat .codebase-memory/artifact.json
+
+      - name: Materialize canonical graph cache without refreshing
+        shell: bash
+        run: |
+          set -euo pipefail
+          zstd -dc .codebase-memory/graph.db.zst > /tmp/cbm-main.db
+          test -s /tmp/cbm-main.db
+
+          project="$(jq -r '.project // empty' .codebase-memory/artifact.json)"
+          test -n "$project"
+          test "$project" != "null"
+          mkdir -p "$HOME/.cache/codebase-memory-mcp"
+          cp /tmp/cbm-main.db "$HOME/.cache/codebase-memory-mcp/${project}.db"
+          echo "CBM_PROJECT=$project" >> "$GITHUB_ENV"
+          echo "CBM project from canonical artifact: $project"
+
+          codebase-memory-mcp cli list_projects | tee /tmp/cbm-projects.txt
+          json_line="$(grep -E '^\{' /tmp/cbm-projects.txt | tail -n 1)"
+          test -n "$json_line"
+          jq -e --arg project "$project" '.projects[] | select(.name == $project)' <<<"$json_line"
+
+      - name: Remove one-shot workflow before graph refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/post-type2-input-contract-graph-gate.yml
+          rm -f snapshot-source.json
+
+      - name: Detect graph delta before refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== detect_changes BEFORE refresh ==='
+          codebase-memory-mcp cli detect_changes --project "$CBM_PROJECT" | tee /tmp/cbm-detect-before.txt
+          echo '=== index_status BEFORE refresh ==='
+          codebase-memory-mcp cli index_status --project "$CBM_PROJECT" | tee /tmp/cbm-status-before.txt
+
+      - name: Refresh graph from final branch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp cli --progress index_repository \
+            --repo-path "$GITHUB_WORKSPACE" \
+            --mode full \
+            --persistence true
+          test -s .codebase-memory/graph.db.zst
+          test -s .codebase-memory/artifact.json
+          test -s .codebase-memory/adr.md
+
+      - name: Verify post-refresh graph status and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp cli list_projects | tee /tmp/cbm-projects-after.txt
+          json_line="$(grep -E '^\{' /tmp/cbm-projects-after.txt | tail -n 1)"
+          project="$(jq -r --arg root "$GITHUB_WORKSPACE" '.projects[] | select((.root_path | gsub("\\\\"; "/")) == $root) | .name' <<<"$json_line" | head -n 1)"
+          test -n "$project"
+          echo '=== index_status AFTER refresh ==='
+          codebase-memory-mcp cli index_status --project "$project"
+          echo '=== detect_changes AFTER refresh ==='
+          codebase-memory-mcp cli detect_changes --project "$project"
+          echo '=== final Git blast radius ==='
+          git diff --name-status origin/main...HEAD
+          echo 'ROADMAP + GRAPH GATE [post]: PASS'
+
+      - name: Ensure generated graph artifacts remain untracked
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f snapshot-source.json
+          if git status --short | grep -E 'graph\.db\.zst|artifact\.json|snapshot-source\.json'; then
+            echo 'Generated graph artifact unexpectedly became trackable.' >&2
+            exit 1
+          fi
+          git diff --check
+
+      - name: Commit one-shot workflow removal only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u .github/workflows/post-type2-input-contract-graph-gate.yml
+          if ! git diff --cached --quiet; then
+            git diff --cached --check
+            git commit -m 'Complete POST Type 2 input-contract graph gate'
+            git push origin HEAD:feat/type2-capability-ui-input-contract-20260907
+          fi
