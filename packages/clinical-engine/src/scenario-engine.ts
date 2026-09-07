@@ -8,6 +8,7 @@ import type {
   Type2ConsiderationRequest,
   Type2MedicationConsideration,
 } from "@glymize/contracts";
+import { TYPE2_LEGACY_SCORE_POLICY_V1 } from "./type2-legacy-score-policy.js";
 
 export type Type2ScenarioKind = "clinical_best" | "access_balanced" | "alternative" | "maintain_monitor";
 export type Type2ScenarioSortMode = "balanced" | "clinical" | "patient_cost" | "insurance_access";
@@ -280,6 +281,7 @@ export function estimateType2Medication30DayCost(input: {
 }
 
 function adjustedClinicalScore(item: Type2MedicationConsideration, request: Type2ConsiderationRequest) {
+  const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.scenario;
   let score = item.priorityScore;
   const eGfr = request.clinicalContext?.kidney?.eGfr ?? request.eGfr;
   const dialysis = Boolean(request.clinicalContext?.kidney?.dialysis);
@@ -287,27 +289,28 @@ function adjustedClinicalScore(item: Type2MedicationConsideration, request: Type
   // ADA 2026: advanced CKD favors GLP-1 RA for glycemic management; SGLT2
   // initiation is supported at eGFR >=20, while continuation below 20 is a
   // separate decision and should not be represented as a new-start scenario.
-  if (hasFactor(request, "ckd") && eGfr !== undefined && eGfr < 30 && isGlp1(item)) score += 24;
-  if (eGfr !== undefined && eGfr < 20 && isSglt2(item) && !item.currentMedication) score -= 80;
-  if (dialysis && isSglt2(item) && !item.currentMedication) score -= 100;
-  if (dialysis && isGlp1(item)) score += 28;
+  if (hasFactor(request, "ckd") && eGfr !== undefined && eGfr < 30 && isGlp1(item)) score += legacyScore.advancedCkdGlp1Bonus;
+  if (eGfr !== undefined && eGfr < 20 && isSglt2(item) && !item.currentMedication) score -= legacyScore.belowSglt2InitiationThresholdNewStartPenalty;
+  if (dialysis && isSglt2(item) && !item.currentMedication) score -= legacyScore.dialysisNewSglt2Penalty;
+  if (dialysis && isGlp1(item)) score += legacyScore.dialysisGlp1Bonus;
 
-  if (hasFactor(request, "heart_failure") && isSglt2(item)) score += 18;
-  if (hasFactor(request, "heart_failure") && isTzd(item)) score -= 100;
-  if (hasFactor(request, "hypoglycemia_risk") && isHypoglycemiaProne(item)) score -= 60;
-  if (hasFactor(request, "weight_priority") && isGlp1(item)) score += 12;
-  if (request.routePreference === "oral_only" && isInjectable(item)) score -= 1000;
+  if (hasFactor(request, "heart_failure") && isSglt2(item)) score += legacyScore.heartFailureSglt2Bonus;
+  if (hasFactor(request, "heart_failure") && isTzd(item)) score -= legacyScore.heartFailureTzdPenalty;
+  if (hasFactor(request, "hypoglycemia_risk") && isHypoglycemiaProne(item)) score -= legacyScore.hypoglycemiaPronePenalty;
+  if (hasFactor(request, "weight_priority") && isGlp1(item)) score += legacyScore.weightPriorityGlp1Bonus;
+  if (request.routePreference === "oral_only" && isInjectable(item)) score -= legacyScore.oralOnlyInjectablePenalty;
   return score;
 }
 
 function marketScore(item: Type2MedicationConsideration, request: Type2ConsiderationRequest, provider?: InsuranceProvider) {
+  const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.scenario;
   let score = adjustedClinicalScore(item, request);
   const coverage = coverageFor(item, provider);
-  if (coverage) score += Math.min(20, coverage.percent / 5);
-  if (item.price) score += 5;
-  if (item.relativeCost === "low") score += 18;
-  else if (item.relativeCost === "medium") score += 8;
-  else score -= 8;
+  if (coverage) score += Math.min(legacyScore.marketCoverageBonusCap, coverage.percent / legacyScore.marketCoveragePercentPerPoint);
+  if (item.price) score += legacyScore.marketPriceKnownBonus;
+  if (item.relativeCost === "low") score += legacyScore.marketLowCostBonus;
+  else if (item.relativeCost === "medium") score += legacyScore.marketMediumCostBonus;
+  else score -= legacyScore.marketHighCostPenalty;
   return score;
 }
 
@@ -555,7 +558,7 @@ export function buildType2TreatmentScenarios(input: Type2ScenarioBuildInput): Ty
     const alternative = eligible.find((item) =>
       !usedPrimary.has(item.genericMedicationId) &&
       classKey(item) !== classKey(first) &&
-      (!request.hyperglycemiaSymptoms && !request.catabolicFeatures || isInsulin(item) || adjustedClinicalScore(item, request) >= 58)
+      (!request.hyperglycemiaSymptoms && !request.catabolicFeatures || isInsulin(item) || adjustedClinicalScore(item, request) >= TYPE2_LEGACY_SCORE_POLICY_V1.scenario.alternativeMinimumScore)
     );
     if (alternative) scenarios.push(makeScenario(3, "alternative", alternative, [alternative], request, input.insuranceProvider, input.costingPlansByMedicationId));
   }

@@ -18,9 +18,11 @@ import {
   getActiveClinicalRulePack,
   type ClinicalRulePack,
 } from "./rule-pack.js";
+import { TYPE2_LEGACY_SCORE_POLICY_V1 } from "./type2-legacy-score-policy.js";
 
 export * from "./guideline-registry.js";
 export * from "./rule-pack.js";
+export * from "./type2-legacy-score-policy.js";
 
 const EVIDENCE = {
   ada: "ada-2026",
@@ -196,7 +198,8 @@ function scoreMedication(
   const coverage = request.insuranceCoverageByMedicationId?.[medication.id] ?? [];
   const eGfr = effectiveEgfr(request);
   const liver = request.clinicalContext?.liver;
-  let score = 50;
+  const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.medication;
+  let score = legacyScore.baselineScore;
 
   if (pathway.priority === "consider_insulin" && isInsulin) {
     score += weights.severeHyperglycemiaInsulin;
@@ -297,12 +300,12 @@ function scoreMedication(
     if (relativeCost === "high") score -= weights.moderateCostHighPenalty;
   } else if (costPreference === "insured_only") {
     const bestCoverage = coverage.reduce((best, item) => Math.max(best, item.percent), 0);
-    score += Math.round(bestCoverage / 5);
+    score += Math.round(bestCoverage / legacyScore.insuranceCoveragePercentPerPoint);
     reasons.push(`پوشش بیمه تا ${bestCoverage}٪`);
   }
 
   return {
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(legacyScore.minimumScore, Math.min(legacyScore.maximumScore, score)),
     reasons,
     evidenceIds: [...evidenceIds],
   };
@@ -503,7 +506,8 @@ export function buildType2MedicationConsiderations(
 
     const ranking = scoreMedication(medication, request, pathway, relativeCost, pack);
     if (currentMedication) ranking.reasons.unshift("این دارو بخشی از رژیم فعلی بیمار است و به‌جای افزودن مجدد باید برای ادامه/تیتراسیون/تعویض بازبینی شود");
-    const priorityTier: Type2MedicationConsideration["priorityTier"] = ranking.score >= 75 ? "recommended" : ranking.score >= 58 ? "preferred" : "consider";
+    const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.medication;
+    const priorityTier: Type2MedicationConsideration["priorityTier"] = ranking.score >= legacyScore.recommendedTierMinimum ? "recommended" : ranking.score >= legacyScore.preferredTierMinimum ? "preferred" : "consider";
     const sourceFields = evidenceFields(ranking.evidenceIds);
     considerations.push(`مرجع علمی این پیشنهاد: ${sourceFields.sourceReference}`);
 
