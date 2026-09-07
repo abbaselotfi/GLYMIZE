@@ -17,8 +17,9 @@ export const type2CoreInputCatalogV2 = {
     description: "Current medication reconciliation",
   },
   "current_medication.interval_stage_reconciliation": {
-    requestSupport: "not_represented",
-    description: "Exact administration interval, days on current dose, therapy phase, and next-administration timing required by interval-aware continuation are not carried through the current Type 2 clinician intake into Decision Graph",
+    requestSupport: "request_composite",
+    requestPath: "currentMedications",
+    description: "Interval-aware current-medication continuation context carrying explicit administration interval, days on current dose, therapy phase, and next-administration timing; these facts remain absent when not supplied and are never inferred from product name, dose, frequency, or duration",
   },
   "core.age_years": {
     requestSupport: "request_field",
