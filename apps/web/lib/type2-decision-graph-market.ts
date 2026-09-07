@@ -1,5 +1,6 @@
 import type { InsuranceCoverage, IranMarketDrugProduct } from "@glymize/contracts";
 import { withBasePath } from "./base-path";
+import { initializeTrustedType2ClaimPolicyRuntime } from "./type2-claim-policy-runtime";
 
 type RawProduct = {
   productId: string;
@@ -152,6 +153,7 @@ export function cachedType2DecisionGraphMarketProducts() {
 }
 
 export async function loadType2DecisionGraphMarketProducts() {
+  await initializeTrustedType2ClaimPolicyRuntime();
   if (cache) return cache;
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {

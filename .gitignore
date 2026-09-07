@@ -18,7 +18,9 @@ tools/iran-drug-runner/runs/
 tools/iran-drug-runner/output/
 
 # Local Codebase Memory cache; canonical shared snapshot is published as a private GitHub Release asset.
-.codebase-memory/
+# Keep the small ADR text in Git so architecture decisions survive fresh snapshot builds.
+.codebase-memory/*
+!.codebase-memory/adr.md
 
 # GLYMIZE local patient-handoff preview data / secrets
 apps/api/.local-data/

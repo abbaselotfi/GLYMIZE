@@ -3,6 +3,7 @@ export {
   buildType2Assessment,
   clearType2DecisionGraphRuntimeCatalogForTests,
   configureType2DecisionGraphRuntimeCatalog,
+  configureType2DecisionGraphRuntimeInsurancePolicies,
   type2DecisionGraphRuntimeConfigured,
   type Type2DecisionGraphRuntimeCatalog,
   type Type2RuntimeAssessmentResultV2,

@@ -17,6 +17,7 @@ import {
   type Type2StructuredConsiderationRequestV2,
 } from "./type2-intake-v2.js";
 import { buildType2AssessmentWithWorldDrugCoverageV2 } from "./type2-worlddrug-recommendation-compat.js";
+import type { ClaimsAwareInsurancePolicyRuleV2 } from "./decision-graph-v2/insurance-claims.js";
 
 export interface Type2DecisionGraphRuntimeCatalog {
   masterRegistry: readonly MasterDrugRegistryEntry[];
@@ -34,6 +35,24 @@ export type Type2RuntimeAssessmentResultV2 = Type2AssessmentResult & {
 };
 
 let runtimeCatalog: Type2DecisionGraphRuntimeCatalog | undefined;
+let runtimeInsurancePolicies: ClaimsAwareInsurancePolicyRuleV2[] = [];
+let runtimeInsurancePoliciesExpiresAt = 0;
+
+export function configureType2DecisionGraphRuntimeInsurancePolicies(
+  policies: readonly ClaimsAwareInsurancePolicyRuleV2[],
+  expiresAt: string | number,
+) {
+  const parsedExpiry = typeof expiresAt === "number" ? expiresAt : Date.parse(expiresAt);
+  runtimeInsurancePolicies = policies.map((policy) => structuredClone(policy));
+  runtimeInsurancePoliciesExpiresAt = Number.isFinite(parsedExpiry)
+    ? parsedExpiry
+    : 0;
+}
+
+function activeRuntimeInsurancePolicies() {
+  if (runtimeInsurancePoliciesExpiresAt <= Date.now()) return [];
+  return runtimeInsurancePolicies;
+}
 
 export function configureType2DecisionGraphRuntimeCatalog(catalog: Type2DecisionGraphRuntimeCatalog) {
   runtimeCatalog = {
@@ -44,6 +63,8 @@ export function configureType2DecisionGraphRuntimeCatalog(catalog: Type2Decision
 
 export function clearType2DecisionGraphRuntimeCatalogForTests() {
   runtimeCatalog = undefined;
+  runtimeInsurancePolicies = [];
+  runtimeInsurancePoliciesExpiresAt = 0;
 }
 
 export function type2DecisionGraphRuntimeConfigured() {
@@ -102,6 +123,7 @@ export function buildType2Assessment(
       request,
       masterRegistry: runtimeCatalog.masterRegistry,
       marketProducts: runtimeCatalog.marketProducts,
+      insurancePolicies: activeRuntimeInsurancePolicies(),
     }),
     request,
   );

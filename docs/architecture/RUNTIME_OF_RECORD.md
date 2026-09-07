@@ -38,6 +38,29 @@ The clinical-engine package is therefore the code authority, and the selected ap
 
 This ADR intentionally does not decide which internal Type 2 implementation should be canonical. Tracing the older score path versus `decision-graph-v2`, then converging them, is reserved for the ordered Phase 3 Tasks 1 and 2.
 
+### Trusted Type 2 claim-policy boundary
+
+Type 2 medication/ranking evaluation remains browser-executed through
+`@glymize/clinical-engine`; this does not promote the Worker or `apps/api`
+into the clinical recommendation runtime.
+
+Insurer claim-timing authority is distinct from ordinary market coverage. The
+browser catalogue must not invent or persist it. Reviewed claim-timing rules are version-controlled in `apps/admin-worker/src/type2-claim-policy-registry.ts`, pass review through ordinary GitHub PR history, remain server-side in the Cloudflare Worker runtime, and are exposed only
+through the authenticated, permission-checked
+`GET /v1/clinical/type2/insurance-claim-policies` snapshot.
+
+The browser may pass that short-lived trusted snapshot into Decision Graph v2
+as a read-only policy input. The snapshot expires after five minutes and the
+web runtime refreshes it periodically and on runtime-auth changes. If the
+runtime endpoint is unavailable, unauthorized, malformed, expired, or returns
+no reviewed rule, the clinical engine receives no claim-timing authority and
+multi-claim `insured_only` evaluation remains fail-closed. Ordinary NFI or
+insurance coverage rows never imply claim timing.
+
+The snapshot contains no payer credential, connector DTO, signing key, reusable
+token, or submission capability. This boundary does not activate a live payer
+API or electronic-prescription integration.
+
 ## Patient and encounter boundary
 
 The web runtime clients resolve their base URL from `NEXT_PUBLIC_RUNTIME_API_URL`, falling back to `NEXT_PUBLIC_ADMIN_API_URL`. The current Pages workflow injects the admin URL, so the deployed client reaches the same Cloudflare Worker for OAuth/admin and `/v1/*` platform requests. `src/platform-v3.ts` is the Wrangler entry point and delegates authenticated patient routes to `src/platform-index.ts` and `src/platform-patient-record-v2.ts`.

@@ -27,6 +27,8 @@ import type {
   ResolvedDosePlanV2,
 } from "./decision-graph-v2/types.js";
 import { resolveType2InsuranceProvidersV2 } from "./type2-intake-v2.js";
+import type { ClaimsAwareInsurancePolicyRuleV2 } from "./decision-graph-v2/insurance-claims.js";
+import { withReviewedInsurancePoliciesV2 } from "./decision-graph-v2/reviewed-insurance-policy-merge.js";
 
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
 export const TYPE2_DECISION_GRAPH_EXECUTION_PROJECTION_V1 = "GLYMIZE_DECISION_GRAPH_EXECUTION_PROJECTION_V1";
@@ -78,6 +80,7 @@ export interface BuildType2DecisionGraphAssessmentInput {
   request: IntervalAwareType2ConsiderationRequestV2;
   masterRegistry: readonly MasterDrugRegistryEntry[];
   marketProducts: readonly IranMarketDrugProduct[];
+  insurancePolicies?: readonly ClaimsAwareInsurancePolicyRuleV2[];
 }
 
 function normalized(value: string | undefined) {
@@ -392,10 +395,14 @@ export function projectDecisionGraphRegimenToType2V2(
 export function buildType2AssessmentFromDecisionGraphV2(
   input: BuildType2DecisionGraphAssessmentInput,
 ): Type2DecisionGraphAssessmentResult {
-  const { inventory } = buildDecisionGraphInventoryFromContractsV2({
+  const { inventory: importedInventory } = buildDecisionGraphInventoryFromContractsV2({
     masterRegistry: input.masterRegistry,
     marketProducts: input.marketProducts,
   });
+  const inventory = withReviewedInsurancePoliciesV2(
+    importedInventory,
+    input.insurancePolicies ?? [],
+  );
   const result = runDecisionGraphV2(graphRequest(input, inventory));
   const regimens = [result.primary, ...result.alternatives]
     .filter((item): item is RecommendationV2 => Boolean(item))
