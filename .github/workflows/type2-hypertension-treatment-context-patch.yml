@@ -1,0 +1,298 @@
+name: Type 2 hypertension treatment context patch
+
+on:
+  push:
+    branches:
+      - feat/type2-hypertension-treatment-context-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: feat/type2-hypertension-treatment-context-20260907
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Activate pinned pnpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@11.7.0 --activate
+          pnpm --version
+
+      - name: Apply assertion-guarded treatment-context patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path_str: str, old: str, new: str):
+              path = Path(path_str)
+              text = path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}: {old[:120]!r}")
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "packages/contracts/src/index.ts",
+              "  genericMedicationId?: string;\n  referencePresentationId?: string;\n",
+              "  genericMedicationId?: string;\n"
+              "  /** Trusted catalogue therapy classification. Never derive this from a free-text medicine name. */\n"
+              "  therapyGroup?: MedicationTherapyGroup;\n"
+              "  referencePresentationId?: string;\n",
+          )
+
+          replace_once(
+              "apps/web/app/type-2/type2-current-medication-ui.ts",
+              "import type { BuildType2DecisionGraphAssessmentInput } from \"@glymize/clinical-engine\";\n",
+              "import type { GenericMedication } from \"@glymize/contracts\";\n"
+              "import type { BuildType2DecisionGraphAssessmentInput } from \"@glymize/clinical-engine\";\n",
+          )
+          replace_once(
+              "apps/web/app/type-2/type2-current-medication-ui.ts",
+              "export function type2CurrentMedicationPayload(\n  rows: readonly Type2MedicationRow[],\n): Type2CurrentMedicationIntakeV2[] {\n",
+              "export function type2CurrentMedicationPayload(\n"
+              "  rows: readonly Type2MedicationRow[],\n"
+              "  catalog: readonly GenericMedication[] = [],\n"
+              "): Type2CurrentMedicationIntakeV2[] {\n",
+          )
+          replace_once(
+              "apps/web/app/type-2/type2-current-medication-ui.ts",
+              "      const hasDailyDose = doseAmount !== undefined && frequencyPerDay !== undefined;\n\n      return {\n        genericMedicationId: item.genericMedicationId,\n",
+              "      const hasDailyDose = doseAmount !== undefined && frequencyPerDay !== undefined;\n"
+              "      const trustedCatalogMedication = item.genericMedicationId\n"
+              "        ? catalog.find((candidate) => candidate.id === item.genericMedicationId)\n"
+              "        : undefined;\n\n"
+              "      return {\n"
+              "        genericMedicationId: item.genericMedicationId,\n"
+              "        therapyGroup: trustedCatalogMedication?.therapyGroup,\n",
+          )
+          replace_once(
+              "apps/web/app/type-2/type2-current-medication-ui.ts",
+              " * - interval/stage/timing is never inferred from medication name, brand, dose, or frequency;\n",
+              " * - interval/stage/timing is never inferred from medication name, brand, dose, or frequency;\n"
+              " * - therapyGroup is copied only from an exact trusted catalogue id; free-text names never create treatment context;\n",
+          )
+
+          replace_once(
+              "apps/web/app/type-2/type2-scenarios-client.tsx",
+              "      currentMedications: type2CurrentMedicationPayload(medications),\n",
+              "      currentMedications: type2CurrentMedicationPayload(medications, catalog),\n",
+          )
+
+          replace_once(
+              "packages/clinical-engine/src/type2-intake-v2.ts",
+              "    masterDrugId: item.genericMedicationId,\n    genericName: item.genericName,\n    route: item.route,\n",
+              "    masterDrugId: item.genericMedicationId,\n"
+              "    genericName: item.genericName,\n"
+              "    therapyGroup: item.therapyGroup,\n"
+              "    route: item.route,\n",
+          )
+
+          replace_once(
+              "packages/clinical-engine/src/type2-input-contract-v2/catalog-specialist.ts",
+              "  \"hypertension.established_treatment_context\": {\n"
+              "    requestSupport: \"not_represented\",\n"
+              "    description: \"Established hypertension-treatment context beyond a single encounter BP\",\n"
+              "  },",
+              "  \"hypertension.established_treatment_context\": {\n"
+              "    requestSupport: \"runtime_derived\",\n"
+              "    requestPath: \"currentMedications[].therapyGroup -> active antihypertensive treatment context\",\n"
+              "    description: \"Established hypertension-treatment context derived only from active current medication with a trusted catalogue therapy group (RAAS blocker, antihypertensive, or mineralocorticoid receptor antagonist); a BP reading or free-text medicine name alone cannot create it\",\n"
+              "  },",
+          )
+
+          replace_once(
+              "apps/web/app/type-2/type2-input-coverage-v2.ts",
+              "  \"hypertension.established_treatment_context\": {\n"
+              "    state: \"not_represented\",\n"
+              "    surface: \"none\",\n"
+              "    note: \"A single encounter BP must not be promoted into an established hypertension-treatment context.\",\n"
+              "  },",
+              "  \"hypertension.established_treatment_context\": {\n"
+              "    state: \"derived\",\n"
+              "    surface: \"runtime_adapter\",\n"
+              "    note: \"Derived only when an active current medication carries a therapy group copied from its exact trusted GenericMedication catalogue id. Free-text medicine names and a single encounter BP never establish this context; missing catalogue identity remains fail-closed.\",\n"
+              "  },",
+          )
+
+          current_med_test = "apps/web/test/type2-current-medication-ui.test.ts"
+          anchor = "  it(\"wires the scenario shell to the dedicated reconciliation row component\", () => {\n"
+          addition = (
+              "  it(\"derives therapy group only from an exact trusted catalogue identity\", () => {\n"
+              "    const catalog = [{\n"
+              "      id: \"losartan-id\",\n"
+              "      canonicalName: \"Losartan\",\n"
+              "      persianName: \"لوزارتان\",\n"
+              "      therapyGroup: \"raas_blocker\" as const,\n"
+              "    }];\n\n"
+              "    const [trusted] = type2CurrentMedicationPayload([{\n"
+              "      id: \"row-trusted\",\n"
+              "      genericMedicationId: \"losartan-id\",\n"
+              "      genericName: \"Losartan\",\n"
+              "      doseAmount: \"50\",\n"
+              "      doseUnit: \"mg\",\n"
+              "      frequencyPerDay: \"1\",\n"
+              "      status: \"active\",\n"
+              "    }], catalog);\n"
+              "    expect(trusted?.therapyGroup).toBe(\"raas_blocker\");\n\n"
+              "    const [freeText] = type2CurrentMedicationPayload([{\n"
+              "      id: \"row-free-text\",\n"
+              "      genericName: \"Losartan\",\n"
+              "      doseAmount: \"50\",\n"
+              "      doseUnit: \"mg\",\n"
+              "      frequencyPerDay: \"1\",\n"
+              "      status: \"active\",\n"
+              "    }], catalog);\n"
+              "    expect(freeText?.therapyGroup).toBeUndefined();\n"
+              "  });\n\n"
+          )
+          replace_once(current_med_test, anchor, addition + anchor)
+
+          structured_test = "packages/clinical-engine/test/type2-structured-intake-v2.test.ts"
+          replace_once(
+              structured_test,
+              "import {\n  resolveDiabeticFootPathwayV2,\n",
+              "import { hasEstablishedHypertensionTreatmentContextV2 } from \"../src/decision-graph-v2/cardiovascular-objectives.js\";\n"
+              "import {\n  resolveDiabeticFootPathwayV2,\n",
+          )
+          structured_anchor = "  it(\"preserves current medication names for pregnancy medication reconciliation without fabricating dose identity\", () => {\n"
+          structured_addition = (
+              "  it(\"carries trusted therapy group into the established hypertension treatment-context gate\", () => {\n"
+              "    const trusted = type2StructuredIntakeToDecisionGraphV2(request({\n"
+              "      currentMedications: [{\n"
+              "        genericMedicationId: \"losartan-id\",\n"
+              "        genericName: \"Losartan\",\n"
+              "        therapyGroup: \"raas_blocker\",\n"
+              "        status: \"active\",\n"
+              "      }],\n"
+              "    }), inventory);\n"
+              "    expect(trusted.patient.currentMedications?.[0]?.therapyGroup).toBe(\"raas_blocker\");\n"
+              "    expect(hasEstablishedHypertensionTreatmentContextV2(trusted)).toBe(true);\n\n"
+              "    const freeTextOnly = type2StructuredIntakeToDecisionGraphV2(request({\n"
+              "      currentMedications: [{ genericName: \"Losartan\", status: \"active\" }],\n"
+              "    }), inventory);\n"
+              "    expect(freeTextOnly.patient.currentMedications?.[0]?.therapyGroup).toBeUndefined();\n"
+              "    expect(hasEstablishedHypertensionTreatmentContextV2(freeTextOnly)).toBe(false);\n"
+              "  });\n\n"
+          )
+          replace_once(structured_test, structured_anchor, structured_addition + structured_anchor)
+
+          replace_once(
+              "packages/clinical-engine/test/clinical-domain-capabilities-v2.test.ts",
+              "    expect(type2ClinicalInputDefinitionV2(\"hypertension.established_treatment_context\").requestSupport).toBe(\"not_represented\");\n",
+              "    const hypertensionContext = type2ClinicalInputDefinitionV2(\"hypertension.established_treatment_context\");\n"
+              "    expect(hypertensionContext.requestSupport).toBe(\"runtime_derived\");\n"
+              "    expect(hypertensionContext.requestPath).toContain(\"currentMedications\");\n"
+              "    expect(hypertensionContext.description.toLocaleLowerCase()).toContain(\"free-text\");\n",
+          )
+
+          coverage_test = "apps/web/test/type2-input-coverage-v2.test.ts"
+          replace_once(
+              coverage_test,
+              "  it(\"keeps semantically unrepresented safety and treatment contexts fail-closed\", () => {\n"
+              "    expect(type2UiInputCoverageV2[\"safety.product_specific_screen\"].state).toBe(\"not_represented\");\n"
+              "    expect(type2UiInputCoverageV2[\"hypertension.established_treatment_context\"].state).toBe(\"not_represented\");\n"
+              "  });\n",
+              "  it(\"keeps product-specific safety unrepresented while deriving trusted hypertension treatment context fail-closed\", () => {\n"
+              "    expect(type2UiInputCoverageV2[\"safety.product_specific_screen\"].state).toBe(\"not_represented\");\n"
+              "    const hypertensionContext = type2UiInputCoverageV2[\"hypertension.established_treatment_context\"];\n"
+              "    expect(hypertensionContext.state).toBe(\"derived\");\n"
+              "    expect(hypertensionContext.surface).toBe(\"runtime_adapter\");\n"
+              "    expect(hypertensionContext.note?.toLocaleLowerCase()).toContain(\"trusted\");\n"
+              "    expect(hypertensionContext.note?.toLocaleLowerCase()).toContain(\"free-text\");\n"
+              "    expect(hypertensionContext.note?.toLocaleLowerCase()).toContain(\"fail-closed\");\n"
+              "  });\n",
+          )
+          replace_once(
+              coverage_test,
+              "      \"safety.product_specific_screen\",\n      \"hypertension.established_treatment_context\",\n",
+              "      \"safety.product_specific_screen\",\n",
+          )
+          replace_once(
+              coverage_test,
+              "    expect(type2UiInputGapsV2).not.toContain(\"core.age_years\");\n",
+              "    expect(type2UiInputGapsV2).not.toContain(\"core.age_years\");\n"
+              "    expect(type2UiInputGapsV2).not.toContain(\"hypertension.established_treatment_context\");\n",
+          )
+          PY
+
+      - name: Install workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @glymize/contracts build
+          pnpm --filter @glymize/clinical-engine build
+
+      - name: Run focused clinical-engine tests
+        run: pnpm --filter @glymize/clinical-engine test -- test/type2-structured-intake-v2.test.ts test/clinical-domain-capabilities-v2.test.ts
+
+      - name: Run focused web tests
+        run: pnpm --filter @glymize/web test -- test/type2-current-medication-ui.test.ts test/type2-input-coverage-v2.test.ts
+
+      - name: Typecheck monorepo
+        run: pnpm typecheck
+
+      - name: Lint monorepo
+        run: pnpm lint
+
+      - name: Verify diff hygiene and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          changed="$(git diff --name-only | sort)"
+          allowed="$(printf '%s\n' \
+            'apps/web/app/type-2/type2-current-medication-ui.ts' \
+            'apps/web/app/type-2/type2-input-coverage-v2.ts' \
+            'apps/web/app/type-2/type2-scenarios-client.tsx' \
+            'apps/web/test/type2-current-medication-ui.test.ts' \
+            'apps/web/test/type2-input-coverage-v2.test.ts' \
+            'packages/clinical-engine/src/type2-input-contract-v2/catalog-specialist.ts' \
+            'packages/clinical-engine/src/type2-intake-v2.ts' \
+            'packages/clinical-engine/test/clinical-domain-capabilities-v2.test.ts' \
+            'packages/clinical-engine/test/type2-structured-intake-v2.test.ts' \
+            'packages/contracts/src/index.ts' | sort)"
+          unexpected="$(comm -23 <(printf '%s\n' "$changed") <(printf '%s\n' "$allowed"))"
+          test -z "$unexpected" || { echo "Unexpected source files:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Commit verified source and self-remove workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/type2-hypertension-treatment-context-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/web/app/type-2/type2-current-medication-ui.ts \
+            apps/web/app/type-2/type2-input-coverage-v2.ts \
+            apps/web/app/type-2/type2-scenarios-client.tsx \
+            apps/web/test/type2-current-medication-ui.test.ts \
+            apps/web/test/type2-input-coverage-v2.test.ts \
+            packages/clinical-engine/src/type2-input-contract-v2/catalog-specialist.ts \
+            packages/clinical-engine/src/type2-intake-v2.ts \
+            packages/clinical-engine/test/clinical-domain-capabilities-v2.test.ts \
+            packages/clinical-engine/test/type2-structured-intake-v2.test.ts \
+            packages/contracts/src/index.ts
+          git add -u .github/workflows/type2-hypertension-treatment-context-patch.yml
+          git diff --cached --check
+          git commit -m "Carry trusted treatment context into Type 2 hypertension gate"
+          git push origin HEAD:${GITHUB_REF_NAME}
