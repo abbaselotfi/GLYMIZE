@@ -3,6 +3,13 @@ import type { EvidenceReferenceV2 } from "./decision-graph-v2/types.js";
 import { activeGuidelineSources, evidenceSourcesFor } from "./guideline-registry.js";
 import { getActiveClinicalRulePack } from "./rule-pack.js";
 
+const EVIDENCE_SEARCH_RELEVANCE_WEIGHTS = {
+  exactTokenMatch: 3,
+  partialTokenMatch: 1,
+  domainTokenMatch: 2,
+  minimumPartialTokenLength: 4,
+} as const;
+
 export type EvidenceAssistantLocale = "fa" | "en";
 
 export interface EvidenceAssistantCitation {
@@ -99,11 +106,11 @@ function scoreRule(questionTokens: readonly string[], haystack: string, domain: 
   const haystackTokens = new Set(tokens(normalized));
   let score = 0;
   for (const token of questionTokens) {
-    if (haystackTokens.has(token)) score += 3;
-    else if (token.length >= 4 && normalized.includes(token)) score += 1;
+    if (haystackTokens.has(token)) score += EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.exactTokenMatch;
+    else if (token.length >= EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.minimumPartialTokenLength && normalized.includes(token)) score += EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.partialTokenMatch;
   }
   const domainTokens = tokens(domain);
-  if (domainTokens.some((token) => questionTokens.includes(token))) score += 2;
+  if (domainTokens.some((token) => questionTokens.includes(token))) score += EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.domainTokenMatch;
   return score;
 }
 

@@ -2,7 +2,7 @@
 
 - Status: **Accepted implementation record for live Type 2**
 - Date: 2026-09-08
-- Repository baseline: `main@06d4873469767cee0bf2a5ca3053005ddb666a7b`
+- Repository baseline: `main@8bca56aada61f17745d15f5ffb393bbd4d8bf537`
 - Roadmap reference: Phase 2 clinical-logic safety foundation
 - Scope: document the precedence already implemented by the physician-facing Type 2 Decision Graph and bound the retained legacy-score compatibility path. This document does not add or change a clinical threshold, dose, indication, evidence source, ranking rule, feature flag, migration, or deployment.
 
@@ -111,6 +111,14 @@ Direct test consumers intentionally exercise presentation compatibility, guideli
 
 `scoreMedication()` is private to `packages/clinical-engine/src/index.ts`. The audit found no external production import of that function. Its result feeds only the retained legacy builder's `priorityScore` ordering.
 
+### 3.6 Named score-mechanics boundary
+
+`packages/clinical-engine/src/type2-legacy-score-policy.ts` now names every previously inline numeric mechanic used by the retained Type 2 aggregate-score builder and its legacy scenario layer. The policy is versioned and marked `compatibility_only`; its values preserve historical behavior and are not reviewed clinical evidence or Decision Graph authority. Clinical thresholds and reviewed treatment weights remain owned by the active `ClinicalRulePack`.
+
+`packages/clinical-engine/src/evidence-assistant.ts` separately names its token-match relevance weights. Those values rank evidence-search matches only; they do not rank medicines, create eligibility, select doses, or change Decision Graph ordering.
+
+The Decision Graph v2 engine must not import `TYPE2_LEGACY_SCORE_POLICY_V1`. A regression test enforces that separation.
+
 ## 4. Regression invariant
 
 The repository must fail validation if any of these boundaries regress:
@@ -129,7 +137,6 @@ This record is sufficient to close the narrow roadmap item **Define rule precede
 The following broader Phase 2 items remain open or partial:
 
 - **Separate hard blocks, cautions, preferences, cost, and display:** strongly implemented and now documented for live Type 2, but the roadmap item spans retained compatibility and other clinical modules.
-- **Replace unexplained score constants:** incomplete repository-wide because the unconfigured legacy compatibility builder still contains aggregate score constants.
 - **Create traceable rule metadata:** substantial versioned rule/evidence infrastructure exists, but universal coverage across every future rule family is not yet proven.
 - **Define minimum safe inputs per pathway:** Type 2 has machine-readable capability/input contracts, but not every clinical module has the same completeness contract. `cardiovascular.nyha_class` remains intentionally uncollected until a real consumer exists.
 - **Add source versioning and review fields:** substantial coverage exists, but universal schema coverage is not yet proven.

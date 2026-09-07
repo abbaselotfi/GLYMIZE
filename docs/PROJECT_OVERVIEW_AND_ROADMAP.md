@@ -914,7 +914,7 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 - [x] Define rule precedence
 - [ ] Separate hard blocks, cautions, preferences, cost, and display
-- [ ] Replace unexplained score constants
+- [x] Replace unexplained score constants
 - [ ] Create traceable rule metadata
 - [ ] Define minimum safe inputs per pathway
 - [ ] Add source versioning and review fields
