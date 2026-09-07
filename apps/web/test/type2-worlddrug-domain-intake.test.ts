@@ -6,7 +6,11 @@ import { medicationClinicalDomains } from "@glymize/contracts";
 const sourcePath = fileURLToPath(
   new URL("../app/type-2/type2-scenarios-client.tsx", import.meta.url),
 );
+const coreIntakePath = fileURLToPath(
+  new URL("../app/type-2/type2-core-intake-ui.ts", import.meta.url),
+);
 const source = readFileSync(sourcePath, "utf8");
+const coreIntakeSource = readFileSync(coreIntakePath, "utf8");
 
 const factorBackedDomains = {
   diabetes: "currentHba1c",
@@ -57,7 +61,8 @@ describe("Type 2 WorldDrug domain intake", () => {
 
   it("routes pregnancy through the clinical factor/context path rather than review-only domain intake", () => {
     expect(source).toContain('{ key: "pregnancy"');
-    expect(source).toContain('pregnancy: factors.includes("pregnancy")');
+    expect(source).toContain("type2ClinicalContextFromActiveIntake");
+    expect(coreIntakeSource).toContain('pregnancy: factors.includes("pregnancy")');
     expect(source).not.toContain('{ key: "pregnancy", fa: "بارداری", en: "Pregnancy", hintFa: "فرآورده‌ها');
   });
 });
