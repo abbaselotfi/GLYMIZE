@@ -15,6 +15,10 @@ import {
   type IntervalAwareCurrentMedicationV2,
 } from "./decision-graph-v2/current-medication-interval.js";
 import { runDecisionGraphV2 } from "./decision-graph-v2/engine.js";
+import {
+  mergeInsuranceClaimTimingPoliciesV2,
+  type InsuranceClaimTimingPolicyV2,
+} from "./decision-graph-v2/insurance-claim-timing-policy.js";
 import { buildDecisionGraphInventoryFromContractsV2 } from "./decision-graph-v2/inventory-adapter.js";
 import type {
   ComposedTherapyActionV2,
@@ -78,6 +82,7 @@ export interface BuildType2DecisionGraphAssessmentInput {
   request: IntervalAwareType2ConsiderationRequestV2;
   masterRegistry: readonly MasterDrugRegistryEntry[];
   marketProducts: readonly IranMarketDrugProduct[];
+  insuranceClaimTimingPolicies?: readonly InsuranceClaimTimingPolicyV2[];
 }
 
 function normalized(value: string | undefined) {
@@ -396,6 +401,10 @@ export function buildType2AssessmentFromDecisionGraphV2(
     masterRegistry: input.masterRegistry,
     marketProducts: input.marketProducts,
   });
+  inventory.insurancePolicies = mergeInsuranceClaimTimingPoliciesV2(
+    inventory.insurancePolicies,
+    input.insuranceClaimTimingPolicies ?? [],
+  );
   const result = runDecisionGraphV2(graphRequest(input, inventory));
   const regimens = [result.primary, ...result.alternatives]
     .filter((item): item is RecommendationV2 => Boolean(item))
