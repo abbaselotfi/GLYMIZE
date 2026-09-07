@@ -912,7 +912,7 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 
 ### Phase 2 — Clinical logic safety foundation
 
-- [ ] Define rule precedence
+- [x] Define rule precedence
 - [ ] Separate hard blocks, cautions, preferences, cost, and display
 - [ ] Replace unexplained score constants
 - [ ] Create traceable rule metadata

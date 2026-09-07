@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import type { GenericMedication, IranMarketDrugProduct, MasterDrugRegistryEntry } from "@glymize/contracts";
 import {
@@ -107,5 +108,37 @@ describe("live Type 2 authority", () => {
       factors: [],
     });
     expect(result.recommendation.sourceReference).not.toContain(TYPE2_DECISION_GRAPH_V2_AUTHORITY);
+  });
+
+  it("keeps direct legacy medication scoring outside physician-facing assessment routes", () => {
+    const runtimeSource = readFileSync(new URL("../src/type2-decision-graph-runtime.ts", import.meta.url), "utf8");
+    const webApiSource = readFileSync(new URL("../../../apps/web/lib/api-client.ts", import.meta.url), "utf8");
+    const nestCatalogSource = readFileSync(new URL("../../../apps/api/src/catalog/catalog.service.ts", import.meta.url), "utf8");
+
+    expect(runtimeSource.match(/buildLegacyType2Assessment\(/g)).toHaveLength(1);
+    const runtimeFallback = runtimeSource.indexOf("if (!runtimeCatalog?.masterRegistry.length)");
+    const legacyAssessment = runtimeSource.indexOf("buildLegacyType2Assessment(", runtimeFallback);
+    const configuredGraphPath = runtimeSource.indexOf("buildType2AssessmentWithWorldDrugCoverageV2(", runtimeFallback);
+    expect(runtimeFallback).toBeGreaterThanOrEqual(0);
+    expect(legacyAssessment).toBeGreaterThan(runtimeFallback);
+    expect(configuredGraphPath).toBeGreaterThan(legacyAssessment);
+    expect(runtimeSource.slice(runtimeFallback, configuredGraphPath)).toContain("filterHardExcludedLegacyType2Assessment(");
+
+    const browserPreview = webApiSource.indexOf('pathname === "/v1/admin/preview/type-2-considerations"');
+    const browserDirectLegacy = webApiSource.indexOf("buildType2MedicationConsiderations(", browserPreview);
+    const browserPhysicianPost = webApiSource.indexOf('pathname === "/v1/catalog/type-2/considerations"');
+    expect(browserPreview).toBeGreaterThanOrEqual(0);
+    expect(browserDirectLegacy).toBeGreaterThan(browserPreview);
+    expect(browserDirectLegacy).toBeLessThan(browserPhysicianPost);
+    expect(webApiSource.slice(browserPhysicianPost, browserPhysicianPost + 250)).toContain("type2Assessment(");
+    expect(webApiSource.slice(browserPhysicianPost, browserPhysicianPost + 250)).not.toContain("buildType2MedicationConsiderations(");
+
+    const nestMainAssessment = nestCatalogSource.indexOf("listType2MedicationConsiderations(");
+    const nestPreview = nestCatalogSource.indexOf("listType2PreviewConsiderations(");
+    expect(nestMainAssessment).toBeGreaterThanOrEqual(0);
+    expect(nestPreview).toBeGreaterThan(nestMainAssessment);
+    expect(nestCatalogSource.slice(nestMainAssessment, nestPreview)).toContain("buildType2Assessment(");
+    expect(nestCatalogSource.slice(nestMainAssessment, nestPreview)).not.toContain("buildType2MedicationConsiderations(");
+    expect(nestCatalogSource.slice(nestPreview, nestPreview + 300)).toContain("buildType2MedicationConsiderations(");
   });
 });
