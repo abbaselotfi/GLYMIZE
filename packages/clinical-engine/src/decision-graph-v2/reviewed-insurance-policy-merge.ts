@@ -18,6 +18,10 @@ function samePolicyTarget(
  * Adds only reviewed claim-timing metadata to an existing imported financial
  * policy. Timing authority never invents financial coverage, so unmatched
  * reviewed rules are ignored and ordinary coverage remains mandatory.
+ *
+ * The imported policy identity and provenance are deliberately preserved.
+ * Claim-timing provenance remains owned by the reviewed runtime registry rather
+ * than being presented as the source of the financial coverage row.
  */
 export function mergeReviewedInsurancePoliciesV2(
   importedPolicies: readonly InsurancePolicyRuleV2[],
@@ -30,13 +34,7 @@ export function mergeReviewedInsurancePoliciesV2(
     if (!reviewed?.claimTiming) return { ...imported };
     return {
       ...imported,
-      id: reviewed.id,
       claimTiming: structuredClone(reviewed.claimTiming),
-      ...(reviewed.effectiveAt ? { effectiveAt: reviewed.effectiveAt } : {}),
-      ...(reviewed.sourceUrl ? { sourceUrl: reviewed.sourceUrl } : {}),
-      ...(reviewed.sourceReference
-        ? { sourceReference: reviewed.sourceReference }
-        : {}),
     };
   });
 }
