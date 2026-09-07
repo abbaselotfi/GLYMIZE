@@ -4,20 +4,24 @@ import type { ClaimsAwareInsurancePolicyRuleV2 } from "../src/decision-graph-v2/
 import type { InsurancePolicyRuleV2 } from "../src/decision-graph-v2/types.js";
 
 describe("reviewed insurance claim timing merge v2", () => {
-  it("adds reviewed timing without replacing imported financial coverage", () => {
+  it("adds reviewed timing without replacing imported financial authority or provenance", () => {
     const imported: InsurancePolicyRuleV2[] = [{
       id: "imported:wegovy:social_security",
       provider: "social_security",
       productId: "WEGOVY-025",
       coveragePercent: 50,
       referencePriceTomanPerPurchaseUnit: 4_000_000,
+      effectiveAt: "2026-08-01T00:00:00.000Z",
+      sourceReference: "financial-coverage-source",
+      sourceUrl: "https://example.test/financial-coverage",
     }];
     const reviewed: ClaimsAwareInsurancePolicyRuleV2[] = [{
       id: "reviewed:tamin:wegovy:2026-09",
       provider: "social_security",
       productId: "WEGOVY-025",
       effectiveAt: "2026-09-01T00:00:00.000Z",
-      sourceReference: "reviewed-policy-2026-09",
+      sourceReference: "reviewed-claim-timing-source",
+      sourceUrl: "https://example.test/claim-timing",
       claimTiming: {
         groupKey: "wegovy-strength-switch",
         windowDays: 30,
@@ -29,9 +33,12 @@ describe("reviewed insurance claim timing merge v2", () => {
 
     const merged = mergeReviewedInsurancePoliciesV2(imported, reviewed);
     expect(merged).toHaveLength(1);
-    expect(merged[0]?.id).toBe("reviewed:tamin:wegovy:2026-09");
+    expect(merged[0]?.id).toBe("imported:wegovy:social_security");
     expect(merged[0]?.coveragePercent).toBe(50);
     expect(merged[0]?.referencePriceTomanPerPurchaseUnit).toBe(4_000_000);
+    expect(merged[0]?.effectiveAt).toBe("2026-08-01T00:00:00.000Z");
+    expect(merged[0]?.sourceReference).toBe("financial-coverage-source");
+    expect(merged[0]?.sourceUrl).toBe("https://example.test/financial-coverage");
     expect(merged[0]?.claimTiming?.minimumDaysBetweenClaims).toBe(28);
   });
 
