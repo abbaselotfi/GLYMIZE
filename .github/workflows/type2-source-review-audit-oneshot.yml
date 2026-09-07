@@ -1,0 +1,125 @@
+name: One-shot Type 2 source and review lifecycle audit
+
+on:
+  push:
+    branches:
+      - 'chore/type2-source-review-lifecycle-20260908'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CBM_VERSION: '0.10.8'
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build contracts dependency
+        run: pnpm --filter @glymize/contracts build
+
+      - name: Probe required evidence version
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp packages/clinical-engine/src/decision-graph-v2/types.ts /tmp/types.ts.original
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('packages/clinical-engine/src/decision-graph-v2/types.ts')
+          s = p.read_text(encoding='utf-8')
+          old = '  version?: string;'
+          if old not in s:
+              raise SystemExit('optional EvidenceReferenceV2.version field not found')
+          p.write_text(s.replace(old, '  version: string;', 1), encoding='utf-8')
+          PY
+          set +e
+          pnpm --filter @glymize/clinical-engine typecheck 2>&1 | tee /tmp/version-probe.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "VERSION_PROBE_EXIT=$rc"
+          if [ "$rc" -ne 0 ]; then
+            echo '=== version probe diagnostics ==='
+            grep -E 'version|EvidenceReferenceV2|Property.*missing' /tmp/version-probe.log || true
+          fi
+          cp /tmp/types.ts.original packages/clinical-engine/src/decision-graph-v2/types.ts
+
+      - name: Probe review-state coverage on executable rule families
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp packages/clinical-engine/src/decision-graph-v2/types.ts /tmp/types.ts.original2
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('packages/clinical-engine/src/decision-graph-v2/types.ts')
+          s = p.read_text(encoding='utf-8')
+          replacements = {
+            'export interface MedicationGateRuleV2 {\n  id: string;': 'export interface MedicationGateRuleV2 {\n  id: string;\n  reviewState: "candidate" | "approved" | "retired";',
+            'export interface RegimenConflictRuleV2 {\n  id: string;': 'export interface RegimenConflictRuleV2 {\n  id: string;\n  reviewState: "candidate" | "approved" | "retired";',
+            'export interface InsulinConversionRuleV2 {\n  id: string;': 'export interface InsulinConversionRuleV2 {\n  id: string;\n  reviewState: "candidate" | "approved" | "retired";',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'expected interface marker not found: {old!r}')
+              s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          set +e
+          pnpm --filter @glymize/clinical-engine typecheck 2>&1 | tee /tmp/review-probe.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "REVIEW_PROBE_EXIT=$rc"
+          if [ "$rc" -ne 0 ]; then
+            echo '=== review-state probe diagnostics ==='
+            grep -E 'reviewState|MedicationGateRuleV2|RegimenConflictRuleV2|InsulinConversionRuleV2|Property.*missing' /tmp/review-probe.log || true
+          fi
+          cp /tmp/types.ts.original2 packages/clinical-engine/src/decision-graph-v2/types.ts
+
+      - name: Inventory source/review lifecycle fields
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== evidence source declarations ==='
+          grep -RIn --include='*.ts' 'sourceId:' packages/clinical-engine/src/decision-graph-v2 || true
+          echo '=== review-state declarations/usages ==='
+          grep -RIn --include='*.ts' 'reviewState:' packages/clinical-engine/src/decision-graph-v2 || true
+          echo '=== inventory rule families ==='
+          grep -nE 'interface (MedicationGateRuleV2|RegimenConflictRuleV2|RegimenTemplateV2|DoseRuleV2|TitrationProtocolV2|InsulinConversionRuleV2|FrcProductProtocolBindingV2)' packages/clinical-engine/src/decision-graph-v2/types.ts
