@@ -4,6 +4,7 @@ import {
   resolveNutritionSupportBoundaryV2,
   type NutritionSupportContextV2,
 } from "./nutrition-support-boundary.js";
+import type { ProductSpecificSafetyScreenV2 } from "./product-safety-screen.js";
 import {
   resolvePregnancyDiabetesPathwayV2,
   type PregnancyDiabetesContextV2,
@@ -21,6 +22,11 @@ export type DecisionGraphRequestWithSpecialistContextsV2 = Omit<DecisionGraphReq
     diabeticFoot?: DiabeticFootContextV2;
     nutritionSupport?: NutritionSupportContextV2;
     pregnancyCare?: PregnancyDiabetesContextV2;
+    /**
+     * Transport-only clinician responses. Presence never clears or excludes a
+     * product until a reviewed criterion registry is explicitly bound later.
+     */
+    productSafetyScreens?: ProductSpecificSafetyScreenV2[];
   };
 };
 
