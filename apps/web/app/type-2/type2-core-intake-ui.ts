@@ -1,6 +1,10 @@
 import type { MedicationClinicalDomain, Type2DecisionFactor } from "@glymize/contracts";
 import type { Type2StructuredConsiderationRequestV2 } from "@glymize/clinical-engine/type2-intake-v2";
 import {
+  type2PatientAgeFromDraft,
+  type Type2PatientAgeDraft,
+} from "./type2-patient-age-ui";
+import {
   structuredClinicalContextFromDraft,
   type Type2StructuredIntakeDraft,
 } from "./type2-structured-intake-ui";
@@ -53,12 +57,16 @@ export interface Type2ClinicalContextProjectionInput {
   structuredContext: Type2StructuredIntakeDraft;
   factors: readonly Type2DecisionFactor[];
   worldDrugDomains: readonly MedicationClinicalDomain[];
+  patientAge?: Type2PatientAgeDraft;
+  /** Test seam for deterministic birthday-boundary assertions. Runtime omits it. */
+  ageAsOf?: Date;
 }
 
 /**
  * Projects the active `/type-2` clinician intake into the structured request.
- * This is a mechanical projection only: absent clinical facts remain absent and
- * CrCl is never derived from eGFR.
+ * This is a mechanical projection only: absent clinical facts remain absent,
+ * age is derived only from explicit DOB/confirmed reported-age inputs, and CrCl
+ * is never derived from eGFR.
  */
 export function type2ClinicalContextFromActiveIntake(
   input: Type2ClinicalContextProjectionInput,
@@ -69,8 +77,12 @@ export function type2ClinicalContextFromActiveIntake(
     ...specialist
   } = structuredClinicalContextFromDraft(structuredContext, { factors, worldDrugDomains });
   const bmi = type2BmiFromCoreDraft(context);
+  const age = input.patientAge
+    ? type2PatientAgeFromDraft(input.patientAge, input.ageAsOf)
+    : { ageYears: undefined as number | undefined };
 
   return {
+    ageYears: age.ageYears,
     pregnancy: factors.includes("pregnancy"),
     cardiovascular: {
       ascvd: factors.includes("ascvd"),
