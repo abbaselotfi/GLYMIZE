@@ -35,13 +35,13 @@ jobs:
           from pathlib import Path
 
           def replace_once(path: Path, old: str, new: str):
-              text = path.read_text(encoding='utf-8')
+              text = path.read_text(encoding="utf-8")
               count = text.count(old)
               if count != 1:
-                  raise SystemExit(f'{path}: expected exactly one match, found {count}: {old[:100]!r}')
-              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}: {old[:100]!r}")
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
-          client = Path('apps/web/app/type-2/type2-scenarios-client.tsx')
+          client = Path("apps/web/app/type-2/type2-scenarios-client.tsx")
           replace_once(
               client,
               'import type { PatientHandoffRecord } from "@glymize/contracts";',
@@ -76,26 +76,28 @@ jobs:
               '      clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains }),',
               '      clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains, patientAge }),',
           )
-          old_a1c = '''            <div className={styles.twoCols}>
-              <Field label={fa ? "HbA1c فعلی" : "Current A1C"} value={currentHba1c} onChange={(value) => { setCurrentHba1c(value); setAssessment(null); }} unit="%" placeholder="8.7" />
-              <Field label={fa ? "HbA1c هدف" : "Target A1C"} value={targetHba1c} onChange={(value) => { setTargetHba1c(value); setAssessment(null); }} unit="%" placeholder="7.0" />
-            </div>
-'''
-          new_a1c = old_a1c + '''            <div className={styles.twoCols}>
-              <Type2PatientAgeField
-                className={styles.field}
-                draft={patientAge}
-                fa={fa}
-                onDateOfBirthChange={(value) => {
-                  setPatientAge((currentAge) => ({ ...currentAge, dateOfBirth: value }));
-                  setAssessment(null);
-                }}
-              />
-            </div>
-'''
+          old_a1c = (
+              '            <div className={styles.twoCols}>\n'
+              '              <Field label={fa ? "HbA1c فعلی" : "Current A1C"} value={currentHba1c} onChange={(value) => { setCurrentHba1c(value); setAssessment(null); }} unit="%" placeholder="8.7" />\n'
+              '              <Field label={fa ? "HbA1c هدف" : "Target A1C"} value={targetHba1c} onChange={(value) => { setTargetHba1c(value); setAssessment(null); }} unit="%" placeholder="7.0" />\n'
+              '            </div>\n'
+          )
+          new_a1c = old_a1c + (
+              '            <div className={styles.twoCols}>\n'
+              '              <Type2PatientAgeField\n'
+              '                className={styles.field}\n'
+              '                draft={patientAge}\n'
+              '                fa={fa}\n'
+              '                onDateOfBirthChange={(value) => {\n'
+              '                  setPatientAge((currentAge) => ({ ...currentAge, dateOfBirth: value }));\n'
+              '                  setAssessment(null);\n'
+              '                }}\n'
+              '              />\n'
+              '            </div>\n'
+          )
           replace_once(client, old_a1c, new_a1c)
 
-          lookup = Path('apps/web/app/components/patient-handoff-lookup.tsx')
+          lookup = Path("apps/web/app/components/patient-handoff-lookup.tsx")
           replace_once(
               lookup,
               'export default function PatientHandoffLookup({ onApply }: { onApply: (record: PatientHandoffRecord) => void }) {',
@@ -103,22 +105,24 @@ jobs:
           )
           replace_once(lookup, '              onApply(record);', '              onApply(record, selection.patient);')
 
-          coverage = Path('apps/web/app/type-2/type2-input-coverage-v2.ts')
-          replace_once(
-              coverage,
-              '''  "core.age_years": {
-    state: "not_collected",
-    surface: "none",
-    note: "The request contract supports ageYears, but the active Type 2 clinician form does not collect it; longitudinal demographic design should prefer date of birth rather than adding a static patient age here.",
-  },''',
-              '''  "core.age_years": {
-    state: "derived",
-    surface: "core_form",
-    note: "The active Type 2 form derives age deterministically from explicit date of birth. Patient Record v2 longitudinal DOB has precedence; a handoff-reported age is used only when its field provenance is confirmed. Unknown age remains absent and age-dependent gates stay fail-closed.",
-  },''',
+          coverage = Path("apps/web/app/type-2/type2-input-coverage-v2.ts")
+          old_coverage = (
+              '  "core.age_years": {\n'
+              '    state: "not_collected",\n'
+              '    surface: "none",\n'
+              '    note: "The request contract supports ageYears, but the active Type 2 clinician form does not collect it; longitudinal demographic design should prefer date of birth rather than adding a static patient age here.",\n'
+              '  },'
           )
+          new_coverage = (
+              '  "core.age_years": {\n'
+              '    state: "derived",\n'
+              '    surface: "core_form",\n'
+              '    note: "The active Type 2 form derives age deterministically from explicit date of birth. Patient Record v2 longitudinal DOB has precedence; a handoff-reported age is used only when its field provenance is confirmed. Unknown age remains absent and age-dependent gates stay fail-closed.",\n'
+              '  },'
+          )
+          replace_once(coverage, old_coverage, new_coverage)
 
-          coverage_test = Path('apps/web/test/type2-input-coverage-v2.test.ts')
+          coverage_test = Path("apps/web/test/type2-input-coverage-v2.test.ts")
           replace_once(
               coverage_test,
               '  it("keeps request-supported age uncollected while marking explicit DPN safety facts collected", () => {\n    expect(type2UiInputCoverageV2["core.age_years"].state).toBe("not_collected");',
@@ -140,28 +144,26 @@ jobs:
               '    expect(type2UiInputGapsV2).not.toContain("cardiovascular.systolic_bp");',
           )
 
-          core_test = Path('apps/web/test/type2-core-intake-ui.test.ts')
-          text = core_test.read_text(encoding='utf-8')
-          marker = '\n});\n'
+          core_test = Path("apps/web/test/type2-core-intake-ui.test.ts")
+          text = core_test.read_text(encoding="utf-8")
+          marker = "\n});\n"
           index = text.rfind(marker)
           if index < 0:
-              raise SystemExit('type2-core-intake-ui.test.ts: final describe close not found')
-          addition = '''
-
-  it("projects DOB-derived age without allowing reported age to override it", () => {
-    const result = type2ClinicalContextFromActiveIntake({
-      context: context(),
-      structuredContext: { ...emptyType2StructuredIntakeDraft },
-      factors: [],
-      worldDrugDomains: [],
-      patientAge: { dateOfBirth: "2000-09-08", confirmedReportedAgeYears: 65 },
-      ageAsOf: new Date(2026, 8, 7, 12),
-    });
-
-    expect(result.ageYears).toBe(25);
-  });
-'''
-          core_test.write_text(text[:index] + addition + text[index:], encoding='utf-8')
+              raise SystemExit("type2-core-intake-ui.test.ts: final describe close not found")
+          addition = (
+              '\n\n  it("projects DOB-derived age without allowing reported age to override it", () => {\n'
+              '    const result = type2ClinicalContextFromActiveIntake({\n'
+              '      context: context(),\n'
+              '      structuredContext: { ...emptyType2StructuredIntakeDraft },\n'
+              '      factors: [],\n'
+              '      worldDrugDomains: [],\n'
+              '      patientAge: { dateOfBirth: "2000-09-08", confirmedReportedAgeYears: 65 },\n'
+              '      ageAsOf: new Date(2026, 8, 7, 12),\n'
+              '    });\n\n'
+              '    expect(result.ageYears).toBe(25);\n'
+              '  });\n'
+          )
+          core_test.write_text(text[:index] + addition + text[index:], encoding="utf-8")
           PY
 
       - name: Install workspace
