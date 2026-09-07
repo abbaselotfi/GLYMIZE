@@ -68,11 +68,11 @@ jobs:
       - name: Test medication intake projection
         run: pnpm --filter @glymize/web exec vitest run test/type2-current-medication-ui.test.ts
 
-      - name: Typecheck web
-        run: pnpm --filter @glymize/web typecheck
+      - name: Typecheck monorepo
+        run: pnpm typecheck
 
-      - name: Lint web
-        run: pnpm --filter @glymize/web lint
+      - name: Lint monorepo
+        run: pnpm lint
 
       - name: Commit shell wiring and remove one-shot workflow
         shell: bash
