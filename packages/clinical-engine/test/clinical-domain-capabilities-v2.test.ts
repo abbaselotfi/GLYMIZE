@@ -40,7 +40,10 @@ describe("clinical engine multidomain capability boundary", () => {
       ]));
     }
     expect(type2ClinicalInputDefinitionV2("kidney.creatinine_clearance").description.toLocaleLowerCase()).toContain("never inferred from egfr");
-    expect(type2ClinicalInputDefinitionV2("current_medication.interval_stage_reconciliation").requestSupport).toBe("not_represented");
+    const intervalReconciliation = type2ClinicalInputDefinitionV2("current_medication.interval_stage_reconciliation");
+    expect(intervalReconciliation.requestSupport).toBe("request_composite");
+    expect(intervalReconciliation.requestPath).toBe("currentMedications");
+    expect(intervalReconciliation.description.toLocaleLowerCase()).toContain("never inferred");
     expect(type2ClinicalInputDefinitionV2("safety.product_specific_screen").requestSupport).toBe("not_represented");
     expect(type2ClinicalInputDefinitionV2("hypertension.established_treatment_context").requestSupport).toBe("not_represented");
   });
