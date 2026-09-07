@@ -28,13 +28,14 @@ jobs:
           test "$(git merge-base HEAD origin/main)" = "956285682f5f69dcd275df48264886757cb1f7ac"
           changed="$(git diff --name-only origin/main...HEAD | sort)"
           printf '%s\n' "$changed"
-          allowed='apps/web/app/type-2/type2-current-medication-row.module.css
-apps/web/app/type-2/type2-current-medication-row.tsx
-apps/web/app/type-2/type2-current-medication-ui.ts
-apps/web/app/type-2/type2-scenarios-client.tsx
-apps/web/test/type2-current-medication-ui.test.ts
-.github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml'
-          unexpected="$(comm -23 <(printf '%s\n' "$changed") <(printf '%s\n' "$allowed" | sort))"
+          allowed="$(printf '%s\n' \
+            '.github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml' \
+            'apps/web/app/type-2/type2-current-medication-row.module.css' \
+            'apps/web/app/type-2/type2-current-medication-row.tsx' \
+            'apps/web/app/type-2/type2-current-medication-ui.ts' \
+            'apps/web/app/type-2/type2-scenarios-client.tsx' \
+            'apps/web/test/type2-current-medication-ui.test.ts' | sort)"
+          unexpected="$(comm -23 <(printf '%s\n' "$changed") <(printf '%s\n' "$allowed"))"
           test -z "$unexpected" || { echo "Unexpected files:"; printf '%s\n' "$unexpected"; exit 1; }
 
       - name: Set up Python
@@ -70,7 +71,6 @@ apps/web/test/type2-current-medication-ui.test.ts
         shell: bash
         run: |
           set -euo pipefail
-          project="$(cat /tmp/cbm-project)"
           python - <<'PY'
           import asyncio, json, os
           from codebase_memory_mcp.server import detect_changes, index_repository, index_status
