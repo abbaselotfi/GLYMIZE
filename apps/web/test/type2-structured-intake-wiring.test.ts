@@ -16,14 +16,18 @@ describe("Type 2 structured intake request wiring", () => {
     expect(source).toContain("worldDrugDomains={worldDrugDomains}");
   });
 
-  it("projects explicit structured draft data through the extracted clinical-context boundary before submit", () => {
+  it("projects explicit structured draft data and DOB-first age through the extracted clinical-context boundary before submit", () => {
     expect(source).toContain("type2ClinicalContextFromActiveIntake");
     expect(source).toContain(
-      "clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains })",
+      "clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains, patientAge })",
     );
+    expect(source).toContain("Type2PatientAgeField");
+    expect(source).toContain("type2PatientAgeDraftFromPatientData(record, patient)");
     expect(coreIntakeSource).toContain(
       "structuredClinicalContextFromDraft(structuredContext, { factors, worldDrugDomains })",
     );
+    expect(coreIntakeSource).toContain("type2PatientAgeFromDraft");
+    expect(coreIntakeSource).toContain("ageYears: age.ageYears");
     expect(coreIntakeSource).toContain("...specialist");
     expect(source).toContain("body: JSON.stringify(request)");
   });
