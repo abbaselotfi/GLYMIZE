@@ -1,0 +1,80 @@
+import type { ClinicalDomainCapability } from "./types.js";
+
+export const specialistClinicalDomainCapabilities = [
+  {
+    domain: "neuropathy",
+    executionState: "partially_executable",
+    decisionGraphLanes: ["neuropathy"],
+    executableObjectives: ["painful_dpn_symptom_control"],
+    minimumSafeInputs: ["adult status", "physician-confirmed diabetic peripheral neuropathy", "painful symptoms", "absence of atypical diagnostic features", "CrCl for pregabalin", "eGFR/liver/MAOI/alcohol context for duloxetine", "pregabalin hypersensitivity"],
+    inputContract: {
+      core: ["core.age_years", "neuropathy.dpn_confirmed", "neuropathy.painful_symptoms", "neuropathy.atypical_features"],
+      conditional: [
+        "kidney.creatinine_clearance",
+        "kidney.egfr",
+        "medication_safety.maoi_exposure",
+        "medication_safety.substantial_alcohol_use",
+        "medication_safety.pregabalin_hypersensitivity",
+      ],
+    },
+    evidenceAuthorities: ["ADA 2026 Section 12", "AAN painful diabetic polyneuropathy guideline update", "pregabalin regulatory label", "duloxetine regulatory label"],
+    boundary: "Only the reviewed clinician-confirmed painful-DPN phenotype can execute the protocolized pregabalin/duloxetine branches; generic neuropathy activation and routine opioid use remain non-executable.",
+    nextGap: "Expand only explicitly reviewed renal/product branches and additional nonopioid classes with exact labels and current-market eligibility.",
+  },
+  {
+    domain: "retinopathy",
+    executionState: "specialist_or_escalation",
+    decisionGraphLanes: [],
+    executableObjectives: [],
+    minimumSafeInputs: ["retinopathy severity", "DME status", "center involvement/visual acuity when treatment evidence is interpreted", "pregnancy context"],
+    inputContract: {
+      core: ["retinopathy.severity", "retinopathy.dme"],
+      conditional: ["retinopathy.center_involving_dme", "retinopathy.visual_acuity_context", "core.pregnancy"],
+    },
+    evidenceAuthorities: ["ADA 2026 Section 12"],
+    boundary: "The general engine now executes a prompt ophthalmology escalation for any DME, moderate-or-worse NPDR, or PDR while keeping intravitreal/laser treatment specialist-only and outside medication ranking.",
+    nextGap: "Any specialist-only ophthalmic product execution must be separately scoped, reviewed, and isolated from the general Type 2 prescribing authority.",
+  },
+  {
+    domain: "diabetic_foot",
+    executionState: "specialist_or_escalation",
+    decisionGraphLanes: ["diabetic_foot"],
+    executableObjectives: [],
+    minimumSafeInputs: ["ulcer confirmation", "clinical infection assessment", "IWGDF/IDSA severity", "ischemia/PAD", "danger features/source-control context", "osteomyelitis suspicion"],
+    inputContract: {
+      core: ["diabetic_foot.ulcer", "diabetic_foot.clinical_infection", "diabetic_foot.infection_severity"],
+      conditional: ["diabetic_foot.pad", "diabetic_foot.danger_features", "diabetic_foot.osteomyelitis"],
+    },
+    evidenceAuthorities: ["IWGDF/IDSA Infection 2023", "IWGDF Wound Healing 2023", "ADA 2026 Section 12"],
+    boundary: "The structured ulcer/infection/severity/source-control pathway is implemented. Clinically uninfected ulcers cannot execute antibiotics; infected cases remain antimicrobial-review only and can trigger hospital/surgical/vascular escalation.",
+    nextGap: "Do not add antibiotic product execution until pathogen/susceptibility, allergy, renal/interaction and local-protocol requirements are explicitly represented and reviewed.",
+  },
+  {
+    domain: "nutrition_support",
+    executionState: "review_only",
+    decisionGraphLanes: [],
+    executableObjectives: [],
+    minimumSafeInputs: ["explicit nutrition-support intent", "named documented deficiency when applicable", "objective deficiency data", "malnutrition/special-population context"],
+    inputContract: {
+      core: ["nutrition.intent"],
+      conditional: ["nutrition.documented_deficiency", "nutrition.deficiency_name", "nutrition.objective_deficiency_data", "nutrition.malnutrition_or_special_population"],
+    },
+    evidenceAuthorities: ["ADA 2026 Section 5"],
+    boundary: "The indication/deficiency safety pathway is implemented: diabetes alone cannot create vitamin/mineral/herbal or enteral/parenteral prescription execution; documented deficiency and malnutrition route to targeted review only.",
+    nextGap: "Add nutrient-specific or nutrition-route-specific protocols only after their indication, objective data, product/route and dosing authority are separately reviewed.",
+  },
+  {
+    domain: "pregnancy",
+    executionState: "safety_context",
+    decisionGraphLanes: ["glycemic"],
+    executableObjectives: [],
+    minimumSafeInputs: ["pregnancy status", "explicit diabetes type (T1D/T2D/GDM)", "pregnancy-specific glucose data", "current glucose-lowering medicines", "hypoglycemia context", "pregnancy specialist-team context"],
+    inputContract: {
+      core: ["core.pregnancy", "pregnancy.diabetes_type", "core.current_medications"],
+      conditional: ["pregnancy.glycemia", "pregnancy.hypoglycemia_context", "pregnancy.specialist_team"],
+    },
+    evidenceAuthorities: ["ADA 2026 Section 15", "product pregnancy labeling"],
+    boundary: "A dedicated pregnancy diabetes pathway now owns pregnancy targets, T1D insulin requirement, T2D insulin preference, GDM lifestyle/insulin escalation review, and medication reconciliation. Exact insulin dose/titration remains clinician/team controlled and non-autonomous.",
+    nextGap: "Only add pregnancy insulin product/dose execution after a separate product-level audit proves gestation-aware initiation, frequent titration, hypoglycemia safeguards, and postpartum dose reduction handling.",
+  },
+] as const satisfies readonly ClinicalDomainCapability[];
