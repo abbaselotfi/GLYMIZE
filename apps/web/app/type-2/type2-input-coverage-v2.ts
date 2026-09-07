@@ -26,9 +26,9 @@ export const type2UiInputCoverageV2 = {
   "core.target_hba1c": { state: "collected", surface: "core_form" },
   "core.current_medications": { state: "collected", surface: "core_form" },
   "current_medication.interval_stage_reconciliation": {
-    state: "not_represented",
-    surface: "none",
-    note: "The active Type 2 clinician intake does not carry explicit administration interval, days on current dose, therapy phase, or next-administration timing through to Decision Graph.",
+    state: "collected",
+    surface: "core_form",
+    note: "The active current-medication row collects explicit administration interval, days on current dose, therapy phase, next-administration timing, and total duration; partial interval data stays partial and these facts are never inferred from medicine identity, dose, or frequency.",
   },
   "core.age_years": {
     state: "not_collected",
