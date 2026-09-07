@@ -13,6 +13,9 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CBM_VERSION: '0.10.8'
+      SNAPSHOT_TAG: codebase-memory-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -26,6 +29,7 @@ jobs:
           set -euo pipefail
           git fetch origin main --no-tags
           test "$(git merge-base HEAD origin/main)" = "956285682f5f69dcd275df48264886757cb1f7ac"
+          test "$(git rev-parse codebase-memory-latest^{commit})" = "956285682f5f69dcd275df48264886757cb1f7ac"
           changed="$(git diff --name-only origin/main...HEAD | sort)"
           printf '%s\n' "$changed"
           allowed="$(printf '%s\n' \
@@ -44,17 +48,27 @@ jobs:
           python-version: '3.12'
 
       - name: Install Codebase Memory
-        run: pip install 'codebase-memory-mcp==0.10.8'
+        run: pip install "codebase-memory-mcp==${CBM_VERSION}"
 
-      - name: Bootstrap canonical snapshot
+      - name: Bootstrap canonical release snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          git show codebase-memory-latest:.codebase-memory/graph.db.zst > /tmp/graph.db.zst
-          git show codebase-memory-latest:.codebase-memory/artifact.json > /tmp/artifact.json
-          mkdir -p .codebase-memory
-          cp /tmp/graph.db.zst .codebase-memory/graph.db.zst
-          cp /tmp/artifact.json .codebase-memory/artifact.json
+          rm -rf /tmp/cbm-snapshot
+          mkdir -p /tmp/cbm-snapshot
+          gh release download "$SNAPSHOT_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'codebase-memory-snapshot.tar.gz' \
+            --pattern 'snapshot-source.json' \
+            --dir /tmp/cbm-snapshot
+          test -s /tmp/cbm-snapshot/codebase-memory-snapshot.tar.gz
+          test "$(jq -r '.source_sha // empty' /tmp/cbm-snapshot/snapshot-source.json)" = "956285682f5f69dcd275df48264886757cb1f7ac"
+          test "$(jq -r '.codebase_memory_version // empty' /tmp/cbm-snapshot/snapshot-source.json)" = "$CBM_VERSION"
+          tar -xzf /tmp/cbm-snapshot/codebase-memory-snapshot.tar.gz
+          test -s .codebase-memory/graph.db.zst
+          test -s .codebase-memory/artifact.json
           project="$(jq -r '.project // empty' .codebase-memory/artifact.json)"
           test -n "$project"
           mkdir -p "$HOME/.cache/codebase-memory-mcp"
@@ -96,8 +110,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f snapshot-source.json
-          git checkout -- .codebase-memory/graph.db.zst .codebase-memory/artifact.json 2>/dev/null || true
+          rm -rf .codebase-memory snapshot-source.json
           git status --short
           unexpected="$(git status --porcelain | awk '{print $2}' | grep -v '^.github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml$' || true)"
           test -z "$unexpected" || { echo "Unexpected cleanup files:"; printf '%s\n' "$unexpected"; exit 1; }
