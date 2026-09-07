@@ -49,6 +49,7 @@ import {
   type2CurrentMedicationPayload,
   type Type2MedicationRow,
 } from "./type2-current-medication-ui";
+import Type2CurrentMedicationRow from "./type2-current-medication-row";
 import base from "./type2-v2.module.css";
 import styles from "./type2-scenarios.module.css";
 
@@ -455,14 +456,15 @@ export default function Type2ScenariosClient() {
             </div>
             {medications.length === 0 && <div className={styles.emptyLine}>{fa ? "داروی فعالی ثبت نشده؛ نشست به‌عنوان شروع درمان پردازش می‌شود." : "No active medicine entered; this is treated as therapy initiation."}</div>}
             <div className={styles.currentMeds}>
-              {medications.map((item, index) => <div className={styles.currentMed} key={item.id}>
-                <div className={styles.medIndex}>{index + 1}</div>
-                <label><span>{fa ? "دارو" : "Medicine"}</span><input list="type2-drugs" value={item.genericName} onChange={(event) => updateMedicationName(item.id, event.target.value)} placeholder="Metformin" /></label>
-                <label><span>{fa ? "دوز هر نوبت" : "Dose"}</span><input type="number" min="0" step="0.1" value={item.doseAmount} onChange={(event) => updateMedication(item.id, { doseAmount: event.target.value })} /></label>
-                <label><span>{fa ? "واحد" : "Unit"}</span><select value={item.doseUnit} onChange={(event) => updateMedication(item.id, { doseUnit: event.target.value })}><option>mg</option><option>g</option><option>mcg</option><option>unit</option><option>mL</option><option>tablet</option><option>capsule</option><option>actuation</option><option>vial</option><option>ampoule</option><option>pen</option></select></label>
-                <label><span>{fa ? "دفعات/روز" : "Times/day"}</span><input type="number" min="0" max="12" step="0.5" value={item.frequencyPerDay} onChange={(event) => updateMedication(item.id, { frequencyPerDay: event.target.value })} /></label>
-                <button className={styles.remove} type="button" aria-label={fa ? "حذف دارو" : "Remove medicine"} onClick={() => setMedications((current) => current.filter((row) => row.id !== item.id))}>×</button>
-              </div>)}
+              {medications.map((item, index) => <Type2CurrentMedicationRow
+      key={item.id}
+      item={item}
+      index={index}
+      locale={locale}
+      onChange={(patch) => updateMedication(item.id, patch)}
+      onNameChange={(value) => updateMedicationName(item.id, value)}
+      onRemove={() => setMedications((current) => current.filter((row) => row.id !== item.id))}
+    />)}
             </div>
             <datalist id="type2-drugs">{catalog.map((item) => <option key={item.id} value={item.canonicalName}>{item.persianName}</option>)}</datalist>
           </section>
