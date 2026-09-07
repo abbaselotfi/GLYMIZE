@@ -2,6 +2,7 @@
 
 import type { MedicationClinicalDomain, Type2DecisionFactor } from "@glymize/contracts";
 import styles from "./type2-scenarios.module.css";
+import Type2ProductSafetyFields from "./type2-product-safety-fields";
 import type { TriState, Type2StructuredIntakeDraft } from "./type2-structured-intake-ui";
 
 interface Props {
@@ -94,11 +95,12 @@ export default function Type2StructuredContextFields({
   const fa = locale === "fa";
   const footActive = factors.includes("diabetic_foot");
   const pregnancyActive = factors.includes("pregnancy");
+  const productSafetyActive = factors.includes("masld_mash");
   const hypertensionActive = worldDrugDomains.includes("hypertension");
   const neuropathyActive = worldDrugDomains.includes("neuropathy");
   const retinopathyActive = worldDrugDomains.includes("retinopathy");
   const nutritionActive = worldDrugDomains.includes("nutrition_support");
-  const anyStructuredDomain = footActive || pregnancyActive || hypertensionActive || neuropathyActive || retinopathyActive || nutritionActive;
+  const anyStructuredDomain = productSafetyActive || footActive || pregnancyActive || hypertensionActive || neuropathyActive || retinopathyActive || nutritionActive;
 
   if (!anyStructuredDomain) return null;
 
@@ -114,6 +116,14 @@ export default function Type2StructuredContextFields({
           </small>
         </div>
       </div>
+
+      {productSafetyActive ? (
+        <Type2ProductSafetyFields
+          screens={draft.productSafetyScreens}
+          locale={locale}
+          onChange={(productSafetyScreens) => onChange({ productSafetyScreens })}
+        />
+      ) : null}
 
       {hypertensionActive ? (
         <div data-testid="hypertension-blood-pressure-fields">
