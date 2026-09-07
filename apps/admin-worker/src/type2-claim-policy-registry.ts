@@ -158,7 +158,14 @@ export function validateReviewedType2ClaimPolicies(
   return validated;
 }
 
-export function reviewedType2ClaimPolicies(now = Date.now()) {
-  return validateReviewedType2ClaimPolicies(REVIEWED_TYPE2_CLAIM_POLICIES)
+export function activeReviewedType2ClaimPolicies(
+  input: unknown,
+  now = Date.now(),
+) {
+  return validateReviewedType2ClaimPolicies(input)
     .filter((policy) => Date.parse(policy.effectiveAt) <= now);
+}
+
+export function reviewedType2ClaimPolicies(now = Date.now()) {
+  return activeReviewedType2ClaimPolicies(REVIEWED_TYPE2_CLAIM_POLICIES, now);
 }
