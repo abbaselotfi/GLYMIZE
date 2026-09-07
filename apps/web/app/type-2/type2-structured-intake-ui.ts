@@ -16,6 +16,9 @@ export interface Type2StructuredIntakeDraft {
   dpnConfirmed: TriState;
   dpnPainfulSymptoms: TriState;
   dpnAtypicalFeatures: TriState;
+  maoiUseOrRecentExposure: TriState;
+  substantialAlcoholUse: TriState;
+  knownPregabalinHypersensitivity: TriState;
   footUlcerPresent: TriState;
   footClinicalInfection: TriState;
   footInfectionSeverity: "" | "mild" | "moderate" | "severe" | "unknown";
@@ -57,6 +60,9 @@ export const emptyType2StructuredIntakeDraft: Type2StructuredIntakeDraft = {
   dpnConfirmed: "unknown",
   dpnPainfulSymptoms: "unknown",
   dpnAtypicalFeatures: "unknown",
+  maoiUseOrRecentExposure: "unknown",
+  substantialAlcoholUse: "unknown",
+  knownPregabalinHypersensitivity: "unknown",
   footUlcerPresent: "unknown",
   footClinicalInfection: "unknown",
   footInfectionSeverity: "",
@@ -111,7 +117,7 @@ export function structuredClinicalContextFromDraft(
   activation: StructuredIntakeActivation,
 ): Pick<
   Type2StructuredClinicalContextV2,
-  "glycemia" | "neuropathy" | "retinopathy" | "diabeticFoot" | "nutritionSupport" | "pregnancyCare"
+  "glycemia" | "neuropathy" | "medicationSafety" | "retinopathy" | "diabeticFoot" | "nutritionSupport" | "pregnancyCare"
 > {
   const neuropathyActive = activation.worldDrugDomains.includes("neuropathy");
   const retinopathyActive = activation.worldDrugDomains.includes("retinopathy");
@@ -139,6 +145,17 @@ export function structuredClinicalContextFromDraft(
           diabeticPeripheralNeuropathyConfirmed: booleanOrUndefined(draft.dpnConfirmed),
           painfulSymptoms: booleanOrUndefined(draft.dpnPainfulSymptoms),
           atypicalFeaturesPresent: booleanOrUndefined(draft.dpnAtypicalFeatures),
+        }
+      : undefined,
+    medicationSafety: neuropathyActive && (
+      draft.maoiUseOrRecentExposure !== "unknown" ||
+      draft.substantialAlcoholUse !== "unknown" ||
+      draft.knownPregabalinHypersensitivity !== "unknown"
+    )
+      ? {
+          maoiUseOrRecentExposure: booleanOrUndefined(draft.maoiUseOrRecentExposure),
+          substantialAlcoholUse: booleanOrUndefined(draft.substantialAlcoholUse),
+          knownPregabalinHypersensitivity: booleanOrUndefined(draft.knownPregabalinHypersensitivity),
         }
       : undefined,
     retinopathy: retinopathyActive && (

@@ -255,11 +255,34 @@ export default function Type2StructuredContextFields({
 
       {neuropathyActive ? (
         <div data-testid="neuropathy-structured-fields">
-          <div className={styles.subhead}><div><b>{fa ? "نوروپاتی دردناک دیابتی" : "Painful diabetic neuropathy"}</b></div></div>
+          <div className={styles.subhead}>
+            <div>
+              <b>{fa ? "نوروپاتی دردناک دیابتی" : "Painful diabetic neuropathy"}</b>
+              <small>{fa ? "فاکتورهای ایمنی دارویی را فقط بر اساس سابقه/بررسی صریح بیمار ثبت کنید." : "Record medication-safety facts only from explicit patient history or review."}</small>
+            </div>
+          </div>
           <div className={styles.twoCols}>
             <TriStateField fa={fa} label={fa ? "DPN توسط پزشک تأیید شده؟" : "Clinician-confirmed DPN?"} value={draft.dpnConfirmed} onChange={(value) => onChange({ dpnConfirmed: value })} />
             <TriStateField fa={fa} label={fa ? "درد/سوزش منتسب به DPN؟" : "Painful symptoms attributable to DPN?"} value={draft.dpnPainfulSymptoms} onChange={(value) => onChange({ dpnPainfulSymptoms: value })} />
             <TriStateField fa={fa} label={fa ? "ویژگی آتیپیک وجود دارد؟" : "Atypical features present?"} value={draft.dpnAtypicalFeatures} onChange={(value) => onChange({ dpnAtypicalFeatures: value })} />
+            <TriStateField
+              fa={fa}
+              label={fa ? "مصرف فعلی/اخیر MAOI، شامل linezolid یا متیلن‌بلو وریدی؟" : "Current/recent MAOI exposure, including linezolid or IV methylene blue?"}
+              value={draft.maoiUseOrRecentExposure}
+              onChange={(value) => onChange({ maoiUseOrRecentExposure: value })}
+            />
+            <TriStateField
+              fa={fa}
+              label={fa ? "مصرف قابل‌توجه الکل؟" : "Substantial alcohol use?"}
+              value={draft.substantialAlcoholUse}
+              onChange={(value) => onChange({ substantialAlcoholUse: value })}
+            />
+            <TriStateField
+              fa={fa}
+              label={fa ? "حساسیت شناخته‌شده به pregabalin؟" : "Known pregabalin hypersensitivity?"}
+              value={draft.knownPregabalinHypersensitivity}
+              onChange={(value) => onChange({ knownPregabalinHypersensitivity: value })}
+            />
           </div>
         </div>
       ) : null}
