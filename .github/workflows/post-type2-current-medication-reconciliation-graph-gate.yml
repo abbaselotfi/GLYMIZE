@@ -119,7 +119,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf .codebase-memory snapshot-source.json
+          rm -f .codebase-memory/graph.db.zst \
+                .codebase-memory/artifact.json \
+                .codebase-memory/.gitattributes \
+                snapshot-source.json
+          git checkout -- .codebase-memory/adr.md 2>/dev/null || true
           git status --short
           unexpected="$(git status --porcelain | awk '{print $2}' | grep -v '^.github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml$' || true)"
           test -z "$unexpected" || { echo "Unexpected cleanup files:"; printf '%s\n' "$unexpected"; exit 1; }
