@@ -183,6 +183,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build clinical engine dependency
+        run: pnpm --filter @glymize/clinical-engine build
+
       - name: Run focused Type 2 intake tests
         run: pnpm --filter @glymize/web exec vitest run test/type2-core-intake-ui.test.ts test/type2-current-medication-ui.test.ts test/type2-input-coverage-v2.test.ts
 
