@@ -10,10 +10,23 @@ describe("Type 2 capability/UI input coverage contract", () => {
     expect(Object.keys(type2UiInputCoverageV2).sort()).toEqual(Object.keys(type2ClinicalInputCatalogV2).sort());
   });
 
+  it("describes the active scenario form rather than an inactive legacy client", () => {
+    expect(type2UiInputCoverageV2["kidney.creatinine_clearance"].state).toBe("collected");
+    expect(type2UiInputCoverageV2["kidney.creatinine_clearance"].surface).toBe("core_form");
+    expect(type2UiInputCoverageV2["kidney.creatinine_clearance"].note?.toLocaleLowerCase()).toContain("never inferred");
+
+    for (const id of [
+      "cardiovascular.nyha_class",
+      "cardiovascular.systolic_bp",
+      "cardiovascular.diastolic_bp",
+    ] as const) {
+      expect(type2UiInputCoverageV2[id].state).toBe("not_collected");
+      expect(type2UiInputCoverageV2[id].surface).toBe("none");
+    }
+  });
+
   it("keeps request-supported but currently uncollected facts explicit", () => {
     expect(type2UiInputCoverageV2["core.age_years"].state).toBe("not_collected");
-    expect(type2UiInputCoverageV2["kidney.creatinine_clearance"].state).toBe("not_collected");
-    expect(type2UiInputCoverageV2["kidney.creatinine_clearance"].note?.toLocaleLowerCase()).toContain("never be inferred");
     for (const id of [
       "medication_safety.maoi_exposure",
       "medication_safety.substantial_alcohol_use",
@@ -36,12 +49,15 @@ describe("Type 2 capability/UI input coverage contract", () => {
     expect(type2UiInputCoverageV2["neuropathy.dpn_confirmed"].state).toBe("collected");
     expect(type2UiInputCoverageV2["anthropometrics.bmi"].state).toBe("derived");
     expect(type2UiInputCoverageV2["core.pregnancy"].state).toBe("derived");
+    expect(type2UiInputCoverageV2["core.pregnancy"].surface).toBe("core_form");
   });
 
-  it("publishes the unresolved UI gaps without mixing in collected inputs", () => {
+  it("publishes unresolved active-route gaps without mixing in collected inputs", () => {
     expect(type2UiInputGapsV2).toEqual(expect.arrayContaining([
       "core.age_years",
-      "kidney.creatinine_clearance",
+      "cardiovascular.nyha_class",
+      "cardiovascular.systolic_bp",
+      "cardiovascular.diastolic_bp",
       "medication_safety.maoi_exposure",
       "medication_safety.substantial_alcohol_use",
       "medication_safety.pregabalin_hypersensitivity",
@@ -49,6 +65,7 @@ describe("Type 2 capability/UI input coverage contract", () => {
       "safety.product_specific_screen",
       "hypertension.established_treatment_context",
     ]));
+    expect(type2UiInputGapsV2).not.toContain("kidney.creatinine_clearance");
     expect(type2UiInputGapsV2).not.toContain("kidney.egfr");
     expect(type2UiInputGapsV2).not.toContain("retinopathy.severity");
   });
