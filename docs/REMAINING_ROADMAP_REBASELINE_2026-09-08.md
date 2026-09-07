@@ -41,7 +41,7 @@ The next irreversible product-scope work should not infer owner intent from impl
 
 | Roadmap item | Re-baselined status | Evidence / remaining boundary |
 | --- | --- | --- |
-| Define rule precedence | **Partial** | The live Type 2 Decision Graph has structural hard gates, objectives, policy ordering and composition boundaries. The repository does not yet have one concise, system-wide precedence specification covering every retained compatibility path and future module. |
+| Define rule precedence | **Implemented — live Type 2** | `docs/architecture/CLINICAL_RULE_PRECEDENCE.md` records the configured Decision Graph precedence and the explicit unconfigured/admin-preview/local-development legacy-score exceptions; `type2-live-authority-v2.test.ts` guards those boundaries. Broader non-Type-2 modules remain subject to their own authority reviews. |
 | Separate hard blocks, cautions, preferences, cost, and display | **Partial — strong on live Type 2** | Phase 3/4 work structurally excludes hard contraindications, keeps specialist/parallel-safety lanes outside ranking, and separates cost/access from clinical authority. The broad roadmap item spans more than the live Type 2 path and should remain open until the precedence model is formally documented across supported modules. |
 | Replace unexplained score constants | **Partial** | `decision-graph-v2` is the live physician-facing Type 2 authority and does not use the old aggregate `priorityScore` as clinical authority. The older score builder remains as an explicit unconfigured compatibility fallback, so a repository-wide “all unexplained score constants removed” claim is not yet justified. |
 | Create traceable rule metadata | **Partial — substantial foundation present** | Versioned Rule Pack, evidence registry, product-dose rules, safety rules, reviewed product-safety registry and Evidence Assistant indexing provide direct provenance. Remaining work is to make this expectation universal for every clinical rule family. |
@@ -51,7 +51,7 @@ The next irreversible product-scope work should not infer owner intent from impl
 
 ### Phase 2 next engineering closure
 
-The safest remaining Phase 2 work is governance/consolidation, not new clinical thresholds: formalize precedence across supported execution paths, quantify the retained legacy-score compatibility boundary, and define clinician-approved golden-case governance. New clinical values still require exact reviewed evidence.
+With live Type 2 precedence and the retained legacy-score boundary now formalized, the safest remaining Phase 2 work is governance/consolidation: keep the legacy score path bounded while addressing unexplained compatibility-score constants, broaden traceable rule/input/version metadata where evidence shows a real gap, and define clinician-approved golden-case governance. New clinical values still require exact reviewed evidence.
 
 ---
 
