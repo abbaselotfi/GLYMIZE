@@ -33,6 +33,10 @@ export const type2ClinicalInputCatalogV2 = {
     requestPath: "currentMedications",
     description: "Current medication reconciliation",
   },
+  "current_medication.interval_stage_reconciliation": {
+    requestSupport: "not_represented",
+    description: "Exact administration interval, days on current dose, therapy phase, and next-administration timing required by interval-aware continuation are not carried through the current Type 2 clinician intake into Decision Graph",
+  },
   "core.age_years": {
     requestSupport: "request_field",
     requestPath: "clinicalContext.ageYears",
@@ -51,7 +55,6 @@ export const type2ClinicalInputCatalogV2 = {
   "core.catabolic_features": {
     requestSupport: "request_field",
     requestPath: "catabolicFeatures",
-    description: "Clinician-entered catabolic features",
   },
   "cardiovascular.ascvd": {
     requestSupport: "request_field",
