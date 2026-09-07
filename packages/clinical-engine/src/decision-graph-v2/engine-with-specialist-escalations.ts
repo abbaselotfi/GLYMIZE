@@ -4,6 +4,7 @@ import {
   resolveNutritionSupportBoundaryV2,
   type NutritionSupportContextV2,
 } from "./nutrition-support-boundary.js";
+import { projectReviewedWegovySafetyForDecisionGraphV2 } from "./product-safety-binding.js";
 import type { ProductSpecificSafetyScreenV2 } from "./product-safety-screen.js";
 import {
   resolvePregnancyDiabetesPathwayV2,
@@ -23,8 +24,9 @@ export type DecisionGraphRequestWithSpecialistContextsV2 = Omit<DecisionGraphReq
     nutritionSupport?: NutritionSupportContextV2;
     pregnancyCare?: PregnancyDiabetesContextV2;
     /**
-     * Transport-only clinician responses. Presence never clears or excludes a
-     * product until a reviewed criterion registry is explicitly bound later.
+     * Product-bound clinician responses. The specialist wrapper validates an
+     * exact reviewed/versioned registry before projecting any product-specific
+     * safety fact into core medication execution.
      */
     productSafetyScreens?: ProductSpecificSafetyScreenV2[];
   };
@@ -41,16 +43,30 @@ export type DecisionGraphResultWithSpecialistPathwaysV2 = DecisionGraphResultV2 
  * Additive execution wrapper for specialist/escalation/safety pathways that must
  * never become medication-ranking authority in the general Decision Graph.
  *
- * The core treatment result is preserved; parallel pathways are appended as
- * separate channels. Ophthalmology, diabetic-foot triage, generic nutrition
- * support and pregnancy diabetes care therefore cannot silently manufacture a
- * second medication-ranking or dose-execution authority.
+ * Product-specific WEGOVY safety responses are normalized here before the core
+ * medication graph executes. Only an exact, current, complete reviewed response
+ * set can populate the five WEGOVY protocol booleans; stale, duplicate, unknown
+ * or missing screens remain unbound and therefore fail closed inside that
+ * protocol. The submitted request is not mutated.
+ *
+ * Other specialist pathways remain parallel channels. Ophthalmology,
+ * diabetic-foot triage, generic nutrition support and pregnancy diabetes care
+ * therefore cannot silently manufacture a second medication-ranking or
+ * dose-execution authority.
  */
 export function runDecisionGraphV2WithSpecialistEscalations(
   request: DecisionGraphRequestWithSpecialistContextsV2,
   policy?: DecisionGraphPolicyV2,
 ): DecisionGraphResultWithSpecialistPathwaysV2 {
-  const core = policy ? runDecisionGraphV2(request, policy) : runDecisionGraphV2(request);
+  const reviewedProductSafety = projectReviewedWegovySafetyForDecisionGraphV2({
+    inventory: request.inventory,
+    patient: request.patient,
+  });
+  const coreRequest: DecisionGraphRequestV2 = {
+    ...request,
+    patient: reviewedProductSafety.patient,
+  };
+  const core = policy ? runDecisionGraphV2(coreRequest, policy) : runDecisionGraphV2(coreRequest);
   const retinopathy = resolveRetinopathySpecialistEscalationV2(request);
   const diabeticFootPathway = resolveDiabeticFootPathwayV2(request);
   const nutritionSupportPathway = resolveNutritionSupportBoundaryV2(request);

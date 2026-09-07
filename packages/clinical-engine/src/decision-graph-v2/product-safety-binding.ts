@@ -4,7 +4,11 @@ import {
   type ProductSafetyScreenValidationV2,
 } from "./product-safety-registry.js";
 import type { ProductSpecificSafetyScreenV2 } from "./product-safety-screen.js";
-import type { DecisionGraphInventoryV2 } from "./types.js";
+import type {
+  DecisionGraphInventoryV2,
+  MedicationSafetyContextV2,
+  PatientContextV2,
+} from "./types.js";
 import type { WegovyMedicationSafetyContextV2 } from "./wegovy-mash-protocol.js";
 
 export type ReviewedWegovySafetyBindingStatusV2 =
@@ -14,6 +18,7 @@ export type ReviewedWegovySafetyBindingStatusV2 =
   | "version_mismatch"
   | "invalid"
   | "incomplete"
+  | "duplicate_screen"
   | "bound";
 
 export interface ReviewedWegovySafetyBindingV2 {
@@ -23,6 +28,15 @@ export interface ReviewedWegovySafetyBindingV2 {
   reviewSetVersion?: string;
   masterDrugId?: string;
   medicationSafety?: WegovyMedicationSafetyContextV2;
+}
+
+export type ProductSafetyScreenedPatientV2 = PatientContextV2 & {
+  productSafetyScreens?: readonly ProductSpecificSafetyScreenV2[];
+};
+
+export interface ReviewedWegovySafetyProjectionV2 {
+  binding: ReviewedWegovySafetyBindingV2;
+  patient: PatientContextV2;
 }
 
 const criterionToSafetyFieldV2 = {
@@ -150,5 +164,87 @@ export function bindReviewedWegovySafetyScreenV2(input: {
     status: "bound",
     ...base,
     medicationSafety,
+  };
+}
+
+/**
+ * Selects the exact WEGOVY review set from a collection of product-safety
+ * envelopes. Unrelated product/review sets are ignored, but two envelopes that
+ * both claim the exact current WEGOVY review-set identity are ambiguous and are
+ * rejected rather than choosing one by array order.
+ */
+export function bindReviewedWegovySafetyScreensV2(input: {
+  inventory: Pick<DecisionGraphInventoryV2, "knowledge" | "marketProducts">;
+  screens?: readonly ProductSpecificSafetyScreenV2[];
+}): ReviewedWegovySafetyBindingV2 {
+  const reviewSets = buildReviewedProductSafetyRegistryV2(input.inventory);
+  if (reviewSets.length !== 1) return { status: "registry_unavailable" };
+
+  const reviewSet = reviewSets[0]!;
+  const candidates = (input.screens ?? []).filter((screen) => screen.reviewSetId === reviewSet.reviewSetId);
+  const exact = candidates.filter((screen) => screen.masterDrugId === reviewSet.masterDrugId);
+  const base = {
+    reviewSetId: reviewSet.reviewSetId,
+    reviewSetVersion: reviewSet.reviewSetVersion,
+    masterDrugId: reviewSet.masterDrugId,
+  };
+
+  if (exact.length > 1) return { status: "duplicate_screen", ...base };
+  if (exact.length === 1) {
+    return bindReviewedWegovySafetyScreenV2({ inventory: input.inventory, screen: exact[0] });
+  }
+
+  // A lone envelope claiming this exact review-set ID for another MasterDrug is
+  // an identity mismatch, not an acceptable substitute or an unrelated screen.
+  if (candidates.length === 1) {
+    return bindReviewedWegovySafetyScreenV2({ inventory: input.inventory, screen: candidates[0] });
+  }
+  if (candidates.length > 1) return { status: "duplicate_screen", ...base };
+
+  return bindReviewedWegovySafetyScreenV2({ inventory: input.inventory });
+}
+
+function preserveGeneralMedicationSafetyV2(
+  safety: PatientContextV2["medicationSafety"],
+): MedicationSafetyContextV2 | undefined {
+  if (!safety) return undefined;
+  const preserved: MedicationSafetyContextV2 = {
+    maoiUseOrRecentExposure: safety.maoiUseOrRecentExposure,
+    substantialAlcoholUse: safety.substantialAlcoholUse,
+    knownPregabalinHypersensitivity: safety.knownPregabalinHypersensitivity,
+  };
+  return Object.values(preserved).some((value) => value !== undefined) ? preserved : undefined;
+}
+
+/**
+ * Projects reviewed product-safety transport data into the normalized core
+ * patient context without mutating the submitted patient object.
+ *
+ * Only the three general medication-safety fields already defined by
+ * `PatientContextV2` are carried forward directly. WEGOVY-specific booleans are
+ * reconstructed exclusively from an exact `bound` review set, so ad-hoc extra
+ * properties on `medicationSafety` cannot bypass the versioned registry on the
+ * structured Type 2 execution path.
+ */
+export function projectReviewedWegovySafetyForDecisionGraphV2(input: {
+  inventory: Pick<DecisionGraphInventoryV2, "knowledge" | "marketProducts">;
+  patient: ProductSafetyScreenedPatientV2;
+}): ReviewedWegovySafetyProjectionV2 {
+  const binding = bindReviewedWegovySafetyScreensV2({
+    inventory: input.inventory,
+    screens: input.patient.productSafetyScreens,
+  });
+  const { productSafetyScreens: _screens, medicationSafety: submittedSafety, ...patient } = input.patient;
+  const generalSafety = preserveGeneralMedicationSafetyV2(submittedSafety);
+  const projectedSafety = binding.status === "bound"
+    ? ({ ...generalSafety, ...binding.medicationSafety } satisfies MedicationSafetyContextV2 & WegovyMedicationSafetyContextV2)
+    : generalSafety;
+
+  return {
+    binding,
+    patient: {
+      ...patient,
+      ...(projectedSafety ? { medicationSafety: projectedSafety } : {}),
+    },
   };
 }
