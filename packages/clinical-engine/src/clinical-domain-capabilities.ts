@@ -1,4 +1,5 @@
 import type { MedicationClinicalDomain } from "@glymize/contracts";
+import type { Type2CapabilityInputContractV2 } from "./type2-input-contract-v2.js";
 
 /**
  * Explicit runtime-facing capability boundary for Type 2 multidomain support.
@@ -20,7 +21,10 @@ export interface ClinicalDomainCapability {
   executionState: ClinicalDomainExecutionState;
   decisionGraphLanes: string[];
   executableObjectives: string[];
+  /** Human-readable clinical summary. Never parse this text into execution or UI requirements. */
   minimumSafeInputs: string[];
+  /** Machine-readable drift/coverage references. This metadata does not execute clinical rules. */
+  inputContract: Type2CapabilityInputContractV2;
   evidenceAuthorities: string[];
   boundary: string;
   nextGap?: string;
@@ -33,6 +37,20 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["glycemic"],
     executableObjectives: ["glycemic_control", "high_efficacy_glycemic_control", "insulin_replacement"],
     minimumSafeInputs: ["currentHba1c", "targetHba1c", "current medications", "pathway-specific renal/weight/glucose inputs"],
+    inputContract: {
+      core: ["core.current_hba1c", "core.target_hba1c", "core.current_medications"],
+      conditional: [
+        "kidney.egfr",
+        "kidney.creatinine_clearance",
+        "anthropometrics.weight_kg",
+        "anthropometrics.bmi",
+        "glycemia.fasting",
+        "glycemia.two_hour_postprandial",
+        "glycemia.random",
+        "core.hyperglycemia_symptoms",
+        "core.catabolic_features",
+      ],
+    },
     evidenceAuthorities: ["ADA 2026 Section 9", "ADA/EASD 2022", "product regulatory labels"],
     boundary: "Authoritative Decision Graph v2 pathway with product-specific dose execution for the reviewed core cohort.",
   },
@@ -42,6 +60,15 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["ascvd", "heart_failure", "hypertension", "lipids"],
     executableObjectives: ["ascvd_protection", "heart_failure_protection", "blood_pressure_control", "lipid_risk_reduction"],
     minimumSafeInputs: ["specific cardiovascular phenotype rather than umbrella cardiovascular=true"],
+    inputContract: {
+      core: ["cardiovascular.ascvd", "cardiovascular.heart_failure"],
+      conditional: [
+        "cardiovascular.lvef_percent",
+        "cardiovascular.nyha_class",
+        "cardiovascular.systolic_bp",
+        "cardiovascular.diastolic_bp",
+      ],
+    },
     evidenceAuthorities: ["ADA 2026 Section 10", "ESC Diabetes-CVD 2023", "AHA/ACC/HFSA 2022", "ACC HFrEF 2024"],
     boundary: "Executable only through a represented sub-phenotype; generic cardiovascular disease does not invent a drug objective.",
     nextGap: "Expand only named cardiovascular phenotypes with their own current guideline and product-label execution.",
@@ -52,6 +79,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["kidney"],
     executableObjectives: ["kidney_protection"],
     minimumSafeInputs: ["CKD status", "eGFR", "UACR when relevant", "potassium for MRA", "explicit CrCl when a label requires CrCl", "dialysis status"],
+    inputContract: {
+      core: ["kidney.ckd"],
+      conditional: ["kidney.egfr", "kidney.uacr", "kidney.potassium", "kidney.creatinine_clearance", "kidney.dialysis"],
+    },
     evidenceAuthorities: ["ADA 2026 Section 11", "KDIGO CKD 2024", "KDIGO Diabetes-CKD 2022", "product regulatory labels"],
     boundary: "Renal execution is phenotype- and label-gated; CrCl is never inferred from eGFR.",
   },
@@ -61,6 +92,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["liver"],
     executableObjectives: ["liver_directed_therapy"],
     minimumSafeInputs: ["MASLD/MASH confirmation", "fibrosis stage", "cirrhosis/decompensation", "weight for resmetirom", "product-specific interaction/contraindication screening", "current medication reconciliation"],
+    inputContract: {
+      core: ["liver.masld_mash", "liver.fibrosis_stage", "liver.cirrhosis", "liver.decompensated_cirrhosis"],
+      conditional: ["core.age_years", "anthropometrics.weight_kg", "safety.product_specific_screen", "core.current_medications"],
+    },
     evidenceAuthorities: ["EASL-EASD-EASO MASLD 2024", "AASLD resmetirom 2024", "REZDIFFRA current regulatory label", "AASLD semaglutide MASH 2025", "WEGOVY current regulatory label"],
     boundary: "The liver lane executes only explicitly protocolized products and phenotypes: reviewed resmetirom plus product-bound WEGOVY initiation and interval-aware continuation for adult noncirrhotic F2-F3 MASH. Phase-aware non-insured treatment cost is implemented; other liver medicines remain review-only.",
     nextGap: "Populate the reviewed payer-scoped claim-timing registry from authoritative insurer evidence before treating insured-only phase-aware cost as executable; ordinary financial coverage rows must not infer claim timing.",
@@ -71,6 +106,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["glycemic"],
     executableObjectives: ["weight_benefit"],
     minimumSafeInputs: ["BMI/weight", "Type 2 treatment context", "product-specific contraindications"],
+    inputContract: {
+      core: ["anthropometrics.weight_kg", "anthropometrics.bmi"],
+      conditional: ["core.current_medications", "safety.product_specific_screen"],
+    },
     evidenceAuthorities: ["ADA 2026 Section 9", "reviewed GLP-1/GIP-GLP-1 product labels"],
     boundary: "Weight is an explicit Type 2 preference axis; a standalone obesity-prescribing engine is not implied.",
     nextGap: "Keep obesity execution inside reviewed Type 2 indications until a separate obesity module is explicitly scoped.",
@@ -81,6 +120,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["hypertension"],
     executableObjectives: ["blood_pressure_control"],
     minimumSafeInputs: ["treatment-range BP", "established hypertension-treatment context", "represented RAAS indication", "renal/potassium facts as product requires"],
+    inputContract: {
+      core: ["cardiovascular.systolic_bp", "cardiovascular.diastolic_bp", "hypertension.established_treatment_context"],
+      conditional: ["kidney.egfr", "kidney.potassium"],
+    },
     evidenceAuthorities: ["ADA 2026 Section 10", "ACC/AHA Hypertension 2025", "ACEi/ARB product labels"],
     boundary: "A single encounter BP does not create a hypertension diagnosis or autonomous initiation.",
   },
@@ -90,6 +133,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["lipids"],
     executableObjectives: ["lipid_risk_reduction"],
     minimumSafeInputs: ["age", "ASCVD status", "CrCl for renal-specific statin branch when required", "pregnancy context"],
+    inputContract: {
+      core: ["core.age_years", "cardiovascular.ascvd"],
+      conditional: ["kidney.creatinine_clearance", "core.pregnancy"],
+    },
     evidenceAuthorities: ["ADA 2026 Section 10", "ACC/AHA Dyslipidemia 2026", "statin product labels"],
     boundary: "Statin indication and product dose are separate; unsupported nonstatin classes remain review-only.",
   },
@@ -99,6 +146,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["heart_failure"],
     executableObjectives: ["heart_failure_protection"],
     minimumSafeInputs: ["heart-failure phenotype", "LVEF for HFrEF-specific MRA", "eGFR", "potassium"],
+    inputContract: {
+      core: ["cardiovascular.heart_failure"],
+      conditional: ["cardiovascular.lvef_percent", "cardiovascular.nyha_class", "cardiovascular.systolic_bp", "kidney.egfr", "kidney.potassium"],
+    },
     evidenceAuthorities: ["AHA/ACC/HFSA 2022", "ACC HFrEF 2024", "ADA 2026 Section 10", "product regulatory labels"],
     boundary: "Current dedicated MRA execution is HFrEF-specific; heartFailure=true alone is not sufficient for spironolactone.",
   },
@@ -108,6 +159,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["ascvd", "lipids"],
     executableObjectives: ["ascvd_protection", "lipid_risk_reduction"],
     minimumSafeInputs: ["established ASCVD phenotype", "relevant medication safety facts"],
+    inputContract: {
+      core: ["cardiovascular.ascvd"],
+      conditional: ["core.current_medications", "safety.product_specific_screen"],
+    },
     evidenceAuthorities: ["ADA 2026 Sections 9 and 10", "ESC Diabetes-CVD 2023", "ACC/AHA Dyslipidemia 2026"],
     boundary: "ASCVD creates independent organ-protection and lipid objectives; unsupported adjunct classes remain review-only until protocolized.",
   },
@@ -117,6 +172,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["liver"],
     executableObjectives: ["liver_directed_therapy"],
     minimumSafeInputs: ["adult status", "confirmed MASH", "F2/F3 fibrosis", "explicit noncirrhotic state", "actual body weight when resmetirom is considered", "WEGOVY MTC/MEN2/hypersensitivity/gastroparesis/pancreatitis screen", "current GLP-1/semaglutide reconciliation"],
+    inputContract: {
+      core: ["core.age_years", "liver.masld_mash", "liver.fibrosis_stage", "liver.cirrhosis", "liver.decompensated_cirrhosis"],
+      conditional: ["anthropometrics.weight_kg", "safety.product_specific_screen", "core.current_medications"],
+    },
     evidenceAuthorities: ["EASL-EASD-EASO MASLD 2024", "AASLD resmetirom 2024", "REZDIFFRA current regulatory label", "AASLD semaglutide MASH 2025", "WEGOVY current regulatory label"],
     boundary: "Resmetirom and product-bound WEGOVY initiation/continuation are executable only for the reviewed adult F2-F3 noncirrhotic phenotype after product-specific safety, exact weekly interval/stage reconciliation, and Iran-market gates pass. Future escalation cost remains conditional/display-only until the future stage is observed; other MASH medicines remain review-only.",
     nextGap: "Populate the reviewed payer-scoped claim-timing registry from authoritative insurer evidence before treating insured-only phase-aware cost as executable; ordinary financial coverage rows must not infer claim timing.",
@@ -127,6 +186,16 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["neuropathy"],
     executableObjectives: ["painful_dpn_symptom_control"],
     minimumSafeInputs: ["adult status", "physician-confirmed diabetic peripheral neuropathy", "painful symptoms", "absence of atypical diagnostic features", "CrCl for pregabalin", "eGFR/liver/MAOI/alcohol context for duloxetine", "pregabalin hypersensitivity"],
+    inputContract: {
+      core: ["core.age_years", "neuropathy.dpn_confirmed", "neuropathy.painful_symptoms", "neuropathy.atypical_features"],
+      conditional: [
+        "kidney.creatinine_clearance",
+        "kidney.egfr",
+        "medication_safety.maoi_exposure",
+        "medication_safety.substantial_alcohol_use",
+        "medication_safety.pregabalin_hypersensitivity",
+      ],
+    },
     evidenceAuthorities: ["ADA 2026 Section 12", "AAN painful diabetic polyneuropathy guideline update", "pregabalin regulatory label", "duloxetine regulatory label"],
     boundary: "Only the reviewed clinician-confirmed painful-DPN phenotype can execute the protocolized pregabalin/duloxetine branches; generic neuropathy activation and routine opioid use remain non-executable.",
     nextGap: "Expand only explicitly reviewed renal/product branches and additional nonopioid classes with exact labels and current-market eligibility.",
@@ -137,6 +206,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: [],
     executableObjectives: [],
     minimumSafeInputs: ["retinopathy severity", "DME status", "center involvement/visual acuity when treatment evidence is interpreted", "pregnancy context"],
+    inputContract: {
+      core: ["retinopathy.severity", "retinopathy.dme"],
+      conditional: ["retinopathy.center_involving_dme", "retinopathy.visual_acuity_context", "core.pregnancy"],
+    },
     evidenceAuthorities: ["ADA 2026 Section 12"],
     boundary: "The general engine now executes a prompt ophthalmology escalation for any DME, moderate-or-worse NPDR, or PDR while keeping intravitreal/laser treatment specialist-only and outside medication ranking.",
     nextGap: "Any specialist-only ophthalmic product execution must be separately scoped, reviewed, and isolated from the general Type 2 prescribing authority.",
@@ -147,6 +220,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["diabetic_foot"],
     executableObjectives: [],
     minimumSafeInputs: ["ulcer confirmation", "clinical infection assessment", "IWGDF/IDSA severity", "ischemia/PAD", "danger features/source-control context", "osteomyelitis suspicion"],
+    inputContract: {
+      core: ["diabetic_foot.ulcer", "diabetic_foot.clinical_infection", "diabetic_foot.infection_severity"],
+      conditional: ["diabetic_foot.pad", "diabetic_foot.danger_features", "diabetic_foot.osteomyelitis"],
+    },
     evidenceAuthorities: ["IWGDF/IDSA Infection 2023", "IWGDF Wound Healing 2023", "ADA 2026 Section 12"],
     boundary: "The structured ulcer/infection/severity/source-control pathway is implemented. Clinically uninfected ulcers cannot execute antibiotics; infected cases remain antimicrobial-review only and can trigger hospital/surgical/vascular escalation.",
     nextGap: "Do not add antibiotic product execution until pathogen/susceptibility, allergy, renal/interaction and local-protocol requirements are explicitly represented and reviewed.",
@@ -157,6 +234,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: [],
     executableObjectives: [],
     minimumSafeInputs: ["explicit nutrition-support intent", "named documented deficiency when applicable", "objective deficiency data", "malnutrition/special-population context"],
+    inputContract: {
+      core: ["nutrition.intent"],
+      conditional: ["nutrition.documented_deficiency", "nutrition.deficiency_name", "nutrition.objective_deficiency_data", "nutrition.malnutrition_or_special_population"],
+    },
     evidenceAuthorities: ["ADA 2026 Section 5"],
     boundary: "The indication/deficiency safety pathway is implemented: diabetes alone cannot create vitamin/mineral/herbal or enteral/parenteral prescription execution; documented deficiency and malnutrition route to targeted review only.",
     nextGap: "Add nutrient-specific or nutrition-route-specific protocols only after their indication, objective data, product/route and dosing authority are separately reviewed.",
@@ -167,6 +248,10 @@ export const clinicalDomainCapabilities: readonly ClinicalDomainCapability[] = [
     decisionGraphLanes: ["glycemic"],
     executableObjectives: [],
     minimumSafeInputs: ["pregnancy status", "explicit diabetes type (T1D/T2D/GDM)", "pregnancy-specific glucose data", "current glucose-lowering medicines", "hypoglycemia context", "pregnancy specialist-team context"],
+    inputContract: {
+      core: ["core.pregnancy", "pregnancy.diabetes_type", "core.current_medications"],
+      conditional: ["pregnancy.glycemia", "pregnancy.hypoglycemia_context", "pregnancy.specialist_team"],
+    },
     evidenceAuthorities: ["ADA 2026 Section 15", "product pregnancy labeling"],
     boundary: "A dedicated pregnancy diabetes pathway now owns pregnancy targets, T1D insulin requirement, T2D insulin preference, GDM lifestyle/insulin escalation review, and medication reconciliation. Exact insulin dose/titration remains clinician/team controlled and non-autonomous.",
     nextGap: "Only add pregnancy insulin product/dose execution after a separate product-level audit proves gestation-aware initiation, frequent titration, hypoglycemia safeguards, and postpartum dose reduction handling.",
