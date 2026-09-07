@@ -4,6 +4,7 @@ export {
   clearType2DecisionGraphRuntimeCatalogForTests,
   configureType2DecisionGraphRuntimeCatalog,
   configureType2DecisionGraphRuntimeInsurancePolicies,
+  listType2ReviewedProductSafetyReviewSetsV2,
   type2DecisionGraphRuntimeConfigured,
   type Type2DecisionGraphRuntimeCatalog,
   type Type2RuntimeAssessmentResultV2,

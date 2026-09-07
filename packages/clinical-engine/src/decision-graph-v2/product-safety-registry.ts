@@ -14,6 +14,8 @@ export type ProductSafetyCriterionEffectV2 =
 export interface ReviewedProductSafetyCriterionV2 {
   criterionId: string;
   label: string;
+  /** Reviewed Persian collection prompt. Presentation metadata only. */
+  promptFa: string;
   presentMeaning: string;
   effect: ProductSafetyCriterionEffectV2;
   evidence: EvidenceReferenceV2[];
@@ -78,12 +80,14 @@ function isCurrentVerifiedWegovyProduct(product: IranMarketProductV2, masterDrug
 function wegovyCriterion(
   criterionId: string,
   label: string,
+  promptFa: string,
   presentMeaning: string,
   effect: ProductSafetyCriterionEffectV2,
 ): ReviewedProductSafetyCriterionV2 {
   return {
     criterionId,
     label,
+    promptFa,
     presentMeaning,
     effect,
     evidence: [wegovy2026LabelEvidenceV2],
@@ -122,30 +126,35 @@ export function buildReviewedProductSafetyRegistryV2(
       wegovyCriterion(
         "wegovy.personal_or_family_mtc_history",
         "Personal or family history of medullary thyroid carcinoma (MTC)",
+        "آیا بیمار سابقهٔ شخصی یا خانوادگی کارسینوم مدولاری تیروئید (MTC) دارد؟",
         "A present response represents the WEGOVY label contraindication for personal or family history of MTC.",
         "exclude_if_present",
       ),
       wegovyCriterion(
         "wegovy.men2",
         "Multiple Endocrine Neoplasia syndrome type 2 (MEN 2)",
+        "آیا بیمار مبتلا به سندرم نئوپلازی متعدد غدد درون‌ریز نوع ۲ (MEN 2) است؟",
         "A present response represents the WEGOVY label contraindication for MEN 2.",
         "exclude_if_present",
       ),
       wegovyCriterion(
         "wegovy.serious_semaglutide_hypersensitivity",
         "Prior serious hypersensitivity reaction to semaglutide or WEGOVY excipients",
+        "آیا بیمار سابقهٔ واکنش حساسیتی شدید به سماگلوتاید یا مواد جانبی WEGOVY دارد؟",
         "A present response represents the WEGOVY label contraindication for prior serious hypersensitivity.",
         "exclude_if_present",
       ),
       wegovyCriterion(
         "wegovy.severe_gastroparesis",
         "Severe gastroparesis",
+        "آیا بیمار گاستروپارزی شدید دارد؟",
         "A present response means the reviewed WEGOVY MASH execution path must remain blocked because WEGOVY is not recommended in severe gastroparesis.",
         "block_execution_if_present",
       ),
       wegovyCriterion(
         "wegovy.suspected_acute_pancreatitis",
         "Suspected acute pancreatitis",
+        "آیا پانکراتیت حاد در بیمار مطرح یا مشکوک است؟",
         "A present response means WEGOVY execution must remain blocked and the pancreatitis warning requires clinical management rather than treatment execution.",
         "block_execution_if_present",
       ),

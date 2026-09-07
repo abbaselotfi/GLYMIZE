@@ -18,6 +18,11 @@ import {
 } from "./type2-intake-v2.js";
 import { buildType2AssessmentWithWorldDrugCoverageV2 } from "./type2-worlddrug-recommendation-compat.js";
 import type { ClaimsAwareInsurancePolicyRuleV2 } from "./decision-graph-v2/insurance-claims.js";
+import { buildDecisionGraphInventoryFromContractsV2 } from "./decision-graph-v2/inventory-adapter.js";
+import {
+  buildReviewedProductSafetyRegistryV2,
+  type ReviewedProductSafetyReviewSetV2,
+} from "./decision-graph-v2/product-safety-registry.js";
 
 export interface Type2DecisionGraphRuntimeCatalog {
   masterRegistry: readonly MasterDrugRegistryEntry[];
@@ -69,6 +74,21 @@ export function clearType2DecisionGraphRuntimeCatalogForTests() {
 
 export function type2DecisionGraphRuntimeConfigured() {
   return Boolean(runtimeCatalog?.masterRegistry.length);
+}
+
+/**
+ * Collection metadata derived from the exact runtime-of-record catalogue used by
+ * live Type 2 assessment. No fallback review set is fabricated when the runtime
+ * catalogue is absent or when exact current/verified product identity does not
+ * satisfy the reviewed registry boundary.
+ */
+export function listType2ReviewedProductSafetyReviewSetsV2(): ReviewedProductSafetyReviewSetV2[] {
+  if (!runtimeCatalog?.masterRegistry.length || !runtimeCatalog.marketProducts.length) return [];
+  const { inventory } = buildDecisionGraphInventoryFromContractsV2({
+    masterRegistry: runtimeCatalog.masterRegistry,
+    marketProducts: runtimeCatalog.marketProducts,
+  });
+  return structuredClone(buildReviewedProductSafetyRegistryV2(inventory));
 }
 
 function withRuntimeSafetyChannels(
