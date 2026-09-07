@@ -4,12 +4,45 @@ import {
   clinicalDomainCapabilities,
   clinicalDomainCapability,
 } from "../src/clinical-domain-capabilities.js";
+import {
+  type2ClinicalInputCatalogV2,
+  type2ClinicalInputDefinitionV2,
+} from "../src/type2-input-contract-v2.js";
 
 describe("clinical engine multidomain capability boundary", () => {
   it("classifies every current MedicationClinicalDomain exactly once", () => {
     const domains = clinicalDomainCapabilities.map((item) => item.domain);
     expect(new Set(domains).size).toBe(domains.length);
     expect([...domains].sort()).toEqual([...medicationClinicalDomains].sort());
+  });
+
+  it("binds every capability input contract to stable catalogue identities without duplicates", () => {
+    const inputIds = new Set(Object.keys(type2ClinicalInputCatalogV2));
+    for (const capability of clinicalDomainCapabilities) {
+      expect(capability.inputContract.core.length).toBeGreaterThan(0);
+      const referenced = [...capability.inputContract.core, ...capability.inputContract.conditional];
+      expect(new Set(referenced).size).toBe(referenced.length);
+      for (const inputId of referenced) expect(inputIds.has(inputId)).toBe(true);
+    }
+  });
+
+  it("keeps known request/UI gaps explicit instead of inferring missing facts", () => {
+    expect(clinicalDomainCapability("kidney").inputContract.conditional).toContain("kidney.creatinine_clearance");
+    expect(clinicalDomainCapability("neuropathy").inputContract.conditional).toEqual(expect.arrayContaining([
+      "medication_safety.maoi_exposure",
+      "medication_safety.substantial_alcohol_use",
+      "medication_safety.pregabalin_hypersensitivity",
+    ]));
+    expect(clinicalDomainCapability("masld_mash").inputContract.conditional).toContain("safety.product_specific_screen");
+    expect(type2ClinicalInputDefinitionV2("kidney.creatinine_clearance").description.toLocaleLowerCase()).toContain("never inferred from egfr");
+    expect(type2ClinicalInputDefinitionV2("safety.product_specific_screen").requestSupport).toBe("not_represented");
+    expect(type2ClinicalInputDefinitionV2("hypertension.established_treatment_context").requestSupport).toBe("not_represented");
+  });
+
+  it("describes the pregnancy fallback as adapter-derived rather than a fabricated direct form field", () => {
+    const pregnancy = type2ClinicalInputDefinitionV2("core.pregnancy");
+    expect(pregnancy.requestSupport).toBe("runtime_derived");
+    expect(pregnancy.requestPath).toContain("factors[pregnancy]");
   });
 
   it("keeps specialist/review/safety domains out of falsely claimed full executable coverage", () => {
