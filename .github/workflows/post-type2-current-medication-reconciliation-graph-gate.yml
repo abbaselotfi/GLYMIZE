@@ -1,0 +1,114 @@
+name: Post Type 2 current medication reconciliation graph gate
+
+on:
+  push:
+    branches:
+      - feat/type2-current-medication-reconciliation-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  graph-gate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Verify expected base and branch scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          test "$(git merge-base HEAD origin/main)" = "956285682f5f69dcd275df48264886757cb1f7ac"
+          changed="$(git diff --name-only origin/main...HEAD | sort)"
+          printf '%s\n' "$changed"
+          allowed='apps/web/app/type-2/type2-current-medication-row.module.css
+apps/web/app/type-2/type2-current-medication-row.tsx
+apps/web/app/type-2/type2-current-medication-ui.ts
+apps/web/app/type-2/type2-scenarios-client.tsx
+apps/web/test/type2-current-medication-ui.test.ts
+.github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml'
+          unexpected="$(comm -23 <(printf '%s\n' "$changed") <(printf '%s\n' "$allowed" | sort))"
+          test -z "$unexpected" || { echo "Unexpected files:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Codebase Memory
+        run: pip install 'codebase-memory-mcp==0.10.8'
+
+      - name: Bootstrap canonical snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show codebase-memory-latest:.codebase-memory/graph.db.zst > /tmp/graph.db.zst
+          git show codebase-memory-latest:.codebase-memory/artifact.json > /tmp/artifact.json
+          mkdir -p .codebase-memory
+          cp /tmp/graph.db.zst .codebase-memory/graph.db.zst
+          cp /tmp/artifact.json .codebase-memory/artifact.json
+          project="$(jq -r '.project // empty' .codebase-memory/artifact.json)"
+          test -n "$project"
+          mkdir -p "$HOME/.cache/codebase-memory-mcp"
+          zstd -d -f .codebase-memory/graph.db.zst -o "$HOME/.cache/codebase-memory-mcp/${project}.db"
+          printf '%s' "$project" > /tmp/cbm-project
+
+      - name: Remove one-shot files before graph refresh
+        shell: bash
+        run: |
+          rm -f .github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml
+          rm -f snapshot-source.json
+
+      - name: Refresh and verify graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$(cat /tmp/cbm-project)"
+          python - <<'PY'
+          import asyncio, json, os
+          from codebase_memory_mcp.server import detect_changes, index_repository, index_status
+
+          async def main():
+              project = open('/tmp/cbm-project').read().strip()
+              repo = os.environ['GITHUB_WORKSPACE']
+              pre = await detect_changes(project=project, repo_path=repo)
+              print('PRE', json.dumps(pre, default=str))
+              result = await index_repository(repo_path=repo, mode='full', persistence=True)
+              print('INDEX', json.dumps(result, default=str))
+              status = await index_status(project=project)
+              print('STATUS', json.dumps(status, default=str))
+              post = await detect_changes(project=project, repo_path=repo)
+              print('POST', json.dumps(post, default=str))
+              text = json.dumps(post, default=str).lower()
+              if any(token in text for token in ['"changed": true', '"has_changes": true', '"dirty": true']):
+                  raise SystemExit('graph remains dirty after full refresh')
+          asyncio.run(main())
+          PY
+
+      - name: Cleanup generated artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f snapshot-source.json
+          git checkout -- .codebase-memory/graph.db.zst .codebase-memory/artifact.json 2>/dev/null || true
+          git status --short
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -v '^.github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml$' || true)"
+          test -z "$unexpected" || { echo "Unexpected cleanup files:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Commit one-shot workflow removal
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u .github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml
+          git diff --cached --check
+          git commit -m "Remove completed Type 2 medication reconciliation graph gate"
+          git push origin HEAD:${GITHUB_REF_NAME}
