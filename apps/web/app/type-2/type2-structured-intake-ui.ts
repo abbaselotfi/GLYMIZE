@@ -7,6 +7,8 @@ export interface Type2StructuredIntakeDraft {
   fastingGlucose: string;
   twoHourPostprandialGlucose: string;
   randomGlucose: string;
+  systolicBloodPressure: string;
+  diastolicBloodPressure: string;
   retinopathyPresent: TriState;
   retinopathySeverity: "" | "none" | "mild_npdr" | "moderate_npdr" | "severe_npdr" | "pdr" | "unknown";
   diabeticMacularEdema: TriState;
@@ -51,6 +53,8 @@ export const emptyType2StructuredIntakeDraft: Type2StructuredIntakeDraft = {
   fastingGlucose: "",
   twoHourPostprandialGlucose: "",
   randomGlucose: "",
+  systolicBloodPressure: "",
+  diastolicBloodPressure: "",
   retinopathyPresent: "unknown",
   retinopathySeverity: "",
   diabeticMacularEdema: "unknown",
@@ -109,16 +113,17 @@ export interface StructuredIntakeActivation {
 }
 
 /**
- * Builds only explicitly represented specialist contexts. Domain visibility is
- * an activation/display concern and never itself becomes a diagnosis.
+ * Builds only explicitly represented specialist/clinical contexts. Domain visibility
+ * is an activation/display concern and never itself becomes a diagnosis.
  */
 export function structuredClinicalContextFromDraft(
   draft: Type2StructuredIntakeDraft,
   activation: StructuredIntakeActivation,
 ): Pick<
   Type2StructuredClinicalContextV2,
-  "glycemia" | "neuropathy" | "medicationSafety" | "retinopathy" | "diabeticFoot" | "nutritionSupport" | "pregnancyCare"
+  "glycemia" | "cardiovascular" | "neuropathy" | "medicationSafety" | "retinopathy" | "diabeticFoot" | "nutritionSupport" | "pregnancyCare"
 > {
+  const hypertensionActive = activation.worldDrugDomains.includes("hypertension");
   const neuropathyActive = activation.worldDrugDomains.includes("neuropathy");
   const retinopathyActive = activation.worldDrugDomains.includes("retinopathy");
   const nutritionActive = activation.worldDrugDomains.includes("nutrition_support");
@@ -127,6 +132,8 @@ export function structuredClinicalContextFromDraft(
   const fasting = numberOrUndefined(draft.fastingGlucose);
   const twoHour = numberOrUndefined(draft.twoHourPostprandialGlucose);
   const random = numberOrUndefined(draft.randomGlucose);
+  const systolic = numberOrUndefined(draft.systolicBloodPressure);
+  const diastolic = numberOrUndefined(draft.diastolicBloodPressure);
 
   return {
     glycemia: fasting !== undefined || twoHour !== undefined || random !== undefined
@@ -134,6 +141,12 @@ export function structuredClinicalContextFromDraft(
           fastingPlasmaGlucoseMgDl: fasting,
           twoHourPostprandialGlucoseMgDl: twoHour,
           randomGlucoseMgDl: random,
+        }
+      : undefined,
+    cardiovascular: hypertensionActive && (systolic !== undefined || diastolic !== undefined)
+      ? {
+          systolicBloodPressure: systolic,
+          diastolicBloodPressure: diastolic,
         }
       : undefined,
     neuropathy: neuropathyActive && (
