@@ -45,28 +45,28 @@ jobs:
 
           replace_once(
               '''import {
-  emptyType2StructuredIntakeDraft,
-  structuredClinicalContextFromDraft,
-  type Type2StructuredIntakeDraft,
-} from "./type2-structured-intake-ui";
-''',
+            emptyType2StructuredIntakeDraft,
+            structuredClinicalContextFromDraft,
+            type Type2StructuredIntakeDraft,
+          } from "./type2-structured-intake-ui";
+          ''',
               '''import {
-  emptyType2StructuredIntakeDraft,
-  type Type2StructuredIntakeDraft,
-} from "./type2-structured-intake-ui";
-import {
-  emptyType2CoreContextDraft,
-  type2BmiFromCoreDraft,
-  type2ClinicalContextFromActiveIntake,
-  type2NumberOrUndefined,
-  type Type2CoreContextDraft,
-} from "./type2-core-intake-ui";
-import {
-  newType2MedicationRow,
-  type2CurrentMedicationPayload,
-  type Type2MedicationRow,
-} from "./type2-current-medication-ui";
-''',
+            emptyType2StructuredIntakeDraft,
+            type Type2StructuredIntakeDraft,
+          } from "./type2-structured-intake-ui";
+          import {
+            emptyType2CoreContextDraft,
+            type2BmiFromCoreDraft,
+            type2ClinicalContextFromActiveIntake,
+            type2NumberOrUndefined,
+            type Type2CoreContextDraft,
+          } from "./type2-core-intake-ui";
+          import {
+            newType2MedicationRow,
+            type2CurrentMedicationPayload,
+            type Type2MedicationRow,
+          } from "./type2-current-medication-ui";
+          ''',
               'add modular intake imports',
           )
 
