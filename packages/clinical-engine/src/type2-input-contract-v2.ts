@@ -39,9 +39,9 @@ export const type2ClinicalInputCatalogV2 = {
     description: "Patient age in years",
   },
   "core.pregnancy": {
-    requestSupport: "request_field",
-    requestPath: "clinicalContext.pregnancy",
-    description: "Explicit pregnancy context",
+    requestSupport: "runtime_derived",
+    requestPath: "factors[pregnancy] -> clinicalContext.pregnancy",
+    description: "Pregnancy context derived by the intake adapter from the explicit pregnancy decision factor when a direct clinical-context value is absent",
   },
   "core.hyperglycemia_symptoms": {
     requestSupport: "request_field",
