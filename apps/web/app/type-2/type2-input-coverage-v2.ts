@@ -13,12 +13,13 @@ export interface Type2UiInputCoverageEntryV2 {
 }
 
 /**
- * Explicit coverage map between the clinician-facing Type 2 intake and the
- * machine-readable clinical input catalogue.
+ * Explicit coverage map for the active clinician-facing `/type-2` route rendered
+ * by Type2ExperienceFrame -> Type2ScenariosClient.
  *
  * This is drift metadata only. It does not populate request values and must not
- * be used to infer missing clinical facts. `not_collected` and `not_represented`
- * inputs remain absent/fail-closed at runtime.
+ * be used to infer missing clinical facts. Legacy/inactive Type 2 clients do not
+ * define coverage for this map. `not_collected` and `not_represented` inputs
+ * remain absent/fail-closed at runtime.
  */
 export const type2UiInputCoverageV2 = {
   "core.current_hba1c": { state: "collected", surface: "core_form" },
@@ -27,32 +28,44 @@ export const type2UiInputCoverageV2 = {
   "current_medication.interval_stage_reconciliation": {
     state: "not_represented",
     surface: "none",
-    note: "The current Type 2 clinician intake does not carry explicit administration interval, days on current dose, therapy phase, or next-administration timing through to Decision Graph.",
+    note: "The active Type 2 clinician intake does not carry explicit administration interval, days on current dose, therapy phase, or next-administration timing through to Decision Graph.",
   },
   "core.age_years": {
     state: "not_collected",
     surface: "none",
-    note: "The request contract supports ageYears, but the current Type 2 clinician form does not collect it.",
+    note: "The request contract supports ageYears, but the active Type 2 clinician form does not collect it; longitudinal demographic design should prefer date of birth rather than adding a static patient age here.",
   },
   "core.pregnancy": {
     state: "derived",
-    surface: "runtime_adapter",
-    note: "The explicit pregnancy factor is converted to patient.pregnancy by the Type 2 intake adapter when no direct value is supplied.",
+    surface: "core_form",
+    note: "The active form's explicit pregnancy decision factor is deterministically projected to clinicalContext.pregnancy; the runtime adapter fallback remains compatibility protection rather than the primary UI source.",
   },
   "core.hyperglycemia_symptoms": { state: "collected", surface: "core_form" },
   "core.catabolic_features": { state: "collected", surface: "core_form" },
   "cardiovascular.ascvd": { state: "collected", surface: "core_form" },
   "cardiovascular.heart_failure": { state: "collected", surface: "core_form" },
   "cardiovascular.lvef_percent": { state: "collected", surface: "core_form" },
-  "cardiovascular.nyha_class": { state: "collected", surface: "core_form" },
-  "cardiovascular.systolic_bp": { state: "collected", surface: "core_form" },
-  "cardiovascular.diastolic_bp": { state: "collected", surface: "core_form" },
+  "cardiovascular.nyha_class": {
+    state: "not_collected",
+    surface: "none",
+    note: "The active Type 2 scenario form does not currently collect NYHA functional class.",
+  },
+  "cardiovascular.systolic_bp": {
+    state: "not_collected",
+    surface: "none",
+    note: "The active Type 2 scenario form does not currently collect systolic blood pressure.",
+  },
+  "cardiovascular.diastolic_bp": {
+    state: "not_collected",
+    surface: "none",
+    note: "The active Type 2 scenario form does not currently collect diastolic blood pressure.",
+  },
   "kidney.ckd": { state: "collected", surface: "core_form" },
   "kidney.egfr": { state: "collected", surface: "core_form" },
   "kidney.creatinine_clearance": {
-    state: "not_collected",
-    surface: "none",
-    note: "CrCl exists in the request/Decision Graph contracts but must never be inferred from the eGFR field.",
+    state: "collected",
+    surface: "core_form",
+    note: "The active CKD panel collects explicit CrCl and can import confirmed handoff CrCl; it is never inferred from eGFR. Visibility is currently conditional on the CKD factor.",
   },
   "kidney.uacr": { state: "collected", surface: "core_form" },
   "kidney.potassium": { state: "collected", surface: "core_form" },
@@ -76,17 +89,17 @@ export const type2UiInputCoverageV2 = {
   "medication_safety.maoi_exposure": {
     state: "not_collected",
     surface: "none",
-    note: "MedicationSafetyContextV2 supports this fact, but the current Type 2 UI has no field for it.",
+    note: "MedicationSafetyContextV2 supports this fact, but the active Type 2 UI has no field for it.",
   },
   "medication_safety.substantial_alcohol_use": {
     state: "not_collected",
     surface: "none",
-    note: "MedicationSafetyContextV2 supports this fact, but the current Type 2 UI has no field for it.",
+    note: "MedicationSafetyContextV2 supports this fact, but the active Type 2 UI has no field for it.",
   },
   "medication_safety.pregabalin_hypersensitivity": {
     state: "not_collected",
     surface: "none",
-    note: "MedicationSafetyContextV2 supports this fact, but the current Type 2 UI has no field for it.",
+    note: "MedicationSafetyContextV2 supports this fact, but the active Type 2 UI has no field for it.",
   },
   "retinopathy.severity": { state: "collected", surface: "structured_form" },
   "retinopathy.dme": { state: "collected", surface: "structured_form" },

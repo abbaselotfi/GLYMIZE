@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type {
-  CurrentMedicationInput,
   GenericMedication,
   InsuranceProvider,
   MedicationClinicalDomain,
@@ -36,36 +35,22 @@ import Type2ParallelSafetyPanel from "./type2-parallel-safety-panel";
 import Type2StructuredContextFields from "./type2-structured-context-fields";
 import {
   emptyType2StructuredIntakeDraft,
-  structuredClinicalContextFromDraft,
   type Type2StructuredIntakeDraft,
 } from "./type2-structured-intake-ui";
+import {
+  emptyType2CoreContextDraft,
+  type2BmiFromCoreDraft,
+  type2ClinicalContextFromActiveIntake,
+  type2NumberOrUndefined,
+  type Type2CoreContextDraft,
+} from "./type2-core-intake-ui";
+import {
+  newType2MedicationRow,
+  type2CurrentMedicationPayload,
+  type Type2MedicationRow,
+} from "./type2-current-medication-ui";
 import base from "./type2-v2.module.css";
 import styles from "./type2-scenarios.module.css";
-
-type MedicationRow = {
-  id: string;
-  genericMedicationId?: string;
-  genericName: string;
-  doseAmount: string;
-  doseUnit: string;
-  frequencyPerDay: string;
-  status: "active" | "held" | "stopped";
-};
-
-type ContextDraft = {
-  eGfr: string;
-  creatinineClearanceMlMin: string;
-  uacr: string;
-  potassiumMmolL: string;
-  dialysis: boolean;
-  recentAki: boolean;
-  lvef: string;
-  weight: string;
-  height: string;
-  fibrosisStage: "" | "F0" | "F1" | "F2" | "F3" | "F4" | "unknown";
-  cirrhosis: boolean;
-  decompensatedCirrhosis: boolean;
-};
 
 type Type2AssessmentWithParallelSafety = Type2AssessmentResult & {
   parallelSafety?: Type2ParallelSafetyProjectionV2;
@@ -148,23 +133,6 @@ const SCENARIO_SORTS: Array<{ value: Type2ScenarioSortMode; fa: string; en: stri
   { value: "patient_cost", fa: "کمترین هزینه برای بیمار", en: "Lowest patient cost" },
   { value: "insurance_access", fa: "بهترین پوشش بیمه و دسترسی", en: "Best insurance and access" },
 ];
-
-function numberOrUndefined(value: string) {
-  if (!value.trim()) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function newMedication(): MedicationRow {
-  return {
-    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-    genericName: "",
-    doseAmount: "",
-    doseUnit: "mg",
-    frequencyPerDay: "",
-    status: "active",
-  };
-}
 
 function toman(value?: number, locale: "fa" | "en" = "fa") {
   if (value === undefined) return "—";
@@ -265,13 +233,10 @@ export default function Type2ScenariosClient() {
   const [catalog, setCatalog] = useState<GenericMedication[]>([]);
   const [currentHba1c, setCurrentHba1c] = useState("");
   const [targetHba1c, setTargetHba1c] = useState("7");
-  const [medications, setMedications] = useState<MedicationRow[]>([]);
+  const [medications, setMedications] = useState<Type2MedicationRow[]>([]);
   const [factors, setFactors] = useState<Type2DecisionFactor[]>([]);
   const [worldDrugDomains, setWorldDrugDomains] = useState<MedicationClinicalDomain[]>([]);
-  const [context, setContext] = useState<ContextDraft>({
-    eGfr: "", creatinineClearanceMlMin: "", uacr: "", potassiumMmolL: "", dialysis: false, recentAki: false, lvef: "", weight: "", height: "",
-    fibrosisStage: "", cirrhosis: false, decompensatedCirrhosis: false,
-  });
+  const [context, setContext] = useState<Type2CoreContextDraft>({ ...emptyType2CoreContextDraft });
   const [structuredContext, setStructuredContext] = useState<Type2StructuredIntakeDraft>({ ...emptyType2StructuredIntakeDraft });
   const [costPreference, setCostPreference] = useState<Type2CostPreference>("moderate");
   const [routePreference, setRoutePreference] = useState<Type2RoutePreference>("oral_and_injectable");
@@ -291,12 +256,7 @@ export default function Type2ScenariosClient() {
       .catch(() => setCatalog([]));
   }, []);
 
-  const bmi = useMemo(() => {
-    const weight = numberOrUndefined(context.weight);
-    const height = numberOrUndefined(context.height);
-    if (!weight || !height) return undefined;
-    return Math.round((weight / ((height / 100) ** 2)) * 10) / 10;
-  }, [context.height, context.weight]);
+  const bmi = useMemo(() => type2BmiFromCoreDraft(context), [context]);
 
   const defaultCostPlans = useMemo<Record<string, Type2CostingPlan>>(() => {
     if (!assessment || !submittedRequest) return {};
@@ -359,7 +319,7 @@ export default function Type2ScenariosClient() {
     setAssessment(null);
   }
 
-  function updateMedication(id: string, patch: Partial<MedicationRow>) {
+  function updateMedication(id: string, patch: Partial<Type2MedicationRow>) {
     setMedications((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
     setAssessment(null);
   }
@@ -368,58 +328,6 @@ export default function Type2ScenariosClient() {
     const normalized = value.trim().toLocaleLowerCase();
     const match = catalog.find((item) => item.canonicalName.toLocaleLowerCase() === normalized || item.persianName.toLocaleLowerCase() === normalized);
     updateMedication(id, { genericName: value, genericMedicationId: match?.id });
-  }
-
-  function currentMedicationPayload(): CurrentMedicationInput[] {
-    return medications.filter((item) => item.genericName.trim()).map((item) => {
-      const doseAmount = numberOrUndefined(item.doseAmount);
-      const frequencyPerDay = numberOrUndefined(item.frequencyPerDay);
-      return {
-        genericMedicationId: item.genericMedicationId,
-        genericName: item.genericName.trim(),
-        doseAmount,
-        doseUnit: doseAmount !== undefined ? item.doseUnit : undefined,
-        frequencyPerDay,
-        totalDailyDose: doseAmount !== undefined && frequencyPerDay !== undefined ? doseAmount * frequencyPerDay : undefined,
-        totalDailyDoseUnit: doseAmount !== undefined && frequencyPerDay !== undefined ? item.doseUnit : undefined,
-        status: item.status,
-        adherence: "unknown",
-        tolerance: "unknown",
-      };
-    });
-  }
-
-  function clinicalContextPayload(): NonNullable<Type2StructuredConsiderationRequestV2["clinicalContext"]> {
-    const specialist = structuredClinicalContextFromDraft(structuredContext, { factors, worldDrugDomains });
-    return {
-      pregnancy: factors.includes("pregnancy"),
-      cardiovascular: {
-        ascvd: factors.includes("ascvd"),
-        heartFailure: factors.includes("heart_failure"),
-        lvefPercent: numberOrUndefined(context.lvef),
-      },
-      kidney: {
-        ckd: factors.includes("ckd"),
-        eGfr: numberOrUndefined(context.eGfr),
-        creatinineClearanceMlMin: numberOrUndefined(context.creatinineClearanceMlMin),
-        uacrMgG: numberOrUndefined(context.uacr),
-        potassiumMmolL: numberOrUndefined(context.potassiumMmolL),
-        dialysis: context.dialysis,
-        recentAki: context.recentAki,
-      },
-      liver: {
-        masldMash: factors.includes("masld_mash"),
-        fibrosisStage: context.fibrosisStage || undefined,
-        cirrhosis: context.cirrhosis,
-        decompensatedCirrhosis: context.decompensatedCirrhosis,
-      },
-      anthropometrics: {
-        weightKg: numberOrUndefined(context.weight),
-        heightCm: numberOrUndefined(context.height),
-        bmi,
-      },
-      ...specialist,
-    };
   }
 
   function applyPatientHandoff(record: PatientHandoffRecord) {
@@ -485,8 +393,8 @@ export default function Type2ScenariosClient() {
     const request: Type2StructuredConsiderationRequestV2 & { activeClinicalDomains?: MedicationClinicalDomain[] } = {
       currentHba1c: current,
       targetHba1c: target,
-      currentMedications: currentMedicationPayload(),
-      clinicalContext: clinicalContextPayload(),
+      currentMedications: type2CurrentMedicationPayload(medications),
+      clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains }),
       costPreference,
       routePreference,
       insuranceProvider,
@@ -543,7 +451,7 @@ export default function Type2ScenariosClient() {
 
             <div className={styles.subhead}>
               <div><b>{fa ? "درمان فعال بیمار" : "Active regimen"}</b><small>{fa ? "دوز فعلی فقط برای شناخت regimen و محاسبات معتبر استفاده می‌شود." : "Current dose is used for regimen context and valid calculations only."}</small></div>
-              <button type="button" onClick={() => setMedications((current) => [...current, newMedication()])}>＋ {fa ? "افزودن" : "Add"}</button>
+              <button type="button" onClick={() => setMedications((current) => [...current, newType2MedicationRow()])}>＋ {fa ? "افزودن" : "Add"}</button>
             </div>
             {medications.length === 0 && <div className={styles.emptyLine}>{fa ? "داروی فعالی ثبت نشده؛ نشست به‌عنوان شروع درمان پردازش می‌شود." : "No active medicine entered; this is treated as therapy initiation."}</div>}
             <div className={styles.currentMeds}>
@@ -594,7 +502,7 @@ export default function Type2ScenariosClient() {
                 {bmi !== undefined && <div className={styles.bmi}>BMI <b>{bmi.toFixed(1)}</b></div>}
               </div>}
               {factors.includes("masld_mash") && <div className={styles.contextInline}>
-                <label><span>{fa ? "مرحله فیبروز" : "Fibrosis stage"}</span><select value={context.fibrosisStage} onChange={(event) => setContext((c) => ({ ...c, fibrosisStage: event.target.value as ContextDraft["fibrosisStage"] }))}><option value="">—</option><option>F0</option><option>F1</option><option>F2</option><option>F3</option><option>F4</option><option value="unknown">Unknown</option></select></label>
+                <label><span>{fa ? "مرحله فیبروز" : "Fibrosis stage"}</span><select value={context.fibrosisStage} onChange={(event) => setContext((c) => ({ ...c, fibrosisStage: event.target.value as Type2CoreContextDraft["fibrosisStage"] }))}><option value="">—</option><option>F0</option><option>F1</option><option>F2</option><option>F3</option><option>F4</option><option value="unknown">Unknown</option></select></label>
                 <Check label={fa ? "سیروز" : "Cirrhosis"} checked={context.cirrhosis} onChange={(value) => setContext((c) => ({ ...c, cirrhosis: value }))} />
                 <Check label={fa ? "سیروز دکامپنسیه" : "Decompensated cirrhosis"} checked={context.decompensatedCirrhosis} onChange={(value) => setContext((c) => ({ ...c, decompensatedCirrhosis: value }))} />
               </div>}
@@ -706,8 +614,8 @@ export default function Type2ScenariosClient() {
                   ? (fa ? "از دوز Decision Graph و فرآورده NFI انتخاب‌شده؛ ورودی دستی استفاده نمی‌شود." : "From the Decision Graph dose and selected NFI product; no manual dose/package input is used.")
                   : (fa ? "این ورودی‌ها فقط fallback محاسبه هزینه‌اند، نه پیشنهاد دوز." : "These inputs are only a costing fallback, not a dose recommendation.")}</small></div><span>{estimate?.status === "calculated" ? "✓" : "…"}</span></div>
                 {!graphCostAuthoritative && <div className={styles.costInputs} data-cost-fallback="manual">
-                  <label><span>{labels.dailyLabel}</span><input type="number" min="0" step="0.1" value={plan.dailyUnits ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], dailyUnits: numberOrUndefined(event.target.value), unitLabel: labels.unitLabel } }))} placeholder={fa ? "ورود پزشک" : "Clinician input"} /></label>
-                  <label><span>{labels.packageLabel}</span><input type="number" min="0" step="0.1" value={plan.unitsPerPackage ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], unitsPerPackage: numberOrUndefined(event.target.value), unitLabel: labels.unitLabel, marketPackageVerified: false } }))} placeholder={profile?.autoFillEligible ? String(profile.packageMeasureQuantity ?? "") : (fa ? "انتخاب/ورود بسته" : "Select/enter package")} /></label>
+                  <label><span>{labels.dailyLabel}</span><input type="number" min="0" step="0.1" value={plan.dailyUnits ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], dailyUnits: type2NumberOrUndefined(event.target.value), unitLabel: labels.unitLabel } }))} placeholder={fa ? "ورود پزشک" : "Clinician input"} /></label>
+                  <label><span>{labels.packageLabel}</span><input type="number" min="0" step="0.1" value={plan.unitsPerPackage ?? ""} onChange={(event) => setCostPlans((current) => ({ ...current, [medication.genericMedicationId]: { ...current[medication.genericMedicationId], unitsPerPackage: type2NumberOrUndefined(event.target.value), unitLabel: labels.unitLabel, marketPackageVerified: false } }))} placeholder={profile?.autoFillEligible ? String(profile.packageMeasureQuantity ?? "") : (fa ? "انتخاب/ورود بسته" : "Select/enter package")} /></label>
                 </div>}
                 {graphCostAuthoritative
                   ? <p className={styles.costProfileHint} data-decision-graph-cost-authority="dose-and-nfi-product">{fa
