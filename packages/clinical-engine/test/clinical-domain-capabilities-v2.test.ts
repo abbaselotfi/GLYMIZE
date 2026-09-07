@@ -40,7 +40,7 @@ describe("clinical engine multidomain capability boundary", () => {
   });
 
   it("describes the pregnancy fallback as adapter-derived rather than a fabricated direct form field", () => {
-    const pregnancy = type2ClinicalInputDefinitionV2("core.pregnancy");
+    const pregnancy = type2ClinicalInputCatalogV2["core.pregnancy"];
     expect(pregnancy.requestSupport).toBe("runtime_derived");
     expect(pregnancy.requestPath).toContain("factors[pregnancy]");
   });
