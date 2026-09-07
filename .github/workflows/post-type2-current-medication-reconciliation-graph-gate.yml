@@ -42,13 +42,17 @@ jobs:
           unexpected="$(comm -23 <(printf '%s\n' "$changed") <(printf '%s\n' "$allowed"))"
           test -z "$unexpected" || { echo "Unexpected files:"; printf '%s\n' "$unexpected"; exit 1; }
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Install Codebase Memory
-        run: pip install "codebase-memory-mcp==${CBM_VERSION}"
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" \
+            /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/codebase-memory-mcp" --version | tee /tmp/cbm-version.txt
+          grep -Fq "$CBM_VERSION" /tmp/cbm-version.txt
 
       - name: Bootstrap canonical release snapshot
         env:
@@ -81,30 +85,35 @@ jobs:
           rm -f .github/workflows/post-type2-current-medication-reconciliation-graph-gate.yml
           rm -f snapshot-source.json
 
-      - name: Refresh and verify graph
+      - name: Detect pre-refresh delta
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import asyncio, json, os
-          from codebase_memory_mcp.server import detect_changes, index_repository, index_status
+          project="$(cat /tmp/cbm-project)"
+          codebase-memory-mcp cli --json detect_changes "{\"project\":\"${project}\",\"repo_path\":\"${GITHUB_WORKSPACE}\"}" | tee /tmp/cbm-pre.json
+          test -s /tmp/cbm-pre.json
 
-          async def main():
-              project = open('/tmp/cbm-project').read().strip()
-              repo = os.environ['GITHUB_WORKSPACE']
-              pre = await detect_changes(project=project, repo_path=repo)
-              print('PRE', json.dumps(pre, default=str))
-              result = await index_repository(repo_path=repo, mode='full', persistence=True)
-              print('INDEX', json.dumps(result, default=str))
-              status = await index_status(project=project)
-              print('STATUS', json.dumps(status, default=str))
-              post = await detect_changes(project=project, repo_path=repo)
-              print('POST', json.dumps(post, default=str))
-              text = json.dumps(post, default=str).lower()
-              if any(token in text for token in ['"changed": true', '"has_changes": true', '"dirty": true']):
-                  raise SystemExit('graph remains dirty after full refresh')
-          asyncio.run(main())
-          PY
+      - name: Refresh full graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp cli --progress --json index_repository "{\"repo_path\":\"${GITHUB_WORKSPACE}\",\"mode\":\"full\",\"persistence\":true}" | tee /tmp/cbm-index.json
+          test -s /tmp/cbm-index.json
+
+      - name: Verify graph status and clean delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$(cat /tmp/cbm-project)"
+          codebase-memory-mcp cli --json index_status "{\"project\":\"${project}\"}" | tee /tmp/cbm-status.json
+          codebase-memory-mcp cli --json detect_changes "{\"project\":\"${project}\",\"repo_path\":\"${GITHUB_WORKSPACE}\"}" | tee /tmp/cbm-post.json
+          test -s /tmp/cbm-status.json
+          test -s /tmp/cbm-post.json
+          if grep -Eqi '"(changed|has_changes|dirty)"[[:space:]]*:[[:space:]]*true' /tmp/cbm-post.json; then
+            echo "Graph remains dirty after full refresh"
+            cat /tmp/cbm-post.json
+            exit 1
+          fi
 
       - name: Cleanup generated artifacts
         shell: bash
