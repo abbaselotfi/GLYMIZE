@@ -20,6 +20,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Locate Master Registry provenance fields
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== sourceObservedAt occurrences ==='
+          grep -RIn --exclude-dir=.git --exclude-dir=node_modules --exclude='*.lock' 'sourceObservedAt' . || true
+          echo '=== sourceCodes occurrences outside contracts ==='
+          grep -RIn --exclude-dir=.git --exclude-dir=node_modules --exclude='*.lock' 'sourceCodes' . | head -n 250 || true
+
       - name: Install pinned Codebase Memory
         shell: bash
         run: |
