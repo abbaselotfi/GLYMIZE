@@ -33,6 +33,9 @@ const criterionToSafetyFieldV2 = {
   "wegovy.suspected_acute_pancreatitis": "suspectedAcutePancreatitis",
 } as const satisfies Record<string, keyof WegovyMedicationSafetyContextV2>;
 
+type ReviewedWegovyCriterionIdV2 = keyof typeof criterionToSafetyFieldV2;
+const reviewedWegovyCriterionIdsV2 = Object.keys(criterionToSafetyFieldV2) as ReviewedWegovyCriterionIdV2[];
+
 /**
  * Converts one exact, complete reviewed WEGOVY product-safety response set into
  * the boolean safety context already consumed by the reviewed WEGOVY MASH
@@ -62,32 +65,86 @@ export function bindReviewedWegovySafetyScreenV2(input: {
     masterDrugId: reviewSet.masterDrugId,
   };
 
-  if (validation.status !== "complete" || !input.screen) {
+  if (validation.status !== "complete") {
     return { status: validation.status, ...base };
   }
 
-  const responseById = new Map(input.screen.responses.map((response) => [response.criterionId, response]));
-  const medicationSafety: WegovyMedicationSafetyContextV2 = {};
-
-  for (const criterion of reviewSet.criteria) {
-    const field = criterionToSafetyFieldV2[criterion.criterionId as keyof typeof criterionToSafetyFieldV2];
-    const response = responseById.get(criterion.criterionId);
-    // The registry and validator make this branch unreachable for an approved
-    // WEGOVY set, but keep the adapter fail-closed if the registry evolves
-    // without a corresponding reviewed binding update.
-    if (!field || !response || response.state === "unknown") {
-      return {
-        status: "incomplete",
-        ...base,
-        validation: {
-          ...validation,
-          status: "incomplete",
-          missingCriterionIds: [criterion.criterionId],
-        },
-      };
-    }
-    medicationSafety[field] = response.state === "present";
+  // `complete` cannot be produced without a submitted screen, but keep this
+  // explicit guard so transport assumptions never become an unsafe assertion.
+  if (!input.screen) {
+    return {
+      status: "missing",
+      ...base,
+      validation: {
+        ...validation,
+        status: "missing",
+        missingCriterionIds: [...reviewedWegovyCriterionIdsV2],
+      },
+    };
   }
+
+  const registryCriterionIds = reviewSet.criteria.map((criterion) => criterion.criterionId);
+  const registryMatchesReviewedBinding =
+    registryCriterionIds.length === reviewedWegovyCriterionIdsV2.length &&
+    reviewedWegovyCriterionIdsV2.every((criterionId) => registryCriterionIds.includes(criterionId));
+
+  // If the reviewed registry changes, the binding must be reviewed and updated
+  // separately. Never silently drop a newly introduced safety criterion or
+  // invent a boolean for one that no longer exists.
+  if (!registryMatchesReviewedBinding) {
+    const unboundCriterionIds = [
+      ...registryCriterionIds.filter((criterionId) => !(criterionId in criterionToSafetyFieldV2)),
+      ...reviewedWegovyCriterionIdsV2.filter((criterionId) => !registryCriterionIds.includes(criterionId)),
+    ];
+    return {
+      status: "incomplete",
+      ...base,
+      validation: {
+        ...validation,
+        status: "incomplete",
+        missingCriterionIds: [...new Set(unboundCriterionIds)],
+      },
+    };
+  }
+
+  const responseById = new Map(input.screen.responses.map((response) => [response.criterionId, response]));
+  const isPresent = (criterionId: ReviewedWegovyCriterionIdV2) => {
+    const response = responseById.get(criterionId);
+    if (!response || response.state === "unknown") return undefined;
+    return response.state === "present";
+  };
+
+  const personalOrFamilyHistoryMtc = isPresent("wegovy.personal_or_family_mtc_history");
+  const men2 = isPresent("wegovy.men2");
+  const priorSeriousSemaglutideHypersensitivity = isPresent("wegovy.serious_semaglutide_hypersensitivity");
+  const severeGastroparesis = isPresent("wegovy.severe_gastroparesis");
+  const suspectedAcutePancreatitis = isPresent("wegovy.suspected_acute_pancreatitis");
+
+  if (
+    personalOrFamilyHistoryMtc === undefined ||
+    men2 === undefined ||
+    priorSeriousSemaglutideHypersensitivity === undefined ||
+    severeGastroparesis === undefined ||
+    suspectedAcutePancreatitis === undefined
+  ) {
+    return {
+      status: "incomplete",
+      ...base,
+      validation: {
+        ...validation,
+        status: "incomplete",
+        missingCriterionIds: reviewedWegovyCriterionIdsV2.filter((criterionId) => isPresent(criterionId) === undefined),
+      },
+    };
+  }
+
+  const medicationSafety: WegovyMedicationSafetyContextV2 = {
+    personalOrFamilyHistoryMtc,
+    men2,
+    priorSeriousSemaglutideHypersensitivity,
+    severeGastroparesis,
+    suspectedAcutePancreatitis,
+  };
 
   return {
     status: "bound",
