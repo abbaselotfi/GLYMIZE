@@ -1,0 +1,143 @@
+name: POST Type 2 hypertension treatment context graph gate
+
+on:
+  push:
+    branches:
+      - feat/type2-hypertension-treatment-context-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  graph-gate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CBM_VERSION: '0.10.8'
+      SNAPSHOT_TAG: codebase-memory-latest
+      EXPECTED_MAIN: '427f2603aae3569f045e43553b9eb302218517e4'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Verify base and source scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          test "$(git merge-base HEAD origin/main)" = "$EXPECTED_MAIN"
+          test "$(git rev-parse codebase-memory-latest^{commit})" = "$EXPECTED_MAIN"
+          changed="$(git diff --name-only origin/main...HEAD | sort)"
+          allowed="$(printf '%s\n' \
+            '.github/workflows/post-type2-hypertension-treatment-context-graph-gate.yml' \
+            'apps/web/app/type-2/type2-current-medication-ui.ts' \
+            'apps/web/app/type-2/type2-input-coverage-v2.ts' \
+            'apps/web/app/type-2/type2-scenarios-client.tsx' \
+            'apps/web/test/type2-current-medication-ui.test.ts' \
+            'apps/web/test/type2-input-coverage-v2.test.ts' \
+            'packages/clinical-engine/src/type2-input-contract-v2/catalog-specialist.ts' \
+            'packages/clinical-engine/src/type2-intake-v2.ts' \
+            'packages/clinical-engine/test/clinical-domain-capabilities-v2.test.ts' \
+            'packages/clinical-engine/test/type2-structured-intake-v2.test.ts' \
+            'packages/contracts/src/index.ts' | sort)"
+          unexpected="$(comm -23 <(printf '%s\n' "$changed") <(printf '%s\n' "$allowed"))"
+          test -z "$unexpected" || { echo "Unexpected files:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" \
+            /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/codebase-memory-mcp" --version | tee /tmp/cbm-version.txt
+          grep -Fq "$CBM_VERSION" /tmp/cbm-version.txt
+
+      - name: Bootstrap canonical release snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/cbm-snapshot
+          mkdir -p /tmp/cbm-snapshot
+          gh release download "$SNAPSHOT_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'codebase-memory-snapshot.tar.gz' \
+            --pattern 'snapshot-source.json' \
+            --dir /tmp/cbm-snapshot
+          test -s /tmp/cbm-snapshot/codebase-memory-snapshot.tar.gz
+          test "$(jq -r '.source_sha // empty' /tmp/cbm-snapshot/snapshot-source.json)" = "$EXPECTED_MAIN"
+          test "$(jq -r '.codebase_memory_version // empty' /tmp/cbm-snapshot/snapshot-source.json)" = "$CBM_VERSION"
+          tar -xzf /tmp/cbm-snapshot/codebase-memory-snapshot.tar.gz
+          project="$(jq -r '.project // empty' .codebase-memory/artifact.json)"
+          test -n "$project"
+          mkdir -p "$HOME/.cache/codebase-memory-mcp"
+          zstd -d -f .codebase-memory/graph.db.zst -o "$HOME/.cache/codebase-memory-mcp/${project}.db"
+          printf '%s' "$project" > /tmp/cbm-project
+
+      - name: Remove one-shot files before graph refresh
+        shell: bash
+        run: |
+          rm -f .github/workflows/post-type2-hypertension-treatment-context-graph-gate.yml snapshot-source.json
+
+      - name: Capture pre-refresh graph signal
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$(cat /tmp/cbm-project)"
+          codebase-memory-mcp cli --json detect_changes "{\"project\":\"${project}\",\"repo_path\":\"${GITHUB_WORKSPACE}\"}" | tee /tmp/cbm-pre.json
+          test -s /tmp/cbm-pre.json
+
+      - name: Refresh full graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp cli --progress --json index_repository "{\"repo_path\":\"${GITHUB_WORKSPACE}\",\"mode\":\"full\",\"persistence\":true}" | tee /tmp/cbm-index.json
+          test -s /tmp/cbm-index.json
+
+      - name: Verify graph status and post-refresh delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="$(cat /tmp/cbm-project)"
+          codebase-memory-mcp cli --json index_status "{\"project\":\"${project}\"}" | tee /tmp/cbm-status.json
+          grep -Fq '\"status\":\"ready\"' /tmp/cbm-status.json
+          codebase-memory-mcp cli --json detect_changes "{\"project\":\"${project}\",\"repo_path\":\"${GITHUB_WORKSPACE}\"}" | tee /tmp/cbm-post.json
+          for file in \
+            apps/web/app/type-2/type2-current-medication-ui.ts \
+            apps/web/app/type-2/type2-input-coverage-v2.ts \
+            apps/web/app/type-2/type2-scenarios-client.tsx \
+            packages/clinical-engine/src/type2-input-contract-v2/catalog-specialist.ts \
+            packages/clinical-engine/src/type2-intake-v2.ts \
+            packages/contracts/src/index.ts; do
+            if grep -Fq "$file" /tmp/cbm-post.json; then
+              echo "Implementation file remains dirty after full refresh: $file"
+              exit 1
+            fi
+          done
+
+      - name: Cleanup generated artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .codebase-memory/graph.db.zst .codebase-memory/artifact.json .codebase-memory/.gitattributes snapshot-source.json
+          unexpected="$(git status --porcelain | awk '{print $2}' | grep -v '^.github/workflows/post-type2-hypertension-treatment-context-graph-gate.yml$' || true)"
+          test -z "$unexpected" || { echo "Unexpected cleanup files:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Commit one-shot workflow removal
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u .github/workflows/post-type2-hypertension-treatment-context-graph-gate.yml
+          git diff --cached --check
+          git commit -m "Remove completed POST hypertension treatment context graph gate"
+          git push origin HEAD:${GITHUB_REF_NAME}
