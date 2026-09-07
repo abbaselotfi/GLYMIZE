@@ -1010,7 +1010,7 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 - [ ] Eliminate browser/API behaviour divergence
 - [ ] Add contract and equivalence tests
 - [ ] Version all schemas
-- [ ] Clarify runtime source of truth
+- [x] Clarify runtime source of truth
 
 ### Phase 7 — Admin workflow and catalogue integrity
 
@@ -1083,28 +1083,30 @@ An improvement should not be marked complete until all relevant items below are 
 
 ## 11. Immediate next task
 
-The accepted numbered convergence sequence is complete: Phase 0 Tasks 1–9, Phase 3 Tasks 1–5, and Phase 4 Tasks 6–10 are all closed.
+The accepted numbered convergence sequence is complete, and the remaining Phase 1, Phase 2, and Phase 5–10 backlog has now been re-baselined against `main@9db6677579c7d239c498098d087ecbe0c3af8b50` in [`REMAINING_ROADMAP_REBASELINE_2026-09-08.md`](REMAINING_ROADMAP_REBASELINE_2026-09-08.md).
 
-The immediate next task is:
+The re-baseline intentionally distinguishes `implemented`, `partial`, `owner decision required`, and `planned / deferred`; broad roadmap checkboxes remain open when only part of their meaning is implemented. Phase 6 `Clarify runtime source of truth` is closed because the accepted Runtime of Record and Clinical Engine Authority documents already establish the active authorities.
 
-> **Remaining-roadmap re-baseline — audit Phase 1, Phase 2, and Phase 5–10 against the post-PR-116 repository before opening another feature PR.**
+The immediate implementation-ready task that does **not** require an unresolved product decision is:
+
+> **Phase 2 closure audit — formalize the live clinical precedence model and retained legacy-score compatibility boundary without changing clinical behavior.**
 
 The task must:
 
-- classify every still-unchecked item as `implemented`, `partial`, `planned`, `deferred`, `out of scope`, or `owner-decision-required`;
-- preserve owner decisions such as final V1 scope, GLP-1/weight product scope, insulin-conversion priority, and catalogue production-authority migration instead of inferring an answer from code;
-- identify the first implementation-ready task that has a demonstrated consumer and does not require an unresolved product/clinical decision;
-- keep `cardiovascular.nyha_class` uncollected until a real downstream consumer exists rather than closing a coverage gap cosmetically;
-- update `CURRENT_STATE.md` and this roadmap together when the re-baseline changes any status.
+- document the current precedence from structured patient facts through hard exclusion, mandatory objectives, approved protocol/dose execution, composition/diversity, access/cost tie-breaks, and display;
+- enumerate every remaining consumer of the unconfigured legacy score builder before proposing deletion;
+- add or strengthen a regression guard so the compatibility score path cannot regain physician-facing authority;
+- identify which Phase 2 checklist items can then be closed and which still require clinician-governed golden cases;
+- make no new clinical threshold, product-eligibility, dose, evidence, ranking, feature-activation, migration, or deployment change.
 
-This re-baseline is required because substantial Patient Care Hub, Patient Workspace, specialist-pathway, Type 2 authority, MASH/product-safety, and runtime-hardening work landed after the 2026-09-03 snapshot.
-
+Phase 1 V1 scope, GLP-1/weight visibility, insulin-conversion launch priority, and the proposed D1 catalogue-persistence migration remain explicit owner decisions and must not be inferred from existing code. `cardiovascular.nyha_class` also remains uncollected until a real downstream consumer exists.
 ---
 
 ## 12. Change log
 
 ### 2026-09-08
 
+- Re-baselined every still-open Phase 1, Phase 2, and Phase 5–10 item in `docs/REMAINING_ROADMAP_REBASELINE_2026-09-08.md`; closed only the already-proven Phase 6 runtime-source-of-truth item and set the next independent task to the Phase 2 precedence/legacy-score closure audit.
 - Closed documentation drift for the accepted numbered convergence sequence: Phase 3 Tasks 2–5 and Phase 4 Tasks 6–10 are now marked complete with PR anchors.
 - Recorded the safe Phase 4 ordering used in practice: Task 6 inventory first, Task 8 reviewed dose protocols, then Task 7 BP/lipid objective activation, followed by Tasks 9–10.
 - Marked §8.27–§8.33 as historical resolved findings while retaining their original problem statements for auditability.
