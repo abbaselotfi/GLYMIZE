@@ -1,5 +1,10 @@
-import { resolveCardiovascularRiskObjectivesV2 } from "./cardiovascular-objectives.js";
+import {
+  ada2026CardiovascularRiskEvidenceV2,
+  resolveCardiovascularRiskObjectivesV2,
+} from "./cardiovascular-objectives.js";
+import { aasldResmetirom2024EvidenceV2 } from "./mash-protocols.js";
 import { ada2026PainfulDpnEvidenceV2 } from "./painful-dpn-protocol.js";
+import { kdigoDmCkd2022 } from "./safety-rules.js";
 import type {
   ClinicalObjectiveV2,
   ClinicalStateV2,
@@ -55,7 +60,7 @@ export function resolveClinicalObjectivesV2(
       lane: "kidney",
       level: "mandatory",
       reason: "CKD فعال است؛ منفعت کلیوی باید مستقل از صرف کاهش A1C در تصمیم لحاظ شود.",
-      evidence: [],
+      evidence: [kdigoDmCkd2022],
     });
   }
 
@@ -65,7 +70,7 @@ export function resolveClinicalObjectivesV2(
       lane: "heart_failure",
       level: "mandatory",
       reason: "نارسایی قلبی فعال است و outcome قلبی باید هدف مستقل درمان باشد.",
-      evidence: [],
+      evidence: [ada2026CardiovascularRiskEvidenceV2],
     });
   }
 
@@ -75,7 +80,7 @@ export function resolveClinicalObjectivesV2(
       lane: "ascvd",
       level: "mandatory",
       reason: "ASCVD فعال است؛ انتخاب باید شواهد outcome قلبی‌عروقی را پوشش دهد.",
-      evidence: [],
+      evidence: [ada2026CardiovascularRiskEvidenceV2],
     });
   }
 
@@ -109,7 +114,7 @@ export function resolveClinicalObjectivesV2(
       lane: "liver",
       level: "strong_preference",
       reason: "MASLD/MASH فعال است؛ stage و شواهد کبدی باید در انتخاب لحاظ شوند.",
-      evidence: [],
+      evidence: [aasldResmetirom2024EvidenceV2],
     });
   }
 
