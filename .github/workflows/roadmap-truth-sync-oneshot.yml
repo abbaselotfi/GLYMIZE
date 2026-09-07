@@ -1,0 +1,81 @@
+name: One-shot roadmap truth sync
+
+on:
+  push:
+    branches:
+      - 'docs/roadmap-current-state-closure-20260908'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Patch roadmap truth
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('docs/PROJECT_OVERVIEW_AND_ROADMAP.md')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace('- GitHub Pages\n', '')
+          text = text.replace(
+              '- Static Next.js deployment to GitHub Pages\n',
+              '- Static/browser Next.js build boundary; the obsolete GitHub Pages deployment workflow has been retired\n',
+          )
+          text = text.replace(
+              'GitHub Pages cannot run NestJS. For the public static deployment:\n',
+              'For the static/browser deployment boundary:\n',
+          )
+
+          runtime_marker = '## 4. Current runtime models\n\n'
+          runtime_note = '''## 4. Current runtime models\n\n> **Current authority note (2026-09-08):** the accepted runtime-of-record ADR supersedes the original prototype wording below. `apps/api` is local-development-only compatibility code; browser-owned catalogue/Type 2 routes execute in the static web runtime, patient/practice operations use the Cloudflare Worker, and `decision-graph-v2` is the configured physician-facing Type 2 selection/ranking authority. See `docs/CURRENT_STATE.md`, `docs/architecture/RUNTIME_OF_RECORD.md`, and `docs/architecture/CLINICAL_ENGINE_AUTHORITY.md`.\n\n'''
+          if runtime_marker not in text:
+              raise SystemExit('runtime marker missing')
+          text = text.replace(runtime_marker, runtime_note, 1)
+
+          clinical_marker = '### 5.1 Type 2 pathway logic\n\n'
+          clinical_note = '''### 5.1 Type 2 pathway logic\n\n> **Authority note (2026-09-08):** the score-oriented description in this original review section is retained as historical compatibility context. The configured physician-facing `/type-2` runtime now uses `decision-graph-v2`; legacy aggregate scoring is not the live ranking authority.\n\n'''
+          if clinical_marker not in text:
+              raise SystemExit('clinical marker missing')
+          text = text.replace(clinical_marker, clinical_note, 1)
+
+          resolution_marker = '\n---\n\n## 9. Proposed step-by-step improvement sequence'
+          resolution = '''\n### 8.34 Resolution status for the 2026-09-03 convergence findings\n\nSections §8.27–§8.33 are retained as the historical findings that created the numbered convergence program. Their required outcomes are no longer open:\n\n- §8.27 was closed by Phase 3 Tasks 1–2 / PRs #37–#38: the live path is documented and converged on `decision-graph-v2`, with a guarded compatibility fallback only.\n- §8.28 was closed by Phase 3 Task 3 / PR #39: shared named thresholds covered by the task use approved versioned rule-pack authority with consistency protection.\n- §8.29 was closed by Phase 3 Task 4 / PR #40: hard contraindications are structural exclusions in the legacy compatibility result and adversarial regression coverage prevents score promotion.\n- §8.30 was closed by Phase 3 Task 5 / PR #41: Evidence Assistant indexing includes product- and dose-specific Decision Graph evidence.\n- §8.31 was closed by Phase 4 Task 6 / PR #42: verified multidomain Iran-market inventory was added before the corresponding clinical-objective activation.\n- §8.32 was closed through Phase 4 Tasks 8 then 7 / PRs #47–#48. Task 6 merged first; the initial Task 7 attempt was closed when the safe dependency on reviewed dose protocols was identified, so dose protocols were completed before the final BP/lipid objective activation.\n- §8.33 was closed by Phase 4 Tasks 9–10 / PRs #49–#50: scenario diversity and the expanded multidomain stress/release gate are explicit acceptance criteria.\n\nSubsequent PRs through #116 further hardened structured intake, runtime parity, claims/insurance, MASH execution, product-safety authority, and UI input coverage without reopening the completed Phase 3/4 task definitions.\n\n---\n\n## 9. Proposed step-by-step improvement sequence'''
+          if resolution_marker not in text:
+              raise SystemExit('resolution marker missing')
+          text = text.replace(resolution_marker, resolution, 1)
+
+          start = text.index('#### Task 2 — Converge on `decision-graph-v2`')
+          end = text.index('### Phase 5 — Insulin conversion module, if confirmed in V1', start)
+          completed = '''#### Task 2 — Converge on `decision-graph-v2`\n\n- [x] Move the configured physician-facing Type 2 pathway to `decision-graph-v2` authority.\n- [x] Retain the older score path only as an explicit tested compatibility fallback for unconfigured/non-live consumers.\n- [x] Add an integration guard against reintroducing a second independent Type 2 scoring path.\n- Completion anchor: PR #38; authority record updated in `docs/architecture/CLINICAL_ENGINE_AUTHORITY.md`.\n\n#### Task 3 — Eliminate independent threshold duplication\n\n- [x] Inventory shared numeric thresholds across `rule-pack.ts`, `safety-rules.ts`, `policy.ts`, and `product-dose-rules.ts`.\n- [x] Use approved versioned rule-pack parameters as the runtime source of truth for the shared named thresholds in scope.\n- [x] Keep parameter-consistency protection for equivalent values that cross compatibility boundaries.\n- Completion anchor: PR #39.\n\n#### Task 4 — Structural exclusion for hard contraindications\n\n- [x] Filter hard-gated candidates from every returned/ranked legacy compatibility result.\n- [x] Add an adversarial regression where moderate penalties on safe options cannot promote a contraindicated product.\n- Completion anchor: PR #40.\n\n#### Task 5 — Deepen Evidence Assistant's citation index\n\n- [x] Index per-product evidence from `safety-rules.ts` and `product-dose-rules.ts`.\n- [x] Prove a dose-specific question returns the specific product-rule citation.\n- Completion anchor: PR #41.\n\n### Phase 4 — Multi-domain scenario engine\n\n#### Task 6 — Add cardiac, renal, hypertension, and lipid classes to the catalogue\n\n- [x] Extend the three-source Iranian consensus pipeline for ACE inhibitors, ARBs, statins, finerenone, and spironolactone.\n- [x] Preserve source evidence for brand, price, and insurance fields and apply existing clinical-domain tags.\n- [x] Test that `inventory-adapter.ts` classifies every new product in the expected RAAS-blocker, MRA, or statin lane.\n- [x] Merge this data task before Tasks 7 and 8.\n- Completion anchor: PR #42.\n\n#### Task 7 — Wire blood-pressure and lipid objectives into the engine\n\n- [x] Add only named, current guideline-sourced triggers to the existing `blood_pressure_control` and `lipid_risk_reduction` objectives.\n- [x] Test supporting-regimen composition and duplicate-therapy avoidance with Task 6 inventory.\n- Completion anchor: PR #48. The first Task 7 attempt (#43) was intentionally closed; Task 8 dose protocols were completed first after that dependency was identified.\n\n#### Task 8 — Add guideline-grounded product-dose rules\n\n- [x] Add per-product dosing and titration rules for Task 6 classes using exact source sections or tables.\n- [x] Register each source in `guideline-registry.ts` for precise Evidence Assistant citation.\n- Completion anchor: PR #47.\n\n#### Task 9 — Verify true scenario diversity\n\n- [x] Keep `topAlternativeCount: 2` unless the owner makes a separate product decision.\n- [x] Test representative cost, organ-protection, and complexity preferences through `chooseDiverseAlternatives` / `diversityKeyV2`.\n- [x] Require the three scenarios to differ on at least one clinically meaningful axis.\n- Completion anchor: PR #49.\n\n#### Task 10 — Regression-test the new pathways at scale\n\n- [x] Extend randomized, synthetic, metamorphic, and adversarial validation to the new objectives and regimens.\n- [x] Treat the expanded stress campaign as a release gate before physician-facing activation.\n- Completion anchor: PR #50; the established combined release campaign is 325,000 cases/pairs.\n\n'''
+          text = text[:start] + completed + text[end:]
+
+          next_start = text.index('## 11. Immediate next task')
+          next_end = text.index('## 12. Change log', next_start)
+          next_block = '''## 11. Immediate next task\n\nThe accepted numbered convergence sequence is complete: Phase 0 Tasks 1–9, Phase 3 Tasks 1–5, and Phase 4 Tasks 6–10 are all closed.\n\nThe immediate next task is:\n\n> **Remaining-roadmap re-baseline — audit Phase 1, Phase 2, and Phase 5–10 against the post-PR-116 repository before opening another feature PR.**\n\nThe task must:\n\n- classify every still-unchecked item as `implemented`, `partial`, `planned`, `deferred`, `out of scope`, or `owner-decision-required`;\n- preserve owner decisions such as final V1 scope, GLP-1/weight product scope, insulin-conversion priority, and catalogue production-authority migration instead of inferring an answer from code;\n- identify the first implementation-ready task that has a demonstrated consumer and does not require an unresolved product/clinical decision;\n- keep `cardiovascular.nyha_class` uncollected until a real downstream consumer exists rather than closing a coverage gap cosmetically;\n- update `CURRENT_STATE.md` and this roadmap together when the re-baseline changes any status.\n\nThis re-baseline is required because substantial Patient Care Hub, Patient Workspace, specialist-pathway, Type 2 authority, MASH/product-safety, and runtime-hardening work landed after the 2026-09-03 snapshot.\n\n---\n\n'''
+          text = text[:next_start] + next_block + text[next_end:]
+
+          changelog_marker = '## 12. Change log\n\n'
+          changelog = '''## 12. Change log\n\n### 2026-09-08\n\n- Closed documentation drift for the accepted numbered convergence sequence: Phase 3 Tasks 2–5 and Phase 4 Tasks 6–10 are now marked complete with PR anchors.\n- Recorded the safe Phase 4 ordering used in practice: Task 6 inventory first, Task 8 reviewed dose protocols, then Task 7 BP/lipid objective activation, followed by Tasks 9–10.\n- Marked §8.27–§8.33 as historical resolved findings while retaining their original problem statements for auditability.\n- Replaced the stale Phase 0 Task 8 immediate-next instruction with a remaining-roadmap re-baseline after PR #116.\n- Added current authority notes for static/browser runtime and Type 2 Decision Graph convergence, and removed obsolete GitHub Pages deployment claims from the current-technology summary.\n- Refreshed `docs/CURRENT_STATE.md` from the repository generator and current runtime/clinical boundaries.\n\n'''
+          if changelog_marker not in text:
+              raise SystemExit('changelog marker missing')
+          text = text.replace(changelog_marker, changelog, 1)
+
+          path.write_text(text, encoding='utf-8')
+      - name: Commit roadmap truth sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/PROJECT_OVERVIEW_AND_ROADMAP.md
+          git diff --cached --check
+          git commit -m 'docs: close completed roadmap convergence tasks'
+          git push origin HEAD:docs/roadmap-current-state-closure-20260908
