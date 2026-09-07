@@ -1,0 +1,57 @@
+name: Apply Type 2 trusted claim-policy boundary
+
+on:
+  push:
+    branches:
+      - feat/type2-trusted-claim-policy-boundary-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/type2-trusted-claim-policy-boundary-20260907
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax-check patch runners
+        run: |
+          node --check scripts/apply-type2-trusted-claim-policy-boundary-20260907.mjs
+          node --check scripts/apply-type2-claim-policy-registry-hardening-20260907.mjs
+          node --check scripts/apply-type2-claim-policy-registry-temporal-guard-20260907.mjs
+
+      - name: Apply reviewed claim-policy boundary
+        run: |
+          node scripts/apply-type2-trusted-claim-policy-boundary-20260907.mjs
+          node scripts/apply-type2-claim-policy-registry-hardening-20260907.mjs
+          node scripts/apply-type2-claim-policy-registry-temporal-guard-20260907.mjs
+
+      - name: Remove one-shot workflow
+        run: rm -f .github/workflows/apply-type2-trusted-claim-policy-boundary.yml
+
+      - name: Verify temporary files are gone
+        run: |
+          test ! -e scripts/apply-type2-trusted-claim-policy-boundary-20260907.mjs
+          test ! -e scripts/apply-type2-claim-policy-registry-hardening-20260907.mjs
+          test ! -e scripts/apply-type2-claim-policy-registry-temporal-guard-20260907.mjs
+          git diff --check
+          git status --short
+
+      - name: Commit final implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Type 2: add trusted claim policy runtime boundary"
+          git push origin HEAD:feat/type2-trusted-claim-policy-boundary-20260907
