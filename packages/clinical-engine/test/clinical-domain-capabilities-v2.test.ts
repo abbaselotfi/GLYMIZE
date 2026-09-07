@@ -28,7 +28,7 @@ describe("clinical engine multidomain capability boundary", () => {
     }
   });
 
-  it("records completed WEGOVY interval/titration execution while keeping insurer claim timing as the MASH gap", () => {
+  it("records completed WEGOVY interval/titration and claim-policy plumbing while keeping authoritative payer timing data as the MASH gap", () => {
     for (const domain of ["liver", "masld_mash"] as const) {
       const capability = clinicalDomainCapability(domain);
       expect(capability.executionState).toBe("partially_executable");
@@ -37,7 +37,11 @@ describe("clinical engine multidomain capability boundary", () => {
       expect(capability.boundary.toLocaleLowerCase()).toContain("resmetirom");
       expect(capability.boundary).toContain("WEGOVY");
       expect(capability.boundary.toLocaleLowerCase()).toContain("continuation");
-      expect(capability.nextGap?.toLocaleLowerCase()).toMatch(/insurer.*claim|claim.*insurer/);
+      expect(capability.nextGap?.toLocaleLowerCase()).toContain("payer-scoped");
+      expect(capability.nextGap?.toLocaleLowerCase()).toContain("authoritative insurer evidence");
+      expect(capability.nextGap?.toLocaleLowerCase()).toContain("registry");
+      expect(capability.nextGap?.toLocaleLowerCase()).toContain("ordinary financial coverage rows");
+      expect(capability.nextGap?.toLocaleLowerCase()).not.toContain("add insurer claim-timing semantics");
     }
   });
 
