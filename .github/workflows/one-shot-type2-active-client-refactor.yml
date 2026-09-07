@@ -84,24 +84,21 @@ jobs:
               'use modular medication row type',
           )
 
-          replace_once(
-              '''const [context, setContext] = useState<ContextDraft>({
-            eGfr: "", creatinineClearanceMlMin: "", uacr: "", potassiumMmolL: "", dialysis: false, recentAki: false, lvef: "", weight: "", height: "",
-            fibrosisStage: "", cirrhosis: false, decompensatedCirrhosis: false,
-          });''',
-              'const [context, setContext] = useState<Type2CoreContextDraft>({ ...emptyType2CoreContextDraft });',
-              'use modular core context draft',
+          context_start = text.index('  const [context, setContext] = useState<ContextDraft>({')
+          context_end = text.index('  const [structuredContext, setStructuredContext]', context_start)
+          text = (
+              text[:context_start]
+              + '  const [context, setContext] = useState<Type2CoreContextDraft>({ ...emptyType2CoreContextDraft });\n'
+              + text[context_end:]
           )
 
-          replace_once(
-              '''const bmi = useMemo(() => {
-            const weight = numberOrUndefined(context.weight);
-            const height = numberOrUndefined(context.height);
-            if (!weight || !height) return undefined;
-            return Math.round((weight / ((height / 100) ** 2)) * 10) / 10;
-          }, [context.height, context.weight]);''',
-              'const bmi = useMemo(() => type2BmiFromCoreDraft(context), [context]);',
-              'delegate BMI projection',
+          bmi_start = text.index('  const bmi = useMemo(() => {')
+          bmi_end_marker = '  }, [context.height, context.weight]);\n'
+          bmi_end = text.index(bmi_end_marker, bmi_start) + len(bmi_end_marker)
+          text = (
+              text[:bmi_start]
+              + '  const bmi = useMemo(() => type2BmiFromCoreDraft(context), [context]);\n'
+              + text[bmi_end:]
           )
 
           replace_once(
