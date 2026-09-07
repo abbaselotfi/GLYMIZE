@@ -21,7 +21,7 @@ import {
 } from "../type2-decision-graph-market";
 import {
   cachedType2InsuranceClaimTimingPolicies,
-  clearType2InsuranceClaimTimingPolicyCacheForTests,
+  invalidateType2InsuranceClaimTimingPolicyCache,
   loadType2InsuranceClaimTimingPolicies,
 } from "../type2-insurance-policy-runtime";
 
@@ -139,7 +139,7 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
     if (runtimePolicyListenerInstalled || typeof window === "undefined") return;
     runtimePolicyListenerInstalled = true;
     window.addEventListener(runtimeAuthEventName(), () => {
-      clearType2InsuranceClaimTimingPolicyCacheForTests();
+      invalidateType2InsuranceClaimTimingPolicyCache();
       void loadType2InsuranceClaimTimingPolicies({ force: true }).then(() => {
         configureDecisionGraph(stateCache);
       });
