@@ -23,9 +23,11 @@ describe("Type 2 capability/UI input coverage contract", () => {
     }
   });
 
-  it("keeps semantically unrepresented safety/treatment contexts fail-closed", () => {
+  it("keeps semantically unrepresented safety/treatment/timing contexts fail-closed", () => {
     expect(type2UiInputCoverageV2["safety.product_specific_screen"].state).toBe("not_represented");
     expect(type2UiInputCoverageV2["hypertension.established_treatment_context"].state).toBe("not_represented");
+    expect(type2UiInputCoverageV2["current_medication.interval_stage_reconciliation"].state).toBe("not_represented");
+    expect(type2UiInputCoverageV2["current_medication.interval_stage_reconciliation"].note?.toLocaleLowerCase()).toContain("therapy phase");
   });
 
   it("distinguishes explicit fields from safe deterministic derivations", () => {
@@ -43,6 +45,7 @@ describe("Type 2 capability/UI input coverage contract", () => {
       "medication_safety.maoi_exposure",
       "medication_safety.substantial_alcohol_use",
       "medication_safety.pregabalin_hypersensitivity",
+      "current_medication.interval_stage_reconciliation",
       "safety.product_specific_screen",
       "hypertension.established_treatment_context",
     ]));
