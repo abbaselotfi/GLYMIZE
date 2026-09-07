@@ -46,10 +46,19 @@ write(
   `import { describe, expect, it } from "vitest";\nimport { type2ClaimPolicyRoute } from "../src/platform-type2-claim-policy";\nimport {\n  reviewedType2ClaimPolicies,\n  validateReviewedType2ClaimPolicies,\n} from "../src/type2-claim-policy-registry";\n\ndescribe("trusted Type-2 claim policy boundary", () => {\n  it("keeps the production registry empty until reviewed authority exists", () => {\n    expect(reviewedType2ClaimPolicies()).toEqual([]);\n  });\n\n  it("requires reviewed provenance and bounded timing metadata", () => {\n    const policies = validateReviewedType2ClaimPolicies([{\n      id: "tamin:wegovy:2026-09",\n      provider: "social_security",\n      productId: "WEGOVY-025",\n      effectiveAt: "2026-09-01T00:00:00.000Z",\n      sourceReference: "reviewed-tamin-policy-2026-09",\n      sourceUrl: "https://example.test/reviewed-policy",\n      claimTiming: {\n        groupKey: "wegovy-strength-switch",\n        windowDays: 30,\n        maxClaimsPerWindow: 2,\n        minimumDaysBetweenClaims: 28,\n        allowDistinctProductsWithinWindow: true,\n      },\n    }]);\n    expect(policies[0]?.claimTiming.minimumDaysBetweenClaims).toBe(28);\n    expect(policies[0]?.sourceReference).toBe("reviewed-tamin-policy-2026-09");\n  });\n\n  it("fails closed on malformed timing configuration", () => {\n    expect(() => validateReviewedType2ClaimPolicies([{\n      id: "bad",\n      provider: "social_security",\n      productId: "WEGOVY-025",\n      effectiveAt: "2026-09-01T00:00:00.000Z",\n      sourceReference: "reviewed-policy",\n      claimTiming: {\n        groupKey: "wegovy",\n        windowDays: 30,\n        maxClaimsPerWindow: 2,\n        minimumDaysBetweenClaims: -1,\n        allowDistinctProductsWithinWindow: true,\n      },\n    }])).toThrow(/TYPE2_CLAIM_POLICY_TIMING_INVALID/);\n  });\n\n  it("requires runtime authentication before exposing the registry", async () => {\n    const response = await type2ClaimPolicyRoute(\n      new Request("https://worker.example.test/v1/clinical/type2/insurance-claim-policies"),\n      {\n        ADMIN_ORIGIN: "https://rc.example.test",\n        SESSION_SECRET: "test-session-secret",\n      },\n    );\n    expect(response?.status).toBe(401);\n    expect(await response?.json()).toEqual({ error: "auth_required" });\n  });\n});\n`,
 );
 
-replaceOnce(
-  "docs/architecture/RUNTIME_OF_RECORD.md",
-  "Reviewed claim-timing rules remain server-side in the Cloudflare Worker configuration and are exposed only",
-  "Reviewed claim-timing rules live in a version-controlled Cloudflare Worker registry in the private repository and are exposed only",
+const docsPath = "docs/architecture/RUNTIME_OF_RECORD.md";
+const docs = read(docsPath);
+const policySourcePattern =
+  /Reviewed claim-timing rules\s+remain server-side in the Cloudflare Worker configuration and are exposed only/;
+if (!policySourcePattern.test(docs)) {
+  throw new Error("Expected policy source paragraph not found.");
+}
+write(
+  docsPath,
+  docs.replace(
+    policySourcePattern,
+    "Reviewed claim-timing rules are version-controlled in `apps/admin-worker/src/type2-claim-policy-registry.ts`, pass review through ordinary GitHub PR history, remain server-side in the Cloudflare Worker runtime, and are exposed only",
+  ),
 );
 
 fs.unlinkSync(selfPath);
