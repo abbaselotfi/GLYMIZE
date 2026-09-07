@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { estimateScheduledInsuranceClaimsV2 } from "../src/decision-graph-v2/insurance-claims.js";
 import {
-  estimateScheduledInsuranceClaimsV2,
-  type ClaimsAwareInsurancePolicyRuleV2,
-} from "../src/decision-graph-v2/insurance-claims.js";
+  mergeInsuranceClaimTimingPoliciesV2,
+  type InsuranceClaimTimingPolicyV2,
+} from "../src/decision-graph-v2/insurance-claim-timing-policy.js";
 import type {
   InsurancePolicyRuleV2,
   IranMarketProductV2,
@@ -43,10 +44,13 @@ function financialPolicy(productId: string): InsurancePolicyRuleV2 {
   };
 }
 
-function claimsPolicy(productId: string, minimumDaysBetweenClaims = 28): ClaimsAwareInsurancePolicyRuleV2 {
+function timingPolicy(productId: string, minimumDaysBetweenClaims = 28): InsuranceClaimTimingPolicyV2 {
   return {
-    ...financialPolicy(productId),
-    id: `claims:${productId}`,
+    id: `timing:${productId}`,
+    provider: "social_security",
+    productId,
+    masterDrugId,
+    reviewState: "approved",
     claimTiming: {
       groupKey: "wegovy-semglutide-strength-switch",
       windowDays: 30,
@@ -79,28 +83,41 @@ describe("scheduled insurance claims v2", () => {
     expect(result[0]?.conditions.join(" ")).toContain("Claim timing");
   });
 
-  it("aggregates exact per-product insurance only after an explicit compatible 28-day claim rule", () => {
+  it("merges reviewed timing onto existing financial policies before multi-claim coverage can be used", () => {
+    const policies = mergeInsuranceClaimTimingPoliciesV2(
+      [financialPolicy(p025.productId), financialPolicy(p05.productId)],
+      [timingPolicy(p025.productId), timingPolicy(p05.productId)],
+    );
     const result = estimateScheduledInsuranceClaimsV2({
       windowDays: 30,
       claims,
       products: [p025, p05],
       providers: ["social_security"],
-      policies: [claimsPolicy(p025.productId), claimsPolicy(p05.productId)],
+      policies,
     });
 
     expect(result[0]?.eligibility).toBe("eligible");
     expect(result[0]?.patientCostIfEligibleToman).toBe(4_000_000);
     expect(result[0]?.insurerCostIfEligibleToman).toBe(4_000_000);
-    expect(result[0]?.sourcePolicyIds).toEqual(["claims:WEGOVY-025", "claims:WEGOVY-05"]);
+    expect(result[0]?.sourcePolicyIds).toEqual([
+      "financial:WEGOVY-025",
+      "timing:WEGOVY-025",
+      "financial:WEGOVY-05",
+      "timing:WEGOVY-05",
+    ]);
   });
 
-  it("marks a schedule ineligible when its explicit minimum claim spacing is violated", () => {
+  it("marks a schedule ineligible when its reviewed minimum claim spacing is violated", () => {
+    const policies = mergeInsuranceClaimTimingPoliciesV2(
+      [financialPolicy(p025.productId), financialPolicy(p05.productId)],
+      [timingPolicy(p025.productId, 30), timingPolicy(p05.productId, 30)],
+    );
     const result = estimateScheduledInsuranceClaimsV2({
       windowDays: 30,
       claims,
       products: [p025, p05],
       providers: ["social_security"],
-      policies: [claimsPolicy(p025.productId, 30), claimsPolicy(p05.productId, 30)],
+      policies,
     });
 
     expect(result[0]?.eligibility).toBe("ineligible");
@@ -121,5 +138,42 @@ describe("scheduled insurance claims v2", () => {
     expect(result[0]?.eligibility).toBe("eligible");
     expect(result[0]?.patientCostIfEligibleToman).toBe(2_000_000);
     expect(result[0]?.insurerCostIfEligibleToman).toBe(2_000_000);
+  });
+
+  it("never turns a timing-only supplement into financial coverage", () => {
+    const policies = mergeInsuranceClaimTimingPoliciesV2(
+      [],
+      [timingPolicy(p025.productId), timingPolicy(p05.productId)],
+    );
+    expect(policies).toEqual([]);
+
+    const result = estimateScheduledInsuranceClaimsV2({
+      windowDays: 30,
+      claims,
+      products: [p025, p05],
+      providers: ["social_security"],
+      policies,
+    });
+    expect(result[0]?.eligibility).toBe("unknown");
+    expect(result[0]?.insurerCostIfEligibleToman).toBe(0);
+  });
+
+  it("fails closed when more than one reviewed timing policy matches the same financial policy", () => {
+    const duplicate = {
+      ...timingPolicy(p025.productId),
+      id: "timing:WEGOVY-025:duplicate",
+    };
+    const policies = mergeInsuranceClaimTimingPoliciesV2(
+      [financialPolicy(p025.productId), financialPolicy(p05.productId)],
+      [timingPolicy(p025.productId), duplicate, timingPolicy(p05.productId)],
+    );
+    const result = estimateScheduledInsuranceClaimsV2({
+      windowDays: 30,
+      claims,
+      products: [p025, p05],
+      providers: ["social_security"],
+      policies,
+    });
+    expect(result[0]?.eligibility).toBe("unknown");
   });
 });
