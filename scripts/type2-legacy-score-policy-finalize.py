@@ -1,0 +1,205 @@
+from pathlib import Path
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected one match, found {count}")
+    return text.replace(old, new, 1)
+
+
+index = Path("packages/clinical-engine/src/index.ts")
+text = index.read_text(encoding="utf-8")
+text = replace_once(
+    text,
+    'import {\n  getActiveClinicalRulePack,\n  type ClinicalRulePack,\n} from "./rule-pack.js";\n',
+    'import {\n  getActiveClinicalRulePack,\n  type ClinicalRulePack,\n} from "./rule-pack.js";\nimport { TYPE2_LEGACY_SCORE_POLICY_V1 } from "./type2-legacy-score-policy.js";\n',
+    "index import",
+)
+text = replace_once(
+    text,
+    'export * from "./rule-pack.js";\n',
+    'export * from "./rule-pack.js";\nexport * from "./type2-legacy-score-policy.js";\n',
+    "index export",
+)
+text = replace_once(
+    text,
+    "  let score = 50;\n",
+    "  const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.medication;\n  let score = legacyScore.baselineScore;\n",
+    "legacy baseline",
+)
+text = replace_once(
+    text,
+    "    score += Math.round(bestCoverage / 5);\n",
+    "    score += Math.round(bestCoverage / legacyScore.insuranceCoveragePercentPerPoint);\n",
+    "legacy insurance divisor",
+)
+text = replace_once(
+    text,
+    "    score: Math.max(0, Math.min(100, score)),\n",
+    "    score: Math.max(legacyScore.minimumScore, Math.min(legacyScore.maximumScore, score)),\n",
+    "legacy clamp",
+)
+text = replace_once(
+    text,
+    '    const priorityTier: Type2MedicationConsideration["priorityTier"] = ranking.score >= 75 ? "recommended" : ranking.score >= 58 ? "preferred" : "consider";\n',
+    '    const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.medication;\n    const priorityTier: Type2MedicationConsideration["priorityTier"] = ranking.score >= legacyScore.recommendedTierMinimum ? "recommended" : ranking.score >= legacyScore.preferredTierMinimum ? "preferred" : "consider";\n',
+    "legacy tiers",
+)
+index.write_text(text, encoding="utf-8")
+
+scenario = Path("packages/clinical-engine/src/scenario-engine.ts")
+text = scenario.read_text(encoding="utf-8")
+text = replace_once(
+    text,
+    '} from "@glymize/contracts";\n\nexport type Type2ScenarioKind',
+    '} from "@glymize/contracts";\nimport { TYPE2_LEGACY_SCORE_POLICY_V1 } from "./type2-legacy-score-policy.js";\n\nexport type Type2ScenarioKind',
+    "scenario import",
+)
+old_block = '''function adjustedClinicalScore(item: Type2MedicationConsideration, request: Type2ConsiderationRequest) {
+  let score = item.priorityScore;
+  const eGfr = request.clinicalContext?.kidney?.eGfr ?? request.eGfr;
+  const dialysis = Boolean(request.clinicalContext?.kidney?.dialysis);
+
+  // ADA 2026: advanced CKD favors GLP-1 RA for glycemic management; SGLT2
+  // initiation is supported at eGFR >=20, while continuation below 20 is a
+  // separate decision and should not be represented as a new-start scenario.
+  if (hasFactor(request, "ckd") && eGfr !== undefined && eGfr < 30 && isGlp1(item)) score += 24;
+  if (eGfr !== undefined && eGfr < 20 && isSglt2(item) && !item.currentMedication) score -= 80;
+  if (dialysis && isSglt2(item) && !item.currentMedication) score -= 100;
+  if (dialysis && isGlp1(item)) score += 28;
+
+  if (hasFactor(request, "heart_failure") && isSglt2(item)) score += 18;
+  if (hasFactor(request, "heart_failure") && isTzd(item)) score -= 100;
+  if (hasFactor(request, "hypoglycemia_risk") && isHypoglycemiaProne(item)) score -= 60;
+  if (hasFactor(request, "weight_priority") && isGlp1(item)) score += 12;
+  if (request.routePreference === "oral_only" && isInjectable(item)) score -= 1000;
+  return score;
+}
+
+function marketScore(item: Type2MedicationConsideration, request: Type2ConsiderationRequest, provider?: InsuranceProvider) {
+  let score = adjustedClinicalScore(item, request);
+  const coverage = coverageFor(item, provider);
+  if (coverage) score += Math.min(20, coverage.percent / 5);
+  if (item.price) score += 5;
+  if (item.relativeCost === "low") score += 18;
+  else if (item.relativeCost === "medium") score += 8;
+  else score -= 8;
+  return score;
+}
+'''
+new_block = '''function adjustedClinicalScore(item: Type2MedicationConsideration, request: Type2ConsiderationRequest) {
+  const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.scenario;
+  let score = item.priorityScore;
+  const eGfr = request.clinicalContext?.kidney?.eGfr ?? request.eGfr;
+  const dialysis = Boolean(request.clinicalContext?.kidney?.dialysis);
+
+  // ADA 2026: advanced CKD favors GLP-1 RA for glycemic management; SGLT2
+  // initiation is supported at eGFR >=20, while continuation below 20 is a
+  // separate decision and should not be represented as a new-start scenario.
+  if (hasFactor(request, "ckd") && eGfr !== undefined && eGfr < 30 && isGlp1(item)) score += legacyScore.advancedCkdGlp1Bonus;
+  if (eGfr !== undefined && eGfr < 20 && isSglt2(item) && !item.currentMedication) score -= legacyScore.belowSglt2InitiationThresholdNewStartPenalty;
+  if (dialysis && isSglt2(item) && !item.currentMedication) score -= legacyScore.dialysisNewSglt2Penalty;
+  if (dialysis && isGlp1(item)) score += legacyScore.dialysisGlp1Bonus;
+
+  if (hasFactor(request, "heart_failure") && isSglt2(item)) score += legacyScore.heartFailureSglt2Bonus;
+  if (hasFactor(request, "heart_failure") && isTzd(item)) score -= legacyScore.heartFailureTzdPenalty;
+  if (hasFactor(request, "hypoglycemia_risk") && isHypoglycemiaProne(item)) score -= legacyScore.hypoglycemiaPronePenalty;
+  if (hasFactor(request, "weight_priority") && isGlp1(item)) score += legacyScore.weightPriorityGlp1Bonus;
+  if (request.routePreference === "oral_only" && isInjectable(item)) score -= legacyScore.oralOnlyInjectablePenalty;
+  return score;
+}
+
+function marketScore(item: Type2MedicationConsideration, request: Type2ConsiderationRequest, provider?: InsuranceProvider) {
+  const legacyScore = TYPE2_LEGACY_SCORE_POLICY_V1.scenario;
+  let score = adjustedClinicalScore(item, request);
+  const coverage = coverageFor(item, provider);
+  if (coverage) score += Math.min(legacyScore.marketCoverageBonusCap, coverage.percent / legacyScore.marketCoveragePercentPerPoint);
+  if (item.price) score += legacyScore.marketPriceKnownBonus;
+  if (item.relativeCost === "low") score += legacyScore.marketLowCostBonus;
+  else if (item.relativeCost === "medium") score += legacyScore.marketMediumCostBonus;
+  else score -= legacyScore.marketHighCostPenalty;
+  return score;
+}
+'''
+text = replace_once(text, old_block, new_block, "legacy scenario score block")
+text = replace_once(
+    text,
+    '      (!request.hyperglycemiaSymptoms && !request.catabolicFeatures || isInsulin(item) || adjustedClinicalScore(item, request) >= 58)\n',
+    '      (!request.hyperglycemiaSymptoms && !request.catabolicFeatures || isInsulin(item) || adjustedClinicalScore(item, request) >= TYPE2_LEGACY_SCORE_POLICY_V1.scenario.alternativeMinimumScore)\n',
+    "legacy alternative threshold",
+)
+scenario.write_text(text, encoding="utf-8")
+
+evidence = Path("packages/clinical-engine/src/evidence-assistant.ts")
+text = evidence.read_text(encoding="utf-8")
+insert_after = 'import { getActiveClinicalRulePack } from "./rule-pack.js";\n\n'
+constants = '''const EVIDENCE_SEARCH_RELEVANCE_WEIGHTS = {
+  exactTokenMatch: 3,
+  partialTokenMatch: 1,
+  domainTokenMatch: 2,
+  minimumPartialTokenLength: 4,
+} as const;
+
+'''
+text = replace_once(text, insert_after, insert_after + constants, "evidence relevance constants")
+old_score = '''  let score = 0;
+  for (const token of questionTokens) {
+    if (haystackTokens.has(token)) score += 3;
+    else if (token.length >= 4 && normalized.includes(token)) score += 1;
+  }
+  const domainTokens = tokens(domain);
+  if (domainTokens.some((token) => questionTokens.includes(token))) score += 2;
+'''
+new_score = '''  let score = 0;
+  for (const token of questionTokens) {
+    if (haystackTokens.has(token)) score += EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.exactTokenMatch;
+    else if (token.length >= EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.minimumPartialTokenLength && normalized.includes(token)) score += EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.partialTokenMatch;
+  }
+  const domainTokens = tokens(domain);
+  if (domainTokens.some((token) => questionTokens.includes(token))) score += EVIDENCE_SEARCH_RELEVANCE_WEIGHTS.domainTokenMatch;
+'''
+text = replace_once(text, old_score, new_score, "evidence relevance score block")
+evidence.write_text(text, encoding="utf-8")
+
+roadmap = Path("docs/PROJECT_OVERVIEW_AND_ROADMAP.md")
+text = roadmap.read_text(encoding="utf-8")
+text = replace_once(text, "- [ ] Replace unexplained score constants", "- [x] Replace unexplained score constants", "roadmap checkbox")
+roadmap.write_text(text, encoding="utf-8")
+
+rebaseline = Path("docs/REMAINING_ROADMAP_REBASELINE_2026-09-08.md")
+text = rebaseline.read_text(encoding="utf-8")
+old_row = '| Replace unexplained score constants | **Partial** | `decision-graph-v2` is the live physician-facing Type 2 authority and does not use the old aggregate `priorityScore` as clinical authority. The older score builder remains as an explicit unconfigured compatibility fallback, so a repository-wide “all unexplained score constants removed” claim is not yet justified. |'
+new_row = '| Replace unexplained score constants | **Implemented — clinical-engine authority boundary** | The retained Type 2 aggregate-score and legacy scenario modifiers are now named in `TYPE2_LEGACY_SCORE_POLICY_V1` as frozen `compatibility_only` mechanics; Rule Pack clinical weights remain separately versioned/reviewed. Evidence Assistant token relevance weights are also named and explicitly remain retrieval-only, not treatment authority. Decision Graph v2 does not consume the compatibility policy. |'
+text = replace_once(text, old_row, new_row, "rebaseline score row")
+old_next = "With live Type 2 precedence and the retained legacy-score boundary now formalized, the safest remaining Phase 2 work is governance/consolidation: keep the legacy score path bounded while addressing unexplained compatibility-score constants, broaden traceable rule/input/version metadata where evidence shows a real gap, and define clinician-approved golden-case governance. New clinical values still require exact reviewed evidence."
+new_next = "With live Type 2 precedence formalized and retained score mechanics now named/bounded, the safest remaining Phase 2 work is governance/consolidation: broaden traceable rule/input/version metadata only where evidence shows a real gap, and define clinician-approved golden-case governance. New clinical values still require exact reviewed evidence."
+text = replace_once(text, old_next, new_next, "rebaseline next work")
+rebaseline.write_text(text, encoding="utf-8")
+
+precedence = Path("docs/architecture/CLINICAL_RULE_PRECEDENCE.md")
+text = precedence.read_text(encoding="utf-8")
+text = replace_once(
+    text,
+    "- Repository baseline: `main@06d4873469767cee0bf2a5ca3053005ddb666a7b`",
+    "- Repository baseline: `main@8bca56aada61f17745d15f5ffb393bbd4d8bf537`",
+    "precedence baseline",
+)
+anchor = "### 3.5 Private score function\n\n`scoreMedication()` is private to `packages/clinical-engine/src/index.ts`. The audit found no external production import of that function. Its result feeds only the retained legacy builder's `priorityScore` ordering.\n\n"
+addition = '''### 3.6 Named score-mechanics boundary
+
+`packages/clinical-engine/src/type2-legacy-score-policy.ts` now names every previously inline numeric mechanic used by the retained Type 2 aggregate-score builder and its legacy scenario layer. The policy is versioned and marked `compatibility_only`; its values preserve historical behavior and are not reviewed clinical evidence or Decision Graph authority. Clinical thresholds and reviewed treatment weights remain owned by the active `ClinicalRulePack`.
+
+`packages/clinical-engine/src/evidence-assistant.ts` separately names its token-match relevance weights. Those values rank evidence-search matches only; they do not rank medicines, create eligibility, select doses, or change Decision Graph ordering.
+
+The Decision Graph v2 engine must not import `TYPE2_LEGACY_SCORE_POLICY_V1`. A regression test enforces that separation.
+
+'''
+text = replace_once(text, anchor, anchor + addition, "precedence score section")
+text = replace_once(
+    text,
+    "- **Replace unexplained score constants:** incomplete repository-wide because the unconfigured legacy compatibility builder still contains aggregate score constants.\n",
+    "",
+    "precedence remaining score bullet",
+)
+precedence.write_text(text, encoding="utf-8")
