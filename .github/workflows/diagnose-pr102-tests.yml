@@ -1,0 +1,55 @@
+name: Diagnose PR 102 monorepo tests
+
+on:
+  push:
+    branches:
+      - feat/type2-active-input-coverage-extraction-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: feat/type2-active-input-coverage-extraction-20260907
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.7.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Capture monorepo test output
+        shell: bash
+        run: |
+          set +e
+          pnpm test > diagnostic-pr102-test.log 2>&1
+          status=$?
+          printf '\n\nDIAGNOSTIC_EXIT_CODE=%s\n' "$status" >> diagnostic-pr102-test.log
+          exit 0
+
+      - name: Commit diagnostic output and remove workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/diagnose-pr102-tests.yml
+          git add diagnostic-pr102-test.log
+          git commit -m "Capture PR 102 monorepo test failure"
+          git push origin HEAD:feat/type2-active-input-coverage-extraction-20260907
