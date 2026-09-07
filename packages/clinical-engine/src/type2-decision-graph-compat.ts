@@ -5,7 +5,6 @@ import type {
   MasterDrugRegistryEntry,
   MedicationTherapyGroup,
   Type2AssessmentResult,
-  Type2ConsiderationRequest,
   Type2MedicationConsideration,
   Type2PathwayPriority,
 } from "@glymize/contracts";
@@ -14,7 +13,10 @@ import {
   type IntervalAwareCurrentMedicationInputV2,
   type IntervalAwareCurrentMedicationV2,
 } from "./decision-graph-v2/current-medication-interval.js";
-import { runDecisionGraphV2 } from "./decision-graph-v2/engine.js";
+import {
+  runDecisionGraphV2WithSpecialistEscalations,
+  type DecisionGraphRequestWithSpecialistContextsV2,
+} from "./decision-graph-v2/engine-with-specialist-escalations.js";
 import { buildDecisionGraphInventoryFromContractsV2 } from "./decision-graph-v2/inventory-adapter.js";
 import type {
   ComposedTherapyActionV2,
@@ -26,14 +28,17 @@ import type {
   RecommendationV2,
   ResolvedDosePlanV2,
 } from "./decision-graph-v2/types.js";
-import { resolveType2InsuranceProvidersV2 } from "./type2-intake-v2.js";
+import {
+  resolveType2InsuranceProvidersV2,
+  type Type2StructuredConsiderationRequestV2,
+} from "./type2-intake-v2.js";
 import type { ClaimsAwareInsurancePolicyRuleV2 } from "./decision-graph-v2/insurance-claims.js";
 import { withReviewedInsurancePoliciesV2 } from "./decision-graph-v2/reviewed-insurance-policy-merge.js";
 
 export const TYPE2_DECISION_GRAPH_V2_AUTHORITY = "GLYMIZE_DECISION_GRAPH_V2_AUTHORITY";
 export const TYPE2_DECISION_GRAPH_EXECUTION_PROJECTION_V1 = "GLYMIZE_DECISION_GRAPH_EXECUTION_PROJECTION_V1";
 
-export type IntervalAwareType2ConsiderationRequestV2 = Omit<Type2ConsiderationRequest, "currentMedications"> & {
+export type IntervalAwareType2ConsiderationRequestV2 = Omit<Type2StructuredConsiderationRequestV2, "currentMedications"> & {
   currentMedications?: IntervalAwareCurrentMedicationInputV2[];
   /** Clinician-selected insurer used for access/cost preference evaluation. */
   insuranceProvider?: InsuranceProvider;
@@ -171,10 +176,15 @@ export function resolveType2InsuranceProvidersForDecisionGraphV2(
   return resolveType2InsuranceProvidersV2(request);
 }
 
-function graphRequest(
+/**
+ * Builds the live Decision Graph request without dropping reviewed structured
+ * safety facts. Product-specific envelopes remain transport data until the
+ * specialist wrapper validates the exact current review-set identity/version.
+ */
+export function buildType2DecisionGraphLiveRequestV2(
   input: BuildType2DecisionGraphAssessmentInput,
   inventory: DecisionGraphRequestV2["inventory"],
-): DecisionGraphRequestV2 {
+): DecisionGraphRequestWithSpecialistContextsV2 {
   const { request, medications, masterRegistry } = input;
   const context = request.clinicalContext;
 
@@ -210,6 +220,8 @@ function graphRequest(
         plateletCount10e9L: context.liver.plateletCount10e9L,
         liverStiffnessKpa: context.liver.liverStiffnessKpa,
       } : request.factors.includes("masld_mash") ? { masldMash: true } : undefined,
+      medicationSafety: context?.medicationSafety,
+      productSafetyScreens: context?.productSafetyScreens,
       hypoglycemiaRisk: request.factors.includes("hypoglycemia_risk") ? "high" : "standard",
       currentMedications: currentMedicationsV2(request, medications, masterRegistry),
     },
@@ -403,7 +415,9 @@ export function buildType2AssessmentFromDecisionGraphV2(
     importedInventory,
     input.insurancePolicies ?? [],
   );
-  const result = runDecisionGraphV2(graphRequest(input, inventory));
+  const result = runDecisionGraphV2WithSpecialistEscalations(
+    buildType2DecisionGraphLiveRequestV2(input, inventory),
+  );
   const regimens = [result.primary, ...result.alternatives]
     .filter((item): item is RecommendationV2 => Boolean(item))
     .slice(0, 3);
