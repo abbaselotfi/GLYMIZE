@@ -33,8 +33,14 @@ describe("clinical engine multidomain capability boundary", () => {
       "medication_safety.substantial_alcohol_use",
       "medication_safety.pregabalin_hypersensitivity",
     ]));
-    expect(clinicalDomainCapability("masld_mash").inputContract.conditional).toContain("safety.product_specific_screen");
+    for (const domain of ["liver", "masld_mash"] as const) {
+      expect(clinicalDomainCapability(domain).inputContract.conditional).toEqual(expect.arrayContaining([
+        "safety.product_specific_screen",
+        "current_medication.interval_stage_reconciliation",
+      ]));
+    }
     expect(type2ClinicalInputDefinitionV2("kidney.creatinine_clearance").description.toLocaleLowerCase()).toContain("never inferred from egfr");
+    expect(type2ClinicalInputDefinitionV2("current_medication.interval_stage_reconciliation").requestSupport).toBe("not_represented");
     expect(type2ClinicalInputDefinitionV2("safety.product_specific_screen").requestSupport).toBe("not_represented");
     expect(type2ClinicalInputDefinitionV2("hypertension.established_treatment_context").requestSupport).toBe("not_represented");
   });
