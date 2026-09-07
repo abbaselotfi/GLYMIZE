@@ -7,7 +7,7 @@ import type {
 } from "./types.js";
 import { ada2026PharmacologicEvidenceV2 } from "./clinical-normalization.js";
 
-const kdigoDmCkd2022: EvidenceReferenceV2 = {
+export const kdigoDmCkd2022: EvidenceReferenceV2 = {
   sourceId: "KDIGO-DMCKD-2022",
   title: "KDIGO 2022 Clinical Practice Guideline for Diabetes Management in Chronic Kidney Disease",
   version: "2022",

@@ -9,6 +9,7 @@ import {
   finitePercentClinicalNumberV2,
   finitePositiveClinicalNumberV2,
 } from "./predicates.js";
+import { kdigoDmCkd2022 } from "./safety-rules.js";
 import type {
   ClinicalStateV2,
   DecisionGraphPolicyV2,
@@ -101,7 +102,7 @@ export function resolveAdaptiveDataRequirementsV2(
         priority: "required",
         blocksFinalDecision: true,
         reason: "eGFR معتبر برای eligibility و ایمنی بسیاری از درمان‌های دیابت/کلیه لازم است.",
-        evidence: [],
+        evidence: [kdigoDmCkd2022],
       });
     }
     if (finiteNonNegativeClinicalNumberV2(request.patient.kidney.uacrMgG) === undefined) {
@@ -110,7 +111,7 @@ export function resolveAdaptiveDataRequirementsV2(
         priority: "recommended",
         blocksFinalDecision: false,
         reason: "UACR معتبر شدت فنوتیپ کلیوی و نیاز به درمان محافظتی را دقیق‌تر می‌کند.",
-        evidence: [],
+        evidence: [kdigoDmCkd2022],
       });
     }
   }
@@ -124,7 +125,7 @@ export function resolveAdaptiveDataRequirementsV2(
       priority: "recommended",
       blocksFinalDecision: false,
       reason: "LVEF معتبر برای phenotype نارسایی قلبی و انتخاب درمان‌های اختصاصی مفید است.",
-      evidence: [],
+      evidence: [ada2026CardiovascularRiskEvidenceV2],
     });
   }
 
