@@ -28,6 +28,10 @@
     "./type2-intake-v2": {
       "types": "./dist/type2-intake-v2.d.ts",
       "default": "./dist/type2-intake-v2.js"
+    },
+    "./type2-input-contract-v2": {
+      "types": "./dist/type2-input-contract-v2.d.ts",
+      "default": "./dist/type2-input-contract-v2.js"
     }
   },
   "scripts": {
