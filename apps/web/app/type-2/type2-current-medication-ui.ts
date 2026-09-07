@@ -1,3 +1,4 @@
+import type { GenericMedication } from "@glymize/contracts";
 import type { BuildType2DecisionGraphAssessmentInput } from "@glymize/clinical-engine";
 import { type2NumberOrUndefined } from "./type2-core-intake-ui";
 
@@ -49,11 +50,13 @@ export function newType2MedicationRow(): Type2MedicationRow {
  *
  * Safety invariants:
  * - interval/stage/timing is never inferred from medication name, brand, dose, or frequency;
+ * - therapyGroup is copied only from an exact trusted catalogue id; free-text names never create treatment context;
  * - a partial explicit interval stays partial so the Decision Graph can fail closed;
  * - explicit interval semantics are carried separately from legacy daily frequency.
  */
 export function type2CurrentMedicationPayload(
   rows: readonly Type2MedicationRow[],
+  catalog: readonly GenericMedication[] = [],
 ): Type2CurrentMedicationIntakeV2[] {
   return rows
     .filter((item) => item.genericName.trim())
@@ -61,9 +64,13 @@ export function type2CurrentMedicationPayload(
       const doseAmount = type2NumberOrUndefined(item.doseAmount);
       const frequencyPerDay = type2NumberOrUndefined(item.frequencyPerDay);
       const hasDailyDose = doseAmount !== undefined && frequencyPerDay !== undefined;
+      const trustedCatalogMedication = item.genericMedicationId
+        ? catalog.find((candidate) => candidate.id === item.genericMedicationId)
+        : undefined;
 
       return {
         genericMedicationId: item.genericMedicationId,
+        therapyGroup: trustedCatalogMedication?.therapyGroup,
         genericName: item.genericName.trim(),
         brandName: item.brandName?.trim() || undefined,
         doseAmount,

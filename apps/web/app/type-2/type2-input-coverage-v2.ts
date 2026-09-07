@@ -126,9 +126,9 @@ export const type2UiInputCoverageV2 = {
     note: "The current request does not expose one complete, product-specific contraindication/interaction screen.",
   },
   "hypertension.established_treatment_context": {
-    state: "not_represented",
-    surface: "none",
-    note: "A single encounter BP must not be promoted into an established hypertension-treatment context.",
+    state: "derived",
+    surface: "runtime_adapter",
+    note: "Derived only when an active current medication carries a therapy group copied from its exact trusted GenericMedication catalogue id. Free-text medicine names and a single encounter BP never establish this context; missing catalogue identity remains fail-closed.",
   },
 } as const satisfies Record<Type2ClinicalInputIdV2, Type2UiInputCoverageEntryV2>;
 

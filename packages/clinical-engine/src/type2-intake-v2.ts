@@ -93,6 +93,7 @@ function currentMedication(item: CurrentMedicationInput) {
   return {
     masterDrugId: item.genericMedicationId,
     genericName: item.genericName,
+    therapyGroup: item.therapyGroup,
     route: item.route,
     dosageFormGroup: item.dosageForm,
     status: item.status,

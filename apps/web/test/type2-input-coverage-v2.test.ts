@@ -52,9 +52,14 @@ describe("Type 2 capability/UI input coverage contract", () => {
     }
   });
 
-  it("keeps semantically unrepresented safety and treatment contexts fail-closed", () => {
+  it("keeps product-specific safety unrepresented while deriving trusted hypertension treatment context fail-closed", () => {
     expect(type2UiInputCoverageV2["safety.product_specific_screen"].state).toBe("not_represented");
-    expect(type2UiInputCoverageV2["hypertension.established_treatment_context"].state).toBe("not_represented");
+    const hypertensionContext = type2UiInputCoverageV2["hypertension.established_treatment_context"];
+    expect(hypertensionContext.state).toBe("derived");
+    expect(hypertensionContext.surface).toBe("runtime_adapter");
+    expect(hypertensionContext.note?.toLocaleLowerCase()).toContain("trusted");
+    expect(hypertensionContext.note?.toLocaleLowerCase()).toContain("free-text");
+    expect(hypertensionContext.note?.toLocaleLowerCase()).toContain("fail-closed");
   });
 
   it("distinguishes explicit fields from safe deterministic derivations", () => {
@@ -70,9 +75,9 @@ describe("Type 2 capability/UI input coverage contract", () => {
     expect(type2UiInputGapsV2).toEqual(expect.arrayContaining([
       "cardiovascular.nyha_class",
       "safety.product_specific_screen",
-      "hypertension.established_treatment_context",
     ]));
     expect(type2UiInputGapsV2).not.toContain("core.age_years");
+    expect(type2UiInputGapsV2).not.toContain("hypertension.established_treatment_context");
     expect(type2UiInputGapsV2).not.toContain("cardiovascular.systolic_bp");
     expect(type2UiInputGapsV2).not.toContain("cardiovascular.diastolic_bp");
     expect(type2UiInputGapsV2).not.toContain("medication_safety.maoi_exposure");
