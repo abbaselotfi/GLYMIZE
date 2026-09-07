@@ -45,28 +45,28 @@ jobs:
 
           replace_once(
               '''import {
-            emptyType2StructuredIntakeDraft,
-            structuredClinicalContextFromDraft,
-            type Type2StructuredIntakeDraft,
-          } from "./type2-structured-intake-ui";
-          ''',
+  emptyType2StructuredIntakeDraft,
+  structuredClinicalContextFromDraft,
+  type Type2StructuredIntakeDraft,
+} from "./type2-structured-intake-ui";
+''',
               '''import {
-            emptyType2StructuredIntakeDraft,
-            type Type2StructuredIntakeDraft,
-          } from "./type2-structured-intake-ui";
-          import {
-            emptyType2CoreContextDraft,
-            type2BmiFromCoreDraft,
-            type2ClinicalContextFromActiveIntake,
-            type2NumberOrUndefined,
-            type Type2CoreContextDraft,
-          } from "./type2-core-intake-ui";
-          import {
-            newType2MedicationRow,
-            type2CurrentMedicationPayload,
-            type Type2MedicationRow,
-          } from "./type2-current-medication-ui";
-          ''',
+  emptyType2StructuredIntakeDraft,
+  type Type2StructuredIntakeDraft,
+} from "./type2-structured-intake-ui";
+import {
+  emptyType2CoreContextDraft,
+  type2BmiFromCoreDraft,
+  type2ClinicalContextFromActiveIntake,
+  type2NumberOrUndefined,
+  type Type2CoreContextDraft,
+} from "./type2-core-intake-ui";
+import {
+  newType2MedicationRow,
+  type2CurrentMedicationPayload,
+  type Type2MedicationRow,
+} from "./type2-current-medication-ui";
+''',
               'add modular intake imports',
           )
 
@@ -183,8 +183,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build clinical engine dependency
-        run: pnpm --filter @glymize/clinical-engine build
+      - name: Build focused workspace dependencies
+        shell: bash
+        run: |
+          pnpm --filter @glymize/contracts build
+          pnpm --filter @glymize/clinical-engine build
 
       - name: Run focused Type 2 intake tests
         run: pnpm --filter @glymize/web exec vitest run test/type2-core-intake-ui.test.ts test/type2-current-medication-ui.test.ts test/type2-input-coverage-v2.test.ts
