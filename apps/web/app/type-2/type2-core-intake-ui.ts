@@ -64,7 +64,10 @@ export function type2ClinicalContextFromActiveIntake(
   input: Type2ClinicalContextProjectionInput,
 ): NonNullable<Type2StructuredConsiderationRequestV2["clinicalContext"]> {
   const { context, structuredContext, factors, worldDrugDomains } = input;
-  const specialist = structuredClinicalContextFromDraft(structuredContext, { factors, worldDrugDomains });
+  const {
+    cardiovascular: structuredCardiovascular,
+    ...specialist
+  } = structuredClinicalContextFromDraft(structuredContext, { factors, worldDrugDomains });
   const bmi = type2BmiFromCoreDraft(context);
 
   return {
@@ -73,6 +76,7 @@ export function type2ClinicalContextFromActiveIntake(
       ascvd: factors.includes("ascvd"),
       heartFailure: factors.includes("heart_failure"),
       lvefPercent: type2NumberOrUndefined(context.lvef),
+      ...(structuredCardiovascular ?? {}),
     },
     kidney: {
       ckd: factors.includes("ckd"),
