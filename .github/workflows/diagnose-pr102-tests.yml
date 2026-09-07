@@ -43,13 +43,12 @@ jobs:
           printf '\n\nDIAGNOSTIC_EXIT_CODE=%s\n' "$status" >> diagnostic-pr102-test.log
           exit 0
 
-      - name: Commit diagnostic output and remove workflow
+      - name: Commit diagnostic output
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/diagnose-pr102-tests.yml
           git add diagnostic-pr102-test.log
           git commit -m "Capture PR 102 monorepo test failure"
           git push origin HEAD:feat/type2-active-input-coverage-extraction-20260907
