@@ -49,6 +49,10 @@ jobs:
         shell: bash
         run: pnpm install --frozen-lockfile
 
+      - name: Build contracts dependency
+        shell: bash
+        run: pnpm --filter @glymize/contracts build
+
       - name: Typecheck clinical engine
         shell: bash
         run: pnpm --filter @glymize/clinical-engine typecheck
