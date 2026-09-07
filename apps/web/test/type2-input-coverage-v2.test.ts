@@ -52,8 +52,15 @@ describe("Type 2 capability/UI input coverage contract", () => {
     }
   });
 
-  it("keeps product-specific safety unrepresented while deriving trusted hypertension treatment context fail-closed", () => {
-    expect(type2UiInputCoverageV2["safety.product_specific_screen"].state).toBe("not_represented");
+  it("represents product-safety transport without claiming UI collection or execution authority", () => {
+    const productSafety = type2UiInputCoverageV2["safety.product_specific_screen"];
+    expect(productSafety.state).toBe("not_collected");
+    expect(productSafety.surface).toBe("none");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("request");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("does not collect");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("never proves");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("reviewed");
+
     const hypertensionContext = type2UiInputCoverageV2["hypertension.established_treatment_context"];
     expect(hypertensionContext.state).toBe("derived");
     expect(hypertensionContext.surface).toBe("runtime_adapter");

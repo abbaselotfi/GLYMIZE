@@ -121,9 +121,9 @@ export const type2UiInputCoverageV2 = {
   "pregnancy.hypoglycemia_context": { state: "collected", surface: "structured_form" },
   "pregnancy.specialist_team": { state: "collected", surface: "structured_form" },
   "safety.product_specific_screen": {
-    state: "not_represented",
+    state: "not_collected",
     surface: "none",
-    note: "The current request does not expose one complete, product-specific contraindication/interaction screen.",
+    note: "The Type 2 request can now carry product-bound safety response envelopes, but the active UI does not collect them and request presence never proves a complete or executable contraindication/interaction screen without a separately reviewed versioned criterion registry.",
   },
   "hypertension.established_treatment_context": {
     state: "derived",

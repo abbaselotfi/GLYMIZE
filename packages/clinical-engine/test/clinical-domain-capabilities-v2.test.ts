@@ -44,7 +44,11 @@ describe("clinical engine multidomain capability boundary", () => {
     expect(intervalReconciliation.requestSupport).toBe("request_composite");
     expect(intervalReconciliation.requestPath).toBe("currentMedications");
     expect(intervalReconciliation.description.toLocaleLowerCase()).toContain("never inferred");
-    expect(type2ClinicalInputDefinitionV2("safety.product_specific_screen").requestSupport).toBe("not_represented");
+    const productSafety = type2ClinicalInputDefinitionV2("safety.product_specific_screen");
+    expect(productSafety.requestSupport).toBe("request_composite");
+    expect(productSafety.requestPath).toBe("clinicalContext.productSafetyScreens");
+    expect(productSafety.description.toLocaleLowerCase()).toContain("does not establish");
+    expect(productSafety.description.toLocaleLowerCase()).toContain("reviewed");
     const hypertensionContext = type2ClinicalInputDefinitionV2("hypertension.established_treatment_context");
     expect(hypertensionContext.requestSupport).toBe("runtime_derived");
     expect(hypertensionContext.requestPath).toContain("currentMedications");
