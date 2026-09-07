@@ -34,8 +34,11 @@ describe("Type 2 capability/UI input coverage contract", () => {
     }
   });
 
-  it("keeps request-supported age uncollected while marking explicit DPN safety facts collected", () => {
-    expect(type2UiInputCoverageV2["core.age_years"].state).toBe("not_collected");
+  it("marks DOB-derived age and explicit DPN safety facts as represented", () => {
+    expect(type2UiInputCoverageV2["core.age_years"].state).toBe("derived");
+    expect(type2UiInputCoverageV2["core.age_years"].surface).toBe("core_form");
+    expect(type2UiInputCoverageV2["core.age_years"].note?.toLocaleLowerCase()).toContain("date of birth");
+    expect(type2UiInputCoverageV2["core.age_years"].note?.toLocaleLowerCase()).toContain("fail-closed");
     for (const id of [
       "medication_safety.maoi_exposure",
       "medication_safety.substantial_alcohol_use",
@@ -65,11 +68,11 @@ describe("Type 2 capability/UI input coverage contract", () => {
 
   it("publishes unresolved active-route gaps without mixing in collected inputs", () => {
     expect(type2UiInputGapsV2).toEqual(expect.arrayContaining([
-      "core.age_years",
       "cardiovascular.nyha_class",
       "safety.product_specific_screen",
       "hypertension.established_treatment_context",
     ]));
+    expect(type2UiInputGapsV2).not.toContain("core.age_years");
     expect(type2UiInputGapsV2).not.toContain("cardiovascular.systolic_bp");
     expect(type2UiInputGapsV2).not.toContain("cardiovascular.diastolic_bp");
     expect(type2UiInputGapsV2).not.toContain("medication_safety.maoi_exposure");
