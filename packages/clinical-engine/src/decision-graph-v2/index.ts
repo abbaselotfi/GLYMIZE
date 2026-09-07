@@ -25,6 +25,8 @@ export * from "./pregnancy-diabetes-pathway.js";
 export * from "./inventory-adapter.js";
 export * from "./clinical-normalization.js";
 export * from "./safety-rules.js";
+export * from "./product-safety-screen.js";
+export * from "./product-safety-registry.js";
 export * from "./insulin-rules.js";
 export * from "./insulin-subgraph.js";
 export * from "./inventory-rules.js";
