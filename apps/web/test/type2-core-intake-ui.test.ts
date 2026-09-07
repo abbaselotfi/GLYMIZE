@@ -86,4 +86,18 @@ describe("active Type 2 core intake model", () => {
     expect(result.cardiovascular?.diastolicBloodPressure).toBeUndefined();
     expect(result.cardiovascular?.nyhaClass).toBeUndefined();
   });
+
+  it("projects DOB-derived age without allowing reported age to override it", () => {
+    const result = type2ClinicalContextFromActiveIntake({
+      context: context(),
+      structuredContext: { ...emptyType2StructuredIntakeDraft },
+      factors: [],
+      worldDrugDomains: [],
+      patientAge: { dateOfBirth: "2000-09-08", confirmedReportedAgeYears: 65 },
+      ageAsOf: new Date(2026, 8, 7, 12),
+    });
+
+    expect(result.ageYears).toBe(25);
+  });
+
 });

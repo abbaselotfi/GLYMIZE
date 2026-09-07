@@ -55,7 +55,7 @@ function latestPreparedEncounter(
     .sort((left, right) => right.encounterAt.localeCompare(left.encounterAt))[0];
 }
 
-export default function PatientHandoffLookup({ onApply }: { onApply: (record: PatientHandoffRecord) => void }) {
+export default function PatientHandoffLookup({ onApply }: { onApply: (record: PatientHandoffRecord, patient: PatientLongitudinalSummary | undefined) => void }) {
   const { locale } = useGlymizeLocale();
   const fa = locale === "fa";
   const [code, setCode] = useState("");
@@ -315,7 +315,7 @@ export default function PatientHandoffLookup({ onApply }: { onApply: (record: Pa
             disabled={!record}
             onClick={() => {
               if (!record) return;
-              onApply(record);
+              onApply(record, selection.patient);
               setSkipped(false);
               setStatus(fa ? "داده‌های تأییدشده آخرین ویزیت آماده روی فرم اعمال شد؛ قبل از محاسبه مرور کنید." : "Confirmed data from the latest prepared visit was applied; review it before calculation.");
             }}

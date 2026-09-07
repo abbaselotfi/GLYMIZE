@@ -12,7 +12,7 @@ import type {
   Type2DecisionFactor,
   Type2RoutePreference,
 } from "@glymize/contracts";
-import type { PatientHandoffRecord } from "@glymize/contracts";
+import type { PatientHandoffRecord, PatientLongitudinalSummary } from "@glymize/contracts";
 import type {
   Type2ParallelSafetyProjectionV2,
   Type2StructuredConsiderationRequestV2,
@@ -50,6 +50,12 @@ import {
   type Type2MedicationRow,
 } from "./type2-current-medication-ui";
 import Type2CurrentMedicationRow from "./type2-current-medication-row";
+import Type2PatientAgeField from "./type2-patient-age-field";
+import {
+  emptyType2PatientAgeDraft,
+  type2PatientAgeDraftFromPatientData,
+  type Type2PatientAgeDraft,
+} from "./type2-patient-age-ui";
 import base from "./type2-v2.module.css";
 import styles from "./type2-scenarios.module.css";
 
@@ -239,6 +245,7 @@ export default function Type2ScenariosClient() {
   const [worldDrugDomains, setWorldDrugDomains] = useState<MedicationClinicalDomain[]>([]);
   const [context, setContext] = useState<Type2CoreContextDraft>({ ...emptyType2CoreContextDraft });
   const [structuredContext, setStructuredContext] = useState<Type2StructuredIntakeDraft>({ ...emptyType2StructuredIntakeDraft });
+  const [patientAge, setPatientAge] = useState<Type2PatientAgeDraft>({ ...emptyType2PatientAgeDraft });
   const [costPreference, setCostPreference] = useState<Type2CostPreference>("moderate");
   const [routePreference, setRoutePreference] = useState<Type2RoutePreference>("oral_and_injectable");
   const [insuranceProvider, setInsuranceProvider] = useState<InsuranceProvider>("social_security");
@@ -331,7 +338,8 @@ export default function Type2ScenariosClient() {
     updateMedication(id, { genericName: value, genericMedicationId: match?.id });
   }
 
-  function applyPatientHandoff(record: PatientHandoffRecord) {
+  function applyPatientHandoff(record: PatientHandoffRecord, patient?: PatientLongitudinalSummary) {
+    setPatientAge(type2PatientAgeDraftFromPatientData(record, patient));
     const confirmedLabs = record.labs.filter((item) => item.verification === "confirmed");
     const labValue = (key: string) => confirmedLabs.find((item) => item.canonicalKey === key)?.value;
     const hba1c = labValue("hba1c");
@@ -395,7 +403,7 @@ export default function Type2ScenariosClient() {
       currentHba1c: current,
       targetHba1c: target,
       currentMedications: type2CurrentMedicationPayload(medications),
-      clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains }),
+      clinicalContext: type2ClinicalContextFromActiveIntake({ context, structuredContext, factors, worldDrugDomains, patientAge }),
       costPreference,
       routePreference,
       insuranceProvider,
@@ -448,6 +456,17 @@ export default function Type2ScenariosClient() {
             <div className={styles.twoCols}>
               <Field label={fa ? "HbA1c فعلی" : "Current A1C"} value={currentHba1c} onChange={(value) => { setCurrentHba1c(value); setAssessment(null); }} unit="%" placeholder="8.7" />
               <Field label={fa ? "HbA1c هدف" : "Target A1C"} value={targetHba1c} onChange={(value) => { setTargetHba1c(value); setAssessment(null); }} unit="%" placeholder="7.0" />
+            </div>
+            <div className={styles.twoCols}>
+              <Type2PatientAgeField
+                className={styles.field}
+                draft={patientAge}
+                fa={fa}
+                onDateOfBirthChange={(value) => {
+                  setPatientAge((currentAge) => ({ ...currentAge, dateOfBirth: value }));
+                  setAssessment(null);
+                }}
+              />
             </div>
 
             <div className={styles.subhead}>

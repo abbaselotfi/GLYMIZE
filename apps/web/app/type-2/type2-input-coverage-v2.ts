@@ -31,9 +31,9 @@ export const type2UiInputCoverageV2 = {
     note: "The active current-medication row collects explicit administration interval, days on current dose, therapy phase, next-administration timing, and total duration; partial interval data stays partial and these facts are never inferred from medicine identity, dose, or frequency.",
   },
   "core.age_years": {
-    state: "not_collected",
-    surface: "none",
-    note: "The request contract supports ageYears, but the active Type 2 clinician form does not collect it; longitudinal demographic design should prefer date of birth rather than adding a static patient age here.",
+    state: "derived",
+    surface: "core_form",
+    note: "The active Type 2 form derives age deterministically from explicit date of birth. Patient Record v2 longitudinal DOB has precedence; a handoff-reported age is used only when its field provenance is confirmed. Unknown age remains absent and age-dependent gates stay fail-closed.",
   },
   "core.pregnancy": {
     state: "derived",
