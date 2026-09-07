@@ -47,6 +47,7 @@ export interface Type2StructuredIntakeDraft {
   significantHypoglycemiaPreventingTightTarget: boolean;
   metforminForPcosOvulation: boolean;
   pregnancySpecialistTeamEstablished: boolean;
+  productSafetyScreens: NonNullable<Type2StructuredClinicalContextV2["productSafetyScreens"]>;
 }
 
 export const emptyType2StructuredIntakeDraft: Type2StructuredIntakeDraft = {
@@ -93,6 +94,7 @@ export const emptyType2StructuredIntakeDraft: Type2StructuredIntakeDraft = {
   significantHypoglycemiaPreventingTightTarget: false,
   metforminForPcosOvulation: false,
   pregnancySpecialistTeamEstablished: false,
+  productSafetyScreens: [],
 };
 
 function booleanOrUndefined(value: TriState) {
@@ -121,7 +123,7 @@ export function structuredClinicalContextFromDraft(
   activation: StructuredIntakeActivation,
 ): Pick<
   Type2StructuredClinicalContextV2,
-  "glycemia" | "cardiovascular" | "neuropathy" | "medicationSafety" | "retinopathy" | "diabeticFoot" | "nutritionSupport" | "pregnancyCare"
+  "glycemia" | "cardiovascular" | "neuropathy" | "medicationSafety" | "retinopathy" | "diabeticFoot" | "nutritionSupport" | "pregnancyCare" | "productSafetyScreens"
 > {
   const hypertensionActive = activation.worldDrugDomains.includes("hypertension");
   const neuropathyActive = activation.worldDrugDomains.includes("neuropathy");
@@ -129,11 +131,20 @@ export function structuredClinicalContextFromDraft(
   const nutritionActive = activation.worldDrugDomains.includes("nutrition_support");
   const footActive = activation.factors.includes("diabetic_foot");
   const pregnancyActive = activation.factors.includes("pregnancy");
+  const productSafetyActive = activation.factors.includes("masld_mash");
   const fasting = numberOrUndefined(draft.fastingGlucose);
   const twoHour = numberOrUndefined(draft.twoHourPostprandialGlucose);
   const random = numberOrUndefined(draft.randomGlucose);
   const systolic = numberOrUndefined(draft.systolicBloodPressure);
   const diastolic = numberOrUndefined(draft.diastolicBloodPressure);
+  const productSafetyScreens = productSafetyActive
+    ? draft.productSafetyScreens
+      .filter((screen) => screen.responses.length > 0)
+      .map((screen) => ({
+        ...screen,
+        responses: screen.responses.map((response) => ({ ...response })),
+      }))
+    : [];
 
   return {
     glycemia: fasting !== undefined || twoHour !== undefined || random !== undefined
@@ -228,5 +239,6 @@ export function structuredClinicalContextFromDraft(
           pregnancySpecialistTeamEstablished: draft.pregnancySpecialistTeamEstablished || undefined,
         }
       : undefined,
+    productSafetyScreens: productSafetyScreens.length ? productSafetyScreens : undefined,
   };
 }

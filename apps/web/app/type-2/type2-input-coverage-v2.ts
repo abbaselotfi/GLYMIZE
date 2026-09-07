@@ -121,9 +121,9 @@ export const type2UiInputCoverageV2 = {
   "pregnancy.hypoglycemia_context": { state: "collected", surface: "structured_form" },
   "pregnancy.specialist_team": { state: "collected", surface: "structured_form" },
   "safety.product_specific_screen": {
-    state: "not_collected",
-    surface: "none",
-    note: "The Type 2 request can now carry product-bound safety response envelopes, but the active UI does not collect them and request presence never proves a complete or executable contraindication/interaction screen without a separately reviewed versioned criterion registry.",
+    state: "collected",
+    surface: "structured_form",
+    note: "The active MASH structured panel loads the exact reviewed/versioned product-safety metadata from the live runtime catalogue and collects explicit Present, Absent, or Unknown responses. Not answered sends no fact, answers are never inferred, and even a complete response envelope is not global product clearance or treatment execution authority.",
   },
   "hypertension.established_treatment_context": {
     state: "derived",

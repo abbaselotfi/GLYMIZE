@@ -52,14 +52,15 @@ describe("Type 2 capability/UI input coverage contract", () => {
     }
   });
 
-  it("represents product-safety transport without claiming UI collection or execution authority", () => {
+  it("marks reviewed product-safety screening as explicitly collected without granting clearance", () => {
     const productSafety = type2UiInputCoverageV2["safety.product_specific_screen"];
-    expect(productSafety.state).toBe("not_collected");
-    expect(productSafety.surface).toBe("none");
-    expect(productSafety.note?.toLocaleLowerCase()).toContain("request");
-    expect(productSafety.note?.toLocaleLowerCase()).toContain("does not collect");
-    expect(productSafety.note?.toLocaleLowerCase()).toContain("never proves");
-    expect(productSafety.note?.toLocaleLowerCase()).toContain("reviewed");
+    expect(productSafety.state).toBe("collected");
+    expect(productSafety.surface).toBe("structured_form");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("reviewed/versioned");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("present, absent, or unknown");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("not answered sends no fact");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("never inferred");
+    expect(productSafety.note?.toLocaleLowerCase()).toContain("not global product clearance");
 
     const hypertensionContext = type2UiInputCoverageV2["hypertension.established_treatment_context"];
     expect(hypertensionContext.state).toBe("derived");
@@ -79,10 +80,8 @@ describe("Type 2 capability/UI input coverage contract", () => {
   });
 
   it("publishes unresolved active-route gaps without mixing in collected inputs", () => {
-    expect(type2UiInputGapsV2).toEqual(expect.arrayContaining([
-      "cardiovascular.nyha_class",
-      "safety.product_specific_screen",
-    ]));
+    expect(type2UiInputGapsV2).toEqual(["cardiovascular.nyha_class"]);
+    expect(type2UiInputGapsV2).not.toContain("safety.product_specific_screen");
     expect(type2UiInputGapsV2).not.toContain("core.age_years");
     expect(type2UiInputGapsV2).not.toContain("hypertension.established_treatment_context");
     expect(type2UiInputGapsV2).not.toContain("cardiovascular.systolic_bp");
