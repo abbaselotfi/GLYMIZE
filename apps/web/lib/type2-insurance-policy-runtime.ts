@@ -105,7 +105,7 @@ export async function loadType2InsuranceClaimTimingPolicies(options?: { force?: 
   return loadPromise;
 }
 
-export function clearType2InsuranceClaimTimingPolicyCacheForTests() {
+export function invalidateType2InsuranceClaimTimingPolicyCache() {
   cache = undefined;
   loadPromise = undefined;
 }
