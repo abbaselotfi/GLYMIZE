@@ -19,6 +19,7 @@ describe("Type 2 structured intake UI model", () => {
     expect(context.diabeticFoot).toBeUndefined();
     expect(context.pregnancyCare).toBeUndefined();
     expect(context.neuropathy).toBeUndefined();
+    expect(context.medicationSafety).toBeUndefined();
     expect(context.retinopathy).toBeUndefined();
     expect(context.nutritionSupport).toBeUndefined();
   });
@@ -71,6 +72,34 @@ describe("Type 2 structured intake UI model", () => {
       painfulSymptoms: true,
       atypicalFeaturesPresent: false,
     });
+  });
+
+  it("projects painful-DPN medication safety only from explicit tri-state entries", () => {
+    const context = structuredClinicalContextFromDraft(draft({
+      maoiUseOrRecentExposure: "yes",
+      substantialAlcoholUse: "no",
+      knownPregabalinHypersensitivity: "yes",
+    }), { factors: [], worldDrugDomains: ["neuropathy"] });
+    expect(context.medicationSafety).toEqual({
+      maoiUseOrRecentExposure: true,
+      substantialAlcoholUse: false,
+      knownPregabalinHypersensitivity: true,
+    });
+  });
+
+  it("keeps unknown or inactive painful-DPN medication safety facts absent", () => {
+    const unknown = structuredClinicalContextFromDraft(draft(), {
+      factors: [],
+      worldDrugDomains: ["neuropathy"],
+    });
+    expect(unknown.medicationSafety).toBeUndefined();
+
+    const inactive = structuredClinicalContextFromDraft(draft({
+      maoiUseOrRecentExposure: "yes",
+      substantialAlcoholUse: "yes",
+      knownPregabalinHypersensitivity: "no",
+    }), { factors: [], worldDrugDomains: [] });
+    expect(inactive.medicationSafety).toBeUndefined();
   });
 
   it("requires an explicit nutrition intent before creating nutrition context", () => {
@@ -150,5 +179,12 @@ describe("Type 2 structured context field surface", () => {
     expect(source).toContain("pregnancyDiabetesType");
     expect(source).toContain("footInfectionSeverity");
     expect(source).toContain("IWGDF/IDSA severity");
+  });
+
+  it("renders explicit tri-state painful-DPN medication-safety inputs", () => {
+    expect(source).toContain("maoiUseOrRecentExposure");
+    expect(source).toContain("substantialAlcoholUse");
+    expect(source).toContain("knownPregabalinHypersensitivity");
+    expect(source).toContain("IV methylene blue");
   });
 });
