@@ -129,7 +129,7 @@ export const type2SpecialistInputCatalogV2 = {
   "safety.product_specific_screen": {
     requestSupport: "request_composite",
     requestPath: "clinicalContext.productSafetyScreens",
-    description: "Product-bound safety-response envelopes are supported and an exact reviewed WEGOVY MASH criterion set is now versioned in the registry; request presence still does not establish completeness, treatment clearance, or execution, and any other product requires its own separately reviewed criterion set",
+    description: "Product-bound safety-response envelopes are supported and an exact reviewed WEGOVY MASH criterion registry is now versioned and bound to its reviewed product identity; request presence still does not establish completeness, treatment clearance, or execution, and any other product requires its own separately reviewed criterion set",
   },
   "hypertension.established_treatment_context": {
     requestSupport: "runtime_derived",
