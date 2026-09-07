@@ -27,6 +27,7 @@ export * from "./clinical-normalization.js";
 export * from "./safety-rules.js";
 export * from "./product-safety-screen.js";
 export * from "./product-safety-registry.js";
+export * from "./product-safety-binding.js";
 export * from "./insulin-rules.js";
 export * from "./insulin-subgraph.js";
 export * from "./inventory-rules.js";
