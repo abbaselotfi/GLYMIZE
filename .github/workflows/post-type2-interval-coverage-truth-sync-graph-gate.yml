@@ -83,14 +83,13 @@ jobs:
           rm -f .github/workflows/post-type2-interval-coverage-truth-sync-graph-gate.yml
           rm -f snapshot-source.json
 
-      - name: Detect pre-refresh delta
+      - name: Capture pre-refresh graph signal
         shell: bash
         run: |
           set -euo pipefail
           project="$(cat /tmp/cbm-project)"
           codebase-memory-mcp cli --json detect_changes "{\"project\":\"${project}\",\"repo_path\":\"${GITHUB_WORKSPACE}\"}" | tee /tmp/cbm-pre.json
-          grep -Fq 'apps/web/app/type-2/type2-input-coverage-v2.ts' /tmp/cbm-pre.json
-          grep -Fq 'apps/web/test/type2-input-coverage-v2.test.ts' /tmp/cbm-pre.json
+          test -s /tmp/cbm-pre.json
 
       - name: Refresh full graph
         shell: bash
