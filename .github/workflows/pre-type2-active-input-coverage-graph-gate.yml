@@ -1,0 +1,99 @@
+name: PRE Active Type 2 input coverage Codebase Memory gate
+
+on:
+  push:
+    branches:
+      - feat/type2-active-input-coverage-extraction-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  graph-gate:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CBM_VERSION: '0.10.8'
+      SNAPSHOT_TAG: codebase-memory-latest
+      EXPECTED_MAIN_SHA: f2094faacb6756d406449b2aa5c59a072a2c2f6c
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v7
+        with:
+          ref: feat/type2-active-input-coverage-extraction-20260907
+          fetch-depth: 0
+
+      - name: Verify exact current main base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_SHA"
+          test "$(git merge-base HEAD origin/main)" = "$EXPECTED_MAIN_SHA"
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" \
+            /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/codebase-memory-mcp" --version | grep -F "$CBM_VERSION"
+
+      - name: Bootstrap exact canonical graph snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/cbm-snapshot
+          gh release download "$SNAPSHOT_TAG" --pattern 'codebase-memory-snapshot.tar.gz' --dir /tmp/cbm-snapshot
+          tar -xzf /tmp/cbm-snapshot/codebase-memory-snapshot.tar.gz -C "$GITHUB_WORKSPACE"
+          test -s .codebase-memory/graph.db.zst
+          test -s .codebase-memory/artifact.json
+          test -s snapshot-source.json
+          jq -e --arg sha "$EXPECTED_MAIN_SHA" '.source_sha == $sha or .sourceSha == $sha or .git_sha == $sha or .gitSha == $sha' snapshot-source.json
+
+      - name: Materialize canonical graph cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          zstd -dc .codebase-memory/graph.db.zst > /tmp/cbm-main.db
+          project="$(jq -r '.project // empty' .codebase-memory/artifact.json)"
+          test -n "$project"
+          mkdir -p "$HOME/.cache/codebase-memory-mcp"
+          cp /tmp/cbm-main.db "$HOME/.cache/codebase-memory-mcp/${project}.db"
+          echo "CBM_PROJECT=$project" >> "$GITHUB_ENV"
+
+      - name: Remove one-shot workflow before PRE delta check
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/pre-type2-active-input-coverage-graph-gate.yml
+          rm -f snapshot-source.json
+
+      - name: Verify graph status and clean PRE delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp cli list_projects
+          codebase-memory-mcp cli index_status --project "$CBM_PROJECT"
+          codebase-memory-mcp cli detect_changes --project "$CBM_PROJECT" | tee /tmp/pre-delta.txt
+          git diff --name-status origin/main
+          git diff --check
+          echo 'ROADMAP + GRAPH GATE [pre]: PASS'
+
+      - name: Commit one-shot workflow removal only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u .github/workflows/pre-type2-active-input-coverage-graph-gate.yml
+          if ! git diff --cached --quiet; then
+            git commit -m 'Complete PRE active Type 2 input coverage graph gate'
+            git push origin HEAD:feat/type2-active-input-coverage-extraction-20260907
+          fi
