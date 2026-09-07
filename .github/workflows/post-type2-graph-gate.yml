@@ -76,35 +76,9 @@ jobs:
           zstd -dc .codebase-memory/graph.db.zst > /tmp/cbm-main.db
           test -s /tmp/cbm-main.db
 
-          project="$(python3 - <<'PY'
-          import sqlite3
-
-          db = sqlite3.connect('/tmp/cbm-main.db')
-          tables = [
-              row[0]
-              for row in db.execute(
-                  "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-              )
-          ]
-          values = set()
-          for table in tables:
-              escaped = table.replace('"', '""')
-              columns = [row[1] for row in db.execute(f'PRAGMA table_info("{escaped}")')]
-              if 'project' not in columns:
-                  continue
-              for row in db.execute(
-                  f'SELECT DISTINCT project FROM "{escaped}" '
-                  "WHERE project IS NOT NULL AND project <> ''"
-              ):
-                  values.add(str(row[0]))
-          db.close()
-          for value in sorted(values):
-              print(value)
-          PY
-          )"
-
+          project="$(jq -r '.project // empty' .codebase-memory/artifact.json)"
           test -n "$project"
-          test "$(printf '%s\n' "$project" | wc -l)" -eq 1
+          test "$project" != "null"
           mkdir -p "$HOME/.cache/codebase-memory-mcp"
           cp /tmp/cbm-main.db "$HOME/.cache/codebase-memory-mcp/${project}.db"
           echo "CBM_PROJECT=$project" >> "$GITHUB_ENV"
