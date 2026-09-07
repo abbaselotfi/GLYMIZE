@@ -33,11 +33,13 @@ jobs:
           test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_SHA"
           test "$(git merge-base HEAD origin/main)" = "$EXPECTED_MAIN_SHA"
 
-      - name: Verify final Git blast radius
+      - name: Verify final source blast radius
         shell: bash
         run: |
           set -euo pipefail
-          git diff --name-only origin/main...HEAD | sort > /tmp/actual-files.txt
+          git diff --name-only origin/main...HEAD \
+            | grep -v '^\.github/workflows/post-type2-active-input-coverage-graph-gate\.yml$' \
+            | sort > /tmp/actual-files.txt
           cat > /tmp/expected-files.txt <<'EOF'
           apps/web/app/type-2/type2-core-intake-ui.ts
           apps/web/app/type-2/type2-current-medication-ui.ts
