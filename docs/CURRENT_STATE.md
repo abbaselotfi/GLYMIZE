@@ -3,7 +3,7 @@
 Snapshot date: 2026-09-08
 Repository baseline: `main` at `1825c23de4193f2b49e2af0eff165869d0616a41` before this documentation-only truth-sync task.
 
-This document is a factual repository snapshot, not a product promise or replacement for the ordered [Project Overview and Roadmap](PROJECT_OVERVIEW_AND_ROADMAP.md). It describes code, routes, tests, migrations, workflow configuration, and checked-in default feature state present in the repository. It does not assert that an uninspected remote environment has been deployed or activated.
+This document is a factual repository snapshot, not a product promise or replacement for the ordered [Project Overview and Roadmap](PROJECT_OVERVIEW_AND_ROADMAP.md). The remaining open roadmap families are status-classified in [Remaining Roadmap Re-baseline](REMAINING_ROADMAP_REBASELINE_2026-09-08.md); that audit does not convert implemented code into V1 scope or deployment claims. It describes code, routes, tests, migrations, workflow configuration, and checked-in default feature state present in the repository. It does not assert that an uninspected remote environment has been deployed or activated.
 
 For runtime ownership, see the accepted [Runtime of Record](architecture/RUNTIME_OF_RECORD.md). For the physician-facing Type 2 clinical authority, see [Clinical Engine Authority](architecture/CLINICAL_ENGINE_AUTHORITY.md).
 
