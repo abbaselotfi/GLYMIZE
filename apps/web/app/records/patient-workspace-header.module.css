@@ -33,6 +33,33 @@
   opacity: 0.68;
 }
 
+.headerActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.fullWorkspaceLink {
+  min-height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.72rem;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.24));
+  border-radius: 0.78rem;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.fullWorkspaceLink:hover,
+.fullWorkspaceLink:focus-visible {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
 .visitCount {
   flex: 0 0 auto;
   min-width: 4.2rem;
@@ -119,6 +146,10 @@
 @media (max-width: 720px) {
   .titleRow {
     align-items: stretch;
+  }
+
+  .headerActions {
+    display: grid;
   }
 
   .visitCount {
