@@ -1,0 +1,69 @@
+name: One-shot Phase 6 contract equivalence coverage audit
+
+on:
+  push:
+    branches:
+      - audit/phase6-contract-equivalence-coverage-20260908
+    paths:
+      - .github/workflows/phase6-contract-equivalence-audit-oneshot.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      CBM_VERSION: 0.10.8
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+
+      - name: Inventory browser and Nest route surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== WEB V1 ROUTE REFERENCES ==='
+          grep -RInE '/v1/[A-Za-z0-9_./?=&{}:-]+' apps/web/lib apps/web/app 2>/dev/null | head -n 1500 || true
+          echo '=== NEST CONTROLLERS / METHODS ==='
+          grep -RInE '@Controller|@(Get|Post|Put|Patch|Delete)\(' apps/api/src 2>/dev/null | head -n 1500 || true
+
+      - name: Inventory parity equivalence and compatibility tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RInEi 'equivalence|parity|compatib|browser[- ]owned|runtime authority|source of truth' apps/web/test apps/api packages docs/architecture 2>/dev/null | head -n 2000 || true
+
+      - name: Inventory shared functions imported by both surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RInE '@glymize/(clinical-engine|contracts|catalog-data)' apps/web/lib apps/api/src 2>/dev/null | head -n 1500 || true
+
+      - name: Inventory API-client browser routing decisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -nE 'browser|catalog|guideline|preview|apiFetch|fetch\(' apps/web/lib/api-client.ts | head -n 1200 || true
