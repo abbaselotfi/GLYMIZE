@@ -1,0 +1,58 @@
+name: One-shot Type 2 authority channel audit
+
+on:
+  push:
+    branches:
+      - 'refactor/type2-authority-channel-separation-20260908'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CBM_VERSION: '0.10.8'
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+
+      - name: Inventory gate and preference mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== gate.status writes ==='
+          grep -RIn --include='*.ts' 'gate\.status\|status = "exclude"\|status = "conditional"\|status = "historical_only"\|status = "needs_data"' packages/clinical-engine/src/decision-graph-v2 || true
+          echo '=== preference/access mutations ==='
+          grep -RIn --include='*.ts' 'routePreference\|costPreference\|preferenceConflicts\|insuranceFit\|monthlyMedicationBudgetToman' packages/clinical-engine/src/decision-graph-v2 || true
+          echo '=== gate consumers ==='
+          grep -RIn --include='*.ts' 'gate\.status' packages/clinical-engine/src apps/web/lib apps/web/app | head -n 300 || true
+
+      - name: Inventory retained compatibility boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RIn --include='*.ts' 'filterHardExcludedLegacyType2Assessment\|legacyType2HardExclusionReasons\|priorityScore\|blockedBy' packages/clinical-engine/src apps/web/lib | head -n 300 || true
