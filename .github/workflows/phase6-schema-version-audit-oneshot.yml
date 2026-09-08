@@ -1,0 +1,83 @@
+name: One-shot Phase 6 schema version coverage audit
+
+on:
+  push:
+    branches:
+      - audit/phase6-schema-version-coverage-20260908
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      CBM_VERSION: 0.10.8
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+
+      - name: Inventory migration-backed storage schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== D1 migrations ==='
+          find apps/admin-worker/migrations -maxdepth 1 -type f -name '*.sql' | sort
+          echo '=== PostgreSQL migrations ==='
+          find infra/postgres -maxdepth 1 -type f -name '*.sql' | sort
+
+      - name: Inventory explicit schema and contract version markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== schemaVersion markers ==='
+          grep -RIn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude='*.lock' 'schemaVersion' apps packages infra scripts docs | head -n 400 || true
+          echo '=== explicit contract/version type markers ==='
+          grep -RInE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude='*.lock' '(contractVersion|schema_version|schemaVersion|version:[[:space:]]*["'"'`]|version\??:)' apps packages infra scripts | head -n 600 || true
+
+      - name: Inventory persisted JSON and browser storage boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== JSON parse/stringify and localStorage boundaries ==='
+          grep -RInE --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' --exclude-dir=node_modules --exclude-dir=.next '(JSON\.parse|JSON\.stringify|localStorage|sessionStorage)' apps packages | head -n 700 || true
+          echo '=== public data JSON assets ==='
+          find apps/web/public -type f -name '*.json' | sort | head -n 300
+
+      - name: Inventory request response DTO and snapshot boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== likely DTO/snapshot/versioned public shapes ==='
+          grep -RInE --include='*.ts' --include='*.tsx' --exclude-dir=node_modules --exclude-dir=.next '(interface|type)[[:space:]].*(Request|Response|Snapshot|Payload|Record|State|Bundle|Envelope|Manifest)' apps packages | head -n 900 || true
+
+      - name: Show package and runtime schema ownership anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat packages/contracts/package.json
+          cat packages/catalog-data/package.json
+          cat apps/admin-worker/package.json
+          cat apps/web/package.json
