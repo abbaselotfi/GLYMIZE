@@ -12,6 +12,7 @@ import {
   type AdminAiModel,
   type AdminAiModelInput,
 } from "../../../lib/admin-auth";
+import { parseAiAdminPreviewStorage, serializeAiAdminPreviewStorage } from "../../../lib/ai-admin-preview-storage";
 import styles from "./ai-models.module.css";
 
 type Draft = AdminAiModel & { isNew?: boolean };
@@ -65,7 +66,15 @@ export default function AdminAiModelsPage() {
       }
       try {
         const saved = window.localStorage.getItem(LOCAL_KEY);
-        setModels(saved ? JSON.parse(saved) as Draft[] : [fresh(1)]);
+        const parsed = parseAiAdminPreviewStorage(saved);
+        if (!parsed) {
+          setModels([fresh(1)]);
+        } else {
+          setModels(parsed.models as Draft[]);
+          if (parsed.migratedFromLegacy) {
+            window.localStorage.setItem(LOCAL_KEY, serializeAiAdminPreviewStorage(parsed.models));
+          }
+        }
       } catch {
         setModels([fresh(1)]);
       }
@@ -99,7 +108,7 @@ export default function AdminAiModelsPage() {
   async function save(model: Draft) {
     if (!remote) {
       const next = models.map((item) => item.id === model.id ? { ...item, tokenConfigured: false } : item);
-      window.localStorage.setItem(LOCAL_KEY, JSON.stringify(stripSecrets(next)));
+      window.localStorage.setItem(LOCAL_KEY, serializeAiAdminPreviewStorage(stripSecrets(next)));
       setModels(next);
       setTokens((current) => ({ ...current, [model.id]: "" }));
       setMessage("پیش‌نمایش محلی ذخیره شد؛ Token در مرورگر ذخیره نشد.");
@@ -122,7 +131,7 @@ export default function AdminAiModelsPage() {
     if (!window.confirm(`«${model.name}» حذف شود؟`)) return;
     if (!remote || model.isNew) {
       const next = models.filter((item) => item.id !== model.id);
-      window.localStorage.setItem(LOCAL_KEY, JSON.stringify(stripSecrets(next)));
+      window.localStorage.setItem(LOCAL_KEY, serializeAiAdminPreviewStorage(stripSecrets(next)));
       setModels(next);
       return;
     }
