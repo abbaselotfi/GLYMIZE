@@ -1,6 +1,7 @@
 "use client";
 
 import type { PatientWorkspaceSnapshot } from "@glymize/contracts";
+import Link from "next/link";
 import styles from "./patient-workspace-header.module.css";
 
 function identifierLabel(
@@ -50,9 +51,17 @@ export function PatientWorkspaceHeader({
               : (fa ? "پرونده بایگانی‌شده" : "Archived patient record")}
           </small>
         </div>
-        <div className={styles.visitCount}>
-          <b>{workspace.encounters.length}</b>
-          <span>{fa ? "ویزیت" : "visits"}</span>
+        <div className={styles.headerActions}>
+          <Link
+            className={styles.fullWorkspaceLink}
+            href={`/patients/${encodeURIComponent(patient.patientId)}`}
+          >
+            {fa ? "نمای کامل بیمار" : "Open full workspace"}
+          </Link>
+          <div className={styles.visitCount}>
+            <b>{workspace.encounters.length}</b>
+            <span>{fa ? "ویزیت" : "visits"}</span>
+          </div>
         </div>
       </div>
 
