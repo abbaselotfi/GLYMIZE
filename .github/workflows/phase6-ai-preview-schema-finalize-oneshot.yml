@@ -1,0 +1,60 @@
+name: One-shot Phase 6 AI preview schema finalize
+
+on:
+  push:
+    branches:
+      - chore/phase6-ai-preview-schema-versioning-20260908
+    paths:
+      - scripts/phase6-ai-preview-schema-patch.py
+      - .github/workflows/phase6-ai-preview-schema-finalize-oneshot.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/phase6-ai-preview-schema-versioning-20260908
+          fetch-depth: 0
+      - name: Apply exact page wiring patch
+        run: python scripts/phase6-ai-preview-schema-patch.py
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck monorepo
+        run: pnpm typecheck
+      - name: Lint monorepo
+        run: pnpm lint
+      - name: Test monorepo
+        run: pnpm test
+      - name: Install Codebase Memory v0.10.8
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/v0.10.8/install.sh | bash -s -- --skip-config
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Run normative POST graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase post -RoadmapReviewed
+      - name: Commit verified page wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "abbaselotfi"
+          git config user.email "167691975+abbaselotfi@users.noreply.github.com"
+          git add apps/web/app/admin/ai-models/page.tsx
+          git diff --cached --quiet && { echo 'expected page wiring diff missing'; exit 1; }
+          git commit -m "feat: use versioned AI admin preview storage"
+          git push origin HEAD:chore/phase6-ai-preview-schema-versioning-20260908
