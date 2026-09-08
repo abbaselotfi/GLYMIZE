@@ -81,6 +81,8 @@ The global patient account architecture is additive. A practice-scoped patient r
 
 Shared compiled catalogue/reference seed data now live in the neutral `@glymize/catalog-data` package, while the active guideline-source registry is consumed directly from `@glymize/clinical-engine`. The web build/runtime no longer imports seed modules from `apps/api/src`; the NestJS process remains local-development-only compatibility code and is not promoted into production authority by this cleanup.
 
+Persisted/public schema compatibility follows `docs/architecture/SCHEMA_VERSIONING.md`: database schemas are migration-versioned, HTTP transports use the `/v1` major boundary, and active static catalogue assets enforce their declared schema versions at read time. Internal TypeScript DTOs do not become independent persistence schemas merely by existing in code.
+
 Do not point production traffic or real patient data at `apps/api` unless a future reviewed architecture decision, persistence design, authorization model, and deployment plan explicitly promote it.
 
 ## Verification anchors
