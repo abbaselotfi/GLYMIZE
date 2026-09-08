@@ -1,0 +1,110 @@
+name: One-shot Phase 6 schema closure audit
+
+on:
+  push:
+    branches:
+      - audit/phase6-schema-version-closure-20260908
+    paths:
+      - .github/workflows/phase6-schema-closure-audit-oneshot.yml
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      CBM_VERSION: 0.10.8
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v4
+        with:
+          ref: audit/phase6-schema-version-closure-20260908
+          fetch-depth: 0
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+      - name: Inventory structured persistence and public payload boundaries
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          roots=[Path('apps'),Path('packages'),Path('worker'),Path('infra')]
+          suffixes={'.ts','.tsx','.js','.mjs','.cjs','.json','.sql'}
+          skip={'node_modules','.next','dist','coverage','.turbo','generated'}
+          patterns={
+            'browser_storage_write': re.compile(r'(localStorage|sessionStorage)\.setItem\s*\('),
+            'browser_storage_read': re.compile(r'(localStorage|sessionStorage)\.getItem\s*\('),
+            'json_parse': re.compile(r'JSON\.parse\s*\('),
+            'json_serialize': re.compile(r'JSON\.stringify\s*\('),
+            'public_json_fetch': re.compile(r'fetch\([^\n]*(?:\.json|/v1/|catalog|market|manifest|meta)',re.I),
+            'kv_or_r2_write': re.compile(r'\.(?:put|write)\s*\([^\n]*JSON\.stringify|(?:KV|R2|bucket|kv)[^\n]*\.put\s*\(',re.I),
+            'structured_db_column': re.compile(r'\b(?:payload_json|metadata_json|snapshot_json|context_json|data_json|jsonb)\b',re.I),
+            'schema_marker': re.compile(r'\b(?:schemaVersion|schema_version|runtimeSchemaVersion|contractVersion|reviewSetVersion|ruleSetVersion)\b'),
+          }
+          files=[]
+          for root in roots:
+            if not root.exists(): continue
+            for p in root.rglob('*'):
+              if not p.is_file() or p.suffix not in suffixes or any(part in skip for part in p.parts): continue
+              files.append(p)
+          print('FILES_SCANNED',len(files))
+          for label,pat in patterns.items():
+            print(f'=== {label} ===')
+            hits=[]
+            for p in files:
+              try: lines=p.read_text(errors='ignore').splitlines()
+              except Exception: continue
+              for i,line in enumerate(lines,1):
+                if pat.search(line): hits.append((str(p),i,line.strip()[:260]))
+            print('COUNT',len(hits))
+            for h in hits[:350]: print(f'{h[0]}:{h[1]}:{h[2]}')
+          PY
+      - name: Inventory migration and accepted version owners
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          print('=== D1/SQL migrations ===')
+          for root in [Path('apps/admin-worker/migrations'),Path('worker/migrations'),Path('infra/postgres'),Path('packages/db/migrations')]:
+            if root.exists():
+              xs=sorted(root.rglob('*.sql'))
+              print(root,'COUNT',len(xs))
+              for p in xs: print(p)
+          print('=== Accepted policy ===')
+          p=Path('docs/architecture/SCHEMA_VERSIONING.md')
+          print(p.read_text(errors='ignore') if p.exists() else 'MISSING_POLICY')
+          PY
+      - name: Inventory version guards and migration readers
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          pats=re.compile(r'(schemaVersion|schema_version|runtimeSchemaVersion|migratedFromLegacy|unsupported.*version|future.*version|/v1/)',re.I)
+          roots=[Path('apps'),Path('packages'),Path('worker')]
+          hits=[]
+          for root in roots:
+            if not root.exists(): continue
+            for p in root.rglob('*'):
+              if p.suffix not in {'.ts','.tsx','.js','.mjs','.json'} or any(x in p.parts for x in ('node_modules','.next','dist','coverage')): continue
+              try: lines=p.read_text(errors='ignore').splitlines()
+              except Exception: continue
+              for i,line in enumerate(lines,1):
+                if pats.search(line): hits.append((str(p),i,line.strip()[:260]))
+          print('COUNT',len(hits))
+          for h in hits[:700]: print(f'{h[0]}:{h[1]}:{h[2]}')
+          PY
