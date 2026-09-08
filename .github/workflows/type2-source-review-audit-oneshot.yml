@@ -59,341 +59,119 @@ jobs:
 
           def replace_once(path: str, old: str, new: str):
               p = Path(path)
-              s = p.read_text(encoding='utf-8')
+              s = p.read_text(encoding="utf-8")
               count = s.count(old)
               if count != 1:
-                  raise SystemExit(f'{path}: expected exactly one occurrence, found {count}: {old!r}')
-              p.write_text(s.replace(old, new, 1), encoding='utf-8')
+                  raise SystemExit(f"{path}: expected exactly one occurrence, found {count}: {old!r}")
+              p.write_text(s.replace(old, new, 1), encoding="utf-8")
 
-          # Evidence identity is always versioned in live Decision Graph v2.
-          replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/types.ts',
-              '  version?: string;\n',
-              '  version: string;\n',
-          )
-          for interface_name in ('MedicationGateRuleV2', 'RegimenConflictRuleV2', 'InsulinConversionRuleV2'):
+          types = "packages/clinical-engine/src/decision-graph-v2/types.ts"
+          replace_once(types, "  version?: string;\n", "  version: string;\n")
+          for name in ("MedicationGateRuleV2", "RegimenConflictRuleV2", "InsulinConversionRuleV2"):
               replace_once(
-                  'packages/clinical-engine/src/decision-graph-v2/types.ts',
-                  f'export interface {interface_name} {{\n  id: string;\n',
-                  f'export interface {interface_name} {{\n  id: string;\n  reviewState: "candidate" | "approved" | "retired";\n',
+                  types,
+                  f"export interface {name} {{\n  id: string;\n",
+                  f"export interface {name} {{\n  id: string;\n  reviewState: \"candidate\" | \"approved\" | \"retired\";\n",
               )
 
-          # Close the only two static regulatory-label version gaps found by the compile probe.
           replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/frc-protocols.ts',
-              '  title: "Suliqua (insulin glargine/lixisenatide) — EU Product Information",\n  url:',
-              '  title: "Suliqua (insulin glargine/lixisenatide) — EU Product Information",\n  version: "2026-07-02",\n  url:',
+              "packages/clinical-engine/src/decision-graph-v2/frc-protocols.ts",
+              "  title: \"Suliqua (insulin glargine/lixisenatide) — EU Product Information\",\n  url:",
+              "  title: \"Suliqua (insulin glargine/lixisenatide) — EU Product Information\",\n  version: \"2026-07-02\",\n  url:",
+          )
+          insulin = "packages/clinical-engine/src/decision-graph-v2/insulin-execution.ts"
+          replace_once(
+              insulin,
+              "  title: \"LANTUS (insulin glargine U-100) — U.S. Prescribing Information\",\n  url:",
+              "  title: \"LANTUS (insulin glargine U-100) — U.S. Prescribing Information\",\n  version: \"2025-05-31\",\n  url:",
           )
           replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/insulin-execution.ts',
-              '  title: "LANTUS (insulin glargine U-100) — U.S. Prescribing Information",\n  url:',
-              '  title: "LANTUS (insulin glargine U-100) — U.S. Prescribing Information",\n  version: "2025-05-31",\n  url:',
-          )
-
-          # Supportive Master Registry evidence uses its observed provenance when available;
-          # otherwise it is explicitly versioned by source-code identity rather than inventing a guideline edition.
-          replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/inventory-adapter.ts',
-              '    title: sourceId,\n    url: entry.sourceUrls[index] ?? entry.sourceUrls[0] ?? "about:blank",',
-              '    title: sourceId,\n    version: entry.sourceObservedAt ?? `source-code:${sourceId}`,\n    url: entry.sourceUrls[index] ?? entry.sourceUrls[0] ?? "about:blank",',
+              "packages/clinical-engine/src/decision-graph-v2/inventory-adapter.ts",
+              "    title: sourceId,\n    url: entry.sourceUrls[index] ?? entry.sourceUrls[0] ?? \"about:blank\",",
+              "    title: sourceId,\n    version: entry.sourceObservedAt ?? `source-code:${sourceId}`,\n    url: entry.sourceUrls[index] ?? entry.sourceUrls[0] ?? \"about:blank\",",
           )
 
-          # Reviewed builders emit approved lifecycle state explicitly.
-          safety = 'packages/clinical-engine/src/decision-graph-v2/safety-rules.ts'
+          safety = "packages/clinical-engine/src/decision-graph-v2/safety-rules.ts"
           for marker in (
-              '      id: `ADA2026-METFORMIN-EGFR30:${masterDrugId}`,\n',
-              '      id: `METFORMIN-EGFR30-44-REVIEW:${masterDrugId}`,\n',
-              '    id: "ADA2026-TZD-HF",\n',
-              '      id: "ADA2026-DPP4-GLP1-CONCURRENT",\n',
-              '      id: "ADA2026-DPP4-DUALGIPGLP1-CONCURRENT",\n',
-              '      id: "ADA2026-FRC-GLP1-DUPLICATION",\n',
-              '      id: "ADA2026-FRC-DUALGIPGLP1-DUPLICATION",\n',
+              "      id: `ADA2026-METFORMIN-EGFR30:${masterDrugId}`,\n",
+              "      id: `METFORMIN-EGFR30-44-REVIEW:${masterDrugId}`,\n",
+              "    id: \"ADA2026-TZD-HF\",\n",
+              "      id: \"ADA2026-DPP4-GLP1-CONCURRENT\",\n",
+              "      id: \"ADA2026-DPP4-DUALGIPGLP1-CONCURRENT\",\n",
+              "      id: \"ADA2026-FRC-GLP1-DUPLICATION\",\n",
+              "      id: \"ADA2026-FRC-DUALGIPGLP1-DUPLICATION\",\n",
           ):
-              replace_once(safety, marker, marker + marker[:len(marker)-len(marker.lstrip())] + 'reviewState: "approved",\n')
+              indent = marker[:len(marker) - len(marker.lstrip())]
+              replace_once(safety, marker, marker + indent + "reviewState: \"approved\",\n")
 
-          cardiometabolic = 'packages/clinical-engine/src/decision-graph-v2/cardiometabolic-protocols.ts'
+          cardio = "packages/clinical-engine/src/decision-graph-v2/cardiometabolic-protocols.ts"
           replace_once(
-              cardiometabolic,
-              '      id: `PHASE4-PREGNANCY-EXCLUDE:${medication.masterDrugId}`,\n      masterDrugId:',
-              '      id: `PHASE4-PREGNANCY-EXCLUDE:${medication.masterDrugId}`,\n      reviewState: "approved",\n      masterDrugId:',
+              cardio,
+              "      id: `PHASE4-PREGNANCY-EXCLUDE:${medication.masterDrugId}`,\n      masterDrugId:",
+              "      id: `PHASE4-PREGNANCY-EXCLUDE:${medication.masterDrugId}`,\n      reviewState: \"approved\",\n      masterDrugId:",
           )
           replace_once(
-              cardiometabolic,
-              '      id: `PHASE4-PREGNANCY-STATIN-REVIEW:${medication.masterDrugId}`,\n      masterDrugId:',
-              '      id: `PHASE4-PREGNANCY-STATIN-REVIEW:${medication.masterDrugId}`,\n      reviewState: "approved",\n      masterDrugId:',
+              cardio,
+              "      id: `PHASE4-PREGNANCY-STATIN-REVIEW:${medication.masterDrugId}`,\n      masterDrugId:",
+              "      id: `PHASE4-PREGNANCY-STATIN-REVIEW:${medication.masterDrugId}`,\n      reviewState: \"approved\",\n      masterDrugId:",
           )
 
-          dpn = 'packages/clinical-engine/src/decision-graph-v2/painful-dpn-protocol.ts'
+          dpn = "packages/clinical-engine/src/decision-graph-v2/painful-dpn-protocol.ts"
           for marker in (
-              '      id: `LABEL-PREGABALIN-HYPERSENSITIVITY:${pregabalin.masterDrugId}`,\n',
-              '        id: `LABEL-DULOXETINE-MAOI:${duloxetine.masterDrugId}`,\n',
-              '        id: `LABEL-DULOXETINE-RENAL-LT30:${duloxetine.masterDrugId}`,\n',
-              '        id: `LABEL-DULOXETINE-CHRONIC-LIVER:${duloxetine.masterDrugId}`,\n',
-              '        id: `LABEL-DULOXETINE-SUBSTANTIAL-ALCOHOL:${duloxetine.masterDrugId}`,\n',
+              "      id: `LABEL-PREGABALIN-HYPERSENSITIVITY:${pregabalin.masterDrugId}`,\n",
+              "        id: `LABEL-DULOXETINE-MAOI:${duloxetine.masterDrugId}`,\n",
+              "        id: `LABEL-DULOXETINE-RENAL-LT30:${duloxetine.masterDrugId}`,\n",
+              "        id: `LABEL-DULOXETINE-CHRONIC-LIVER:${duloxetine.masterDrugId}`,\n",
+              "        id: `LABEL-DULOXETINE-SUBSTANTIAL-ALCOHOL:${duloxetine.masterDrugId}`,\n",
           ):
-              indent = marker[:len(marker)-len(marker.lstrip())]
-              replace_once(dpn, marker, marker + indent + 'reviewState: "approved",\n')
+              indent = marker[:len(marker) - len(marker.lstrip())]
+              replace_once(dpn, marker, marker + indent + "reviewState: \"approved\",\n")
 
-          # Insulin conversion builder is reviewed as one registry: centralize the approved stamp.
           replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/insulin-execution.ts',
-              'function pushRule(rules: InsulinConversionRuleV2[], rule: InsulinConversionRuleV2 | undefined) {\n  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) rules.push(rule);\n}',
-              'function pushRule(\n  rules: InsulinConversionRuleV2[],\n  rule: Omit<InsulinConversionRuleV2, "reviewState"> | undefined,\n) {\n  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) {\n    rules.push({ ...rule, reviewState: "approved" });\n  }\n}',
-          )
-
-          # Live consumers are fail-closed: candidate/retired metadata never carries authority.
-          replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/gates.ts',
-              '    const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>\n      (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&',
-              '    const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>\n      rule.reviewState === "approved" &&\n      (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&',
+              insulin,
+              "function pushRule(rules: InsulinConversionRuleV2[], rule: InsulinConversionRuleV2 | undefined) {\n  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) rules.push(rule);\n}",
+              "function pushRule(\n  rules: InsulinConversionRuleV2[],\n  rule: Omit<InsulinConversionRuleV2, \"reviewState\"> | undefined,\n) {\n  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) {\n    rules.push({ ...rule, reviewState: \"approved\" });\n  }\n}",
           )
           replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/regimens.ts',
-              '  for (const rule of rules) {\n    const direct = tagsA.includes(rule.tagA) && tagsB.includes(rule.tagB);',
-              '  for (const rule of rules) {\n    if (rule.reviewState !== "approved") continue;\n    const direct = tagsA.includes(rule.tagA) && tagsB.includes(rule.tagB);',
+              "packages/clinical-engine/src/decision-graph-v2/gates.ts",
+              "    const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>\n      (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&",
+              "    const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>\n      rule.reviewState === \"approved\" &&\n      (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&",
           )
           replace_once(
-              'packages/clinical-engine/src/decision-graph-v2/insulin-execution.ts',
-              '  const rule = rules.find((item) => item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));',
-              '  const rule = rules.find((item) => item.reviewState === "approved" && item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));',
+              "packages/clinical-engine/src/decision-graph-v2/regimens.ts",
+              "  for (const rule of rules) {\n    const direct = tagsA.includes(rule.tagA) && tagsB.includes(rule.tagB);",
+              "  for (const rule of rules) {\n    if (rule.reviewState !== \"approved\") continue;\n    const direct = tagsA.includes(rule.tagA) && tagsB.includes(rule.tagB);",
+          )
+          replace_once(
+              insulin,
+              "  const rule = rules.find((item) => item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));",
+              "  const rule = rules.find((item) => item.reviewState === \"approved\" && item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));",
           )
 
-          # Update the architecture contract from the previous metadata-only closure to the lifecycle closure.
-          metadata = 'docs/architecture/CLINICAL_RULE_METADATA.md'
+          metadata = "docs/architecture/CLINICAL_RULE_METADATA.md"
           replace_once(
               metadata,
-              'Repository baseline for this closure: `main@b0d9f614b0fb88a99ffa21e244be6c598a365025`.',
-              'Repository baseline for this lifecycle closure: `main@a1f78be10900e11ff75570f6cd9e4ccfc9586012`.',
+              "Repository baseline for this closure: `main@b0d9f614b0fb88a99ffa21e244be6c598a365025`.",
+              "Repository baseline for this lifecycle closure: `main@a1f78be10900e11ff75570f6cd9e4ccfc9586012`.",
           )
           replace_once(
               metadata,
-              '| Medication/safety gate | `id` | non-empty `evidence` | governed by reviewed rule source; no new generic review field is introduced here |\n| Regimen conflict rule | `id` | non-empty `evidence` | governed by reviewed rule source |',
-              '| Medication/safety gate | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |\n| Regimen conflict rule | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |',
+              "| Medication/safety gate | `id` | non-empty `evidence` | governed by reviewed rule source; no new generic review field is introduced here |\n| Regimen conflict rule | `id` | non-empty `evidence` | governed by reviewed rule source |",
+              "| Medication/safety gate | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |\n| Regimen conflict rule | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |",
           )
           replace_once(
               metadata,
-              '| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type already requires it |\n| Product-safety review set |',
-              '| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type requires it |\n| Insulin conversion edge | conversion rule `id` | non-empty `evidence` | explicit `reviewState`; live conversion considers only `approved` edges |\n| Product-safety review set |',
+              "| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type already requires it |\n| Product-safety review set |",
+              "| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type requires it |\n| Insulin conversion edge | conversion rule `id` | non-empty `evidence` | explicit `reviewState`; live conversion considers only `approved` edges |\n| Product-safety review set |",
           )
           replace_once(
               metadata,
-              'Every evidence reference used for this closure carries at least `sourceId`, `title`, `version`, and `url`; locators and evidence strength remain available where the source module already provides them.',
-              '`EvidenceReferenceV2.version` is required for live Decision Graph evidence. Static guideline/regulatory sources carry their reviewed edition or effective date. Supportive evidence projected from the Master Registry carries `sourceObservedAt` when present and otherwise an explicit `source-code:<sourceId>` provenance identity; that fallback is not represented as a guideline edition.',
+              "Every evidence reference used for this closure carries at least `sourceId`, `title`, `version`, and `url`; locators and evidence strength remain available where the source module already provides them.",
+              "`EvidenceReferenceV2.version` is required for live Decision Graph evidence. Static guideline/regulatory sources carry their reviewed edition or effective date. Supportive evidence projected from the Master Registry carries `sourceObservedAt` when present and otherwise an explicit `source-code:<sourceId>` provenance identity; that fallback is not represented as a guideline edition.",
           )
-          old_section = '''## 4. Boundary with source review/version governance\n\nThis closure satisfies the Roadmap requirement to make current clinical rule metadata traceable; it does **not** claim that every public schema or every future clinical module has a universal review/version lifecycle.\n\nThe separate Phase 2 item **Add source versioning and review fields** remains independently auditable. A future task may standardize review-state/version metadata more broadly, but it must not fabricate review approval for artifacts that have not undergone that governance process.\n'''
-          new_section = '''## 4. Source version and review lifecycle governance\n\nThe Phase 2 source/review lifecycle is now explicit for live Type 2 authority. Evidence references are versioned, and decision-bearing medication gates, regimen conflicts and insulin-conversion edges carry `candidate | approved | retired`.\n\nLifecycle state is not display-only metadata: live consumers fail closed and apply only `approved` rules. Existing builders that were already the reviewed authority emit `approved`; this task does not promote any new clinical rule, threshold, dose, indication or recommendation. Candidate or retired rules remain non-authoritative until a separate reviewed change explicitly promotes them.\n'''
-          replace_once(metadata, old_section, new_section)
-
-          # Focused regression proving lifecycle state is authoritative, not decorative.
-          test_path = Path('packages/clinical-engine/test/type2-source-review-lifecycle-v2.test.ts')
-          if test_path.exists():
-              raise SystemExit(f'{test_path}: file already exists')
-          test_path.write_text(r'''import { describe, expect, it } from "vitest";
-import type { MasterDrugRegistryEntry } from "@glymize/contracts";
-import {
-  applyHardGatesV2,
-  buildDecisionGraphInventoryFromContractsV2,
-  calculateInsulinConversionV2,
-  generateRegimenCandidatesV2,
-  lantusLabelEvidenceV2,
-  suliquaEuEvidenceV2,
-} from "../src/index.js";
-import type {
-  ClinicalStateV2,
-  DecisionGraphInventoryV2,
-  DecisionGraphRequestV2,
-  EvidenceReferenceV2,
-  InsulinConversionRuleV2,
-  IranMarketProductV2,
-  KnowledgeMedicationV2,
-  MedicationGateRuleV2,
-  RegimenConflictRuleV2,
-} from "../src/index.js";
-
-const evidence: EvidenceReferenceV2 = {
-  sourceId: "TEST-SOURCE",
-  title: "Lifecycle regression evidence",
-  version: "1",
-  url: "https://example.test/evidence",
-};
-
-function medication(id: string, tag: string): KnowledgeMedicationV2 {
-  return {
-    masterDrugId: id,
-    genericName: `Medicine ${id}`,
-    combination: false,
-    therapeuticAreas: ["Diabetes"],
-    therapyGroup: `group_${id.toLowerCase()}`,
-    primaryLanes: ["glycemic"],
-    routeOptions: ["oral"],
-    efficacyBand: "high",
-    hypoglycemiaRisk: "low",
-    weightDirection: "neutral",
-    effects: [],
-    tags: [tag],
-    evidence: [evidence],
-    engineState: "approved",
-  };
-}
-
-function product(id: string): IranMarketProductV2 {
-  return {
-    productId: `P-${id}`,
-    masterDrugId: id,
-    nfiMatchState: "verified",
-    genericName: `Medicine ${id}`,
-    dosageFormGroup: "tablet",
-    route: "oral",
-    consumptionUnit: "tablet",
-    strengthComponents: [{ ingredientKey: id, amount: 1, unit: "mg" }],
-    consumptionUnitsPerPurchaseUnit: 30,
-    purchaseUnitLabel: "30 tablets",
-    priceToman: 100000,
-    license: { everValid: true, currentValid: true },
-    marketPresence: "recently_observed",
-    observedAt: "2026-09-01T00:00:00.000Z",
-  };
-}
-
-const state: ClinicalStateV2 = {
-  pathway: "modest_intensification",
-  insulinAction: "none",
-  severeHyperglycemia: false,
-  hba1cGap: 1,
-  reasons: [],
-  evidence: [],
-};
-
-function requestWithRules(input: {
-  medicationGateRules?: MedicationGateRuleV2[];
-  regimenConflictRules?: RegimenConflictRuleV2[];
-  currentMedicationId?: string;
-}): DecisionGraphRequestV2 {
-  const a = medication("A", "tag_a");
-  const b = medication("B", "tag_b");
-  const inventory: DecisionGraphInventoryV2 = {
-    knowledge: [a, b],
-    marketProducts: [product("A"), product("B")],
-    doseRules: [],
-    insurancePolicies: [],
-    medicationGateRules: input.medicationGateRules,
-    regimenConflictRules: input.regimenConflictRules,
-  };
-  return {
-    patient: {
-      glycemia: { currentHba1c: 8, targetHba1c: 7 },
-      pregnancy: true,
-      currentMedications: input.currentMedicationId
-        ? [{ masterDrugId: input.currentMedicationId, genericName: `Medicine ${input.currentMedicationId}`, therapyGroup: `group_${input.currentMedicationId.toLowerCase()}` }]
-        : undefined,
-    },
-    preferences: { routePreference: "oral_or_injectable", costPreference: "no_constraint" },
-    inventory,
-  };
-}
-
-describe("Type 2 source version and review lifecycle", () => {
-  it("requires explicit versions for the two regulatory sources closed by this task", () => {
-    expect(lantusLabelEvidenceV2.version).toBe("2025-05-31");
-    expect(suliquaEuEvidenceV2.version).toBe("2026-07-02");
-  });
-
-  it("preserves Master Registry observed provenance and uses a non-fabricated source-code fallback", () => {
-    const base: MasterDrugRegistryEntry = {
-      id: "WD-PROV",
-      canonicalName: "Provenance medicine",
-      searchSynonyms: [],
-      combination: false,
-      therapeuticAreas: ["Diabetes"],
-      drugClass: "Other",
-      primaryIndications: ["Type 2 diabetes"],
-      guidelineRole: "Supportive test fixture",
-      diabetesOrPhenotype: "T2D",
-      clinicalEffects: [],
-      sourceCodes: ["SRC-1"],
-      sourceUrls: ["https://example.test/src"],
-      reviewState: "approved",
-    };
-    const observed = buildDecisionGraphInventoryFromContractsV2({
-      masterRegistry: [{ ...base, sourceObservedAt: "2026-08-07T20:49:40.432578+00:00" }],
-      marketProducts: [],
-    });
-    expect(observed.inventory.knowledge[0]?.evidence.find((item) => item.sourceId === "SRC-1")?.version)
-      .toBe("2026-08-07T20:49:40.432578+00:00");
-
-    const fallback = buildDecisionGraphInventoryFromContractsV2({ masterRegistry: [base], marketProducts: [] });
-    expect(fallback.inventory.knowledge[0]?.evidence.find((item) => item.sourceId === "SRC-1")?.version)
-      .toBe("source-code:SRC-1");
-  });
-
-  it("does not apply candidate or retired medication gates to live decisions", () => {
-    const template: Omit<MedicationGateRuleV2, "reviewState"> = {
-      id: "TEST-PREGNANCY-BLOCK",
-      masterDrugId: "A",
-      when: { fact: "pregnancy", op: "eq", value: true },
-      effect: "exclude",
-      reason: "TEST gate must be lifecycle-bound",
-      evidence: [evidence],
-    };
-    for (const reviewState of ["candidate", "retired"] as const) {
-      const request = requestWithRules({ medicationGateRules: [{ ...template, reviewState }] });
-      const candidate = generateRegimenCandidatesV2(request, state).find((item) => item.regimenId === "med:A:glycemic")!;
-      const gated = applyHardGatesV2(request, state, [], candidate);
-      expect(gated.gate.status).not.toBe("exclude");
-      expect(gated.gate.reasons).not.toContain(template.reason);
-    }
-
-    const approvedRequest = requestWithRules({ medicationGateRules: [{ ...template, reviewState: "approved" }] });
-    const approvedCandidate = generateRegimenCandidatesV2(approvedRequest, state).find((item) => item.regimenId === "med:A:glycemic")!;
-    const approved = applyHardGatesV2(approvedRequest, state, [], approvedCandidate);
-    expect(approved.gate.status).toBe("exclude");
-    expect(approved.gate.reasons).toContain(template.reason);
-  });
-
-  it("ignores non-approved regimen conflicts but enforces an approved conflict", () => {
-    const template: Omit<RegimenConflictRuleV2, "reviewState"> = {
-      id: "TEST-CONFLICT",
-      tagA: "tag_a",
-      tagB: "tag_b",
-      reason: "TEST conflict",
-      evidence: [evidence],
-    };
-    const hasAB = (request: DecisionGraphRequestV2) => generateRegimenCandidatesV2(request, state).some((item) => {
-      const ids = item.components.map((component) => component.masterDrugId);
-      return ids.includes("A") && ids.includes("B");
-    });
-
-    expect(hasAB(requestWithRules({ regimenConflictRules: [{ ...template, reviewState: "candidate" }], currentMedicationId: "A" }))).toBe(true);
-    expect(hasAB(requestWithRules({ regimenConflictRules: [{ ...template, reviewState: "retired" }], currentMedicationId: "A" }))).toBe(true);
-    expect(hasAB(requestWithRules({ regimenConflictRules: [{ ...template, reviewState: "approved" }], currentMedicationId: "A" }))).toBe(false);
-  });
-
-  it("executes only approved insulin conversion edges", () => {
-    const baseRule: Omit<InsulinConversionRuleV2, "reviewState"> = {
-      id: "TEST-CONVERSION",
-      sourceMasterDrugId: "SRC",
-      targetMasterDrugId: "DST",
-      sourceFrequencyPerDay: [1],
-      factor: 0.8,
-      executionStatus: "executable",
-      evidenceTier: "regulatory_label",
-      reason: "TEST conversion",
-      evidence: [evidence],
-    };
-    const request = {
-      sourceMasterDrugId: "SRC",
-      targetMasterDrugId: "DST",
-      sourceTotalDailyUnits: 40,
-      sourceFrequencyPerDay: 1,
-    };
-    expect(calculateInsulinConversionV2(request, [{ ...baseRule, reviewState: "candidate" }]).status).toBe("unsupported");
-    expect(calculateInsulinConversionV2(request, [{ ...baseRule, reviewState: "retired" }]).status).toBe("unsupported");
-    const approved = calculateInsulinConversionV2(request, [{ ...baseRule, reviewState: "approved" }]);
-    expect(approved.status).toBe("executable");
-    expect(approved.targetStartingTotalDailyUnits).toBe(32);
-  });
-});
-''', encoding='utf-8')
+          old = "## 4. Boundary with source review/version governance\n\nThis closure satisfies the Roadmap requirement to make current clinical rule metadata traceable; it does **not** claim that every public schema or every future clinical module has a universal review/version lifecycle.\n\nThe separate Phase 2 item **Add source versioning and review fields** remains independently auditable. A future task may standardize review-state/version metadata more broadly, but it must not fabricate review approval for artifacts that have not undergone that governance process.\n"
+          new = "## 4. Source version and review lifecycle governance\n\nThe Phase 2 source/review lifecycle is now explicit for live Type 2 authority. Evidence references are versioned, and decision-bearing medication gates, regimen conflicts and insulin-conversion edges carry `candidate | approved | retired`.\n\nLifecycle state is not display-only metadata: live consumers fail closed and apply only `approved` rules. Existing builders that were already the reviewed authority emit `approved`; this task does not promote any new clinical rule, threshold, dose, indication or recommendation. Candidate or retired rules remain non-authoritative until a separate reviewed change explicitly promotes them.\n"
+          replace_once(metadata, old, new)
           PY
 
       - name: Build contracts dependency
@@ -434,7 +212,6 @@ describe("Type 2 source version and review lifecycle", () => {
                   packages/clinical-engine/src/decision-graph-v2/painful-dpn-protocol.ts \
                   packages/clinical-engine/src/decision-graph-v2/gates.ts \
                   packages/clinical-engine/src/decision-graph-v2/regimens.ts \
-                  packages/clinical-engine/test/type2-source-review-lifecycle-v2.test.ts \
                   docs/architecture/CLINICAL_RULE_METADATA.md
           git diff --cached --check
           git commit -m "feat: enforce Type 2 source review lifecycle"
