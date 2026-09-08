@@ -46,7 +46,7 @@ export interface BrowserCatalogState {
   marketOverrides: Record<string, { approved: boolean; approvedAt: string }>;
 }
 
-interface PublishedCatalogState extends BrowserCatalogState {
+export interface PublishedCatalogState extends BrowserCatalogState {
   schemaVersion: 1 | 2;
   revision: string;
   updatedAt: string;
@@ -69,36 +69,84 @@ function emptyState(): BrowserCatalogState {
   };
 }
 
+type CatalogSchemaVersion = PublishedCatalogState["schemaVersion"];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function isSupportedCatalogSchemaVersion(
+  value: unknown,
+): value is CatalogSchemaVersion {
+  return value === 1 || value === 2;
+}
+
+function normalizeCatalogState(
+  parsed: Partial<BrowserCatalogState>,
+): BrowserCatalogState {
+  return {
+    ...emptyState(),
+    ...parsed,
+    marketData: parsed.marketData ?? {},
+    notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+    updateRuns: Array.isArray(parsed.updateRuns) ? parsed.updateRuns : [],
+    masterCandidates: Array.isArray(parsed.masterCandidates) ? parsed.masterCandidates : [],
+    masterRegistry: Array.isArray(parsed.masterRegistry) ? parsed.masterRegistry : [],
+    customPresentations: Array.isArray(parsed.customPresentations)
+      ? parsed.customPresentations
+      : [],
+    marketOverrides: parsed.marketOverrides ?? {},
+  };
+}
+
 export function parseStoredCatalogState(value: string | null): {
   state: BrowserCatalogState;
   savedAt?: string;
 } | null {
   if (!value) return null;
   try {
-    const raw = JSON.parse(value) as {
-      state?: Partial<BrowserCatalogState>;
-      savedAt?: string;
-    } & Partial<BrowserCatalogState>;
-    const parsed = raw.state ?? raw;
+    const rawValue: unknown = JSON.parse(value);
+    if (!isRecord(rawValue)) return null;
+    if (
+      rawValue.schemaVersion !== undefined &&
+      !isSupportedCatalogSchemaVersion(rawValue.schemaVersion)
+    ) {
+      return null;
+    }
+    const stateValue = rawValue.state ?? rawValue;
+    if (!isRecord(stateValue)) return null;
     return {
-      state: {
-        ...emptyState(),
-        ...parsed,
-        marketData: parsed.marketData ?? {},
-        notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
-        updateRuns: Array.isArray(parsed.updateRuns) ? parsed.updateRuns : [],
-        masterCandidates: Array.isArray(parsed.masterCandidates) ? parsed.masterCandidates : [],
-        masterRegistry: Array.isArray(parsed.masterRegistry) ? parsed.masterRegistry : [],
-        customPresentations: Array.isArray(parsed.customPresentations)
-          ? parsed.customPresentations
-          : [],
-        marketOverrides: parsed.marketOverrides ?? {},
-      },
-      savedAt: raw.savedAt,
+      state: normalizeCatalogState(stateValue as Partial<BrowserCatalogState>),
+      savedAt: typeof rawValue.savedAt === "string" ? rawValue.savedAt : undefined,
     };
   } catch {
     return null;
   }
+}
+
+export function parsePublishedCatalogState(
+  value: unknown,
+): PublishedCatalogState | null {
+  if (!isRecord(value) || !isSupportedCatalogSchemaVersion(value.schemaVersion)) {
+    return null;
+  }
+  if (
+    typeof value.revision !== "string" ||
+    !value.revision ||
+    typeof value.updatedAt !== "string" ||
+    !Number.isFinite(Date.parse(value.updatedAt)) ||
+    typeof value.updatedBy !== "string" ||
+    !value.updatedBy
+  ) {
+    return null;
+  }
+  return {
+    ...normalizeCatalogState(value as Partial<BrowserCatalogState>),
+    schemaVersion: value.schemaVersion,
+    revision: value.revision,
+    updatedAt: value.updatedAt,
+    updatedBy: value.updatedBy,
+  };
 }
 
 function notifyPublish(status: "pending" | "publishing" | "success" | "error", message: string) {
@@ -189,24 +237,9 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
           { cache: "no-store" },
         );
         if (!response.ok) throw new Error("published_catalog_unavailable");
-        const published = (await response.json()) as PublishedCatalogState;
-        const publishedState: BrowserCatalogState = {
-          visibility: published.visibility ?? {},
-          insurance: published.insurance ?? {},
-          brands: published.brands ?? {},
-          customGenerics: published.customGenerics ?? [],
-          marketData: published.marketData ?? {},
-          notifications: published.notifications ?? [],
-          updateRuns: published.updateRuns ?? [],
-          masterCandidates: Array.isArray(published.masterCandidates)
-            ? published.masterCandidates
-            : [],
-          masterRegistry: Array.isArray(published.masterRegistry) ? published.masterRegistry : [],
-          customPresentations: Array.isArray(published.customPresentations)
-            ? published.customPresentations
-            : [],
-          marketOverrides: published.marketOverrides ?? {},
-        };
+        const published = parsePublishedCatalogState(await response.json());
+        if (!published) throw new Error("published_catalog_schema_unsupported");
+        const publishedState = normalizeCatalogState(published);
         const localIsNewer = Boolean(
           localDraft?.savedAt && Date.parse(localDraft.savedAt) > Date.parse(published.updatedAt),
         );

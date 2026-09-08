@@ -649,6 +649,48 @@ async function loadChunkedClinicianMarket(
   return reconstructed;
 }
 
+export type ClinicianMarketDeploymentMeta = {
+  schemaVersion: 1;
+  runtimeSchemaVersion: 2;
+  kind: "glymize_clinician_market_deployment_meta";
+  deploymentSha256?: string;
+  canonicalSha256?: string;
+};
+
+function isSha256(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+}
+
+export function parseClinicianMarketDeploymentMeta(
+  value: unknown,
+): ClinicianMarketDeploymentMeta | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const meta = value as Record<string, unknown>;
+  if (
+    meta.schemaVersion !== 1 ||
+    meta.runtimeSchemaVersion !== 2 ||
+    meta.kind !== "glymize_clinician_market_deployment_meta"
+  ) {
+    return null;
+  }
+  if (meta.deploymentSha256 !== undefined && !isSha256(meta.deploymentSha256)) {
+    return null;
+  }
+  if (meta.canonicalSha256 !== undefined && !isSha256(meta.canonicalSha256)) {
+    return null;
+  }
+  if (meta.deploymentSha256 === undefined && meta.canonicalSha256 === undefined) {
+    return null;
+  }
+  return {
+    schemaVersion: 1,
+    runtimeSchemaVersion: 2,
+    kind: "glymize_clinician_market_deployment_meta",
+    deploymentSha256: meta.deploymentSha256 as string | undefined,
+    canonicalSha256: meta.canonicalSha256 as string | undefined,
+  };
+}
+
 export async function loadClinicianMarketV2() {
   if (marketIndex || typeof window === "undefined") return;
   if (marketLoadPromise) return marketLoadPromise;
@@ -660,9 +702,9 @@ export async function loadClinicianMarketV2() {
         { cache: "no-store" },
       );
       if (metaResponse.ok) {
-        const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };
-        runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;
-      }
+          const meta = parseClinicianMarketDeploymentMeta(await metaResponse.json());
+          runtimeVersion = meta?.deploymentSha256 ?? meta?.canonicalSha256 ?? runtimeVersion;
+        }
     } catch {
       // Runtime remains usable if the small metadata file is temporarily unavailable.
     }
