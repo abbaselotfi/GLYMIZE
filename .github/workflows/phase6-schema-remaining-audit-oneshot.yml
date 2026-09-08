@@ -10,6 +10,8 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    env:
+      CBM_VERSION: 0.10.8
     steps:
       - name: Checkout exact task branch
         uses: actions/checkout@v4
@@ -18,14 +20,20 @@ jobs:
           fetch-depth: 0
 
       - name: Install pinned Codebase Memory
-        shell: pwsh
+        shell: bash
         run: |
-          Invoke-WebRequest -Uri https://github.com/codebase-memory/codebase-memory/releases/download/v0.10.8/codebase-memory-linux-x64 -OutFile ./codebase-memory
-          chmod +x ./codebase-memory
-          sudo mv ./codebase-memory /usr/local/bin/codebase-memory
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Verify Codebase Memory version
-        run: codebase-memory --version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
 
       - name: Run normative PRE graph gate
         shell: pwsh
