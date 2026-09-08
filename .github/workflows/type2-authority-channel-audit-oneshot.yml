@@ -1,4 +1,4 @@
-name: One-shot Type 2 authority channel audit
+name: One-shot Type 2 authority channel finalizer
 
 on:
   push:
@@ -6,12 +6,12 @@ on:
       - 'refactor/type2-authority-channel-separation-20260908'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  audit:
+  finalize:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       CBM_VERSION: '0.10.8'
     steps:
@@ -19,6 +19,41 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply deterministic authority-channel patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/type2-authority-channel-separation-finalize.py
+          git diff --check
+          git status --short
+
+      - name: Typecheck clinical engine
+        shell: bash
+        run: pnpm --filter @glymize/clinical-engine typecheck
+
+      - name: Run focused authority-channel regression
+        shell: bash
+        run: pnpm --filter @glymize/clinical-engine exec vitest run test/type2-authority-channel-separation-v2.test.ts
+
+      - name: Run full clinical engine suite
+        shell: bash
+        run: pnpm --filter @glymize/clinical-engine test
 
       - name: Install pinned Codebase Memory
         shell: bash
@@ -36,23 +71,29 @@ jobs:
           codebase-memory-mcp --version | tee /tmp/cbm-version.txt
           grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
 
-      - name: Run normative PRE graph gate
+      - name: Run normative POST graph gate
         shell: pwsh
-        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+        run: ./scripts/codebase-memory-gate.ps1 -Phase post -RoadmapReviewed -GraphRelevant
 
-      - name: Inventory gate and preference mutations
+      - name: Commit verified implementation
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== gate.status writes ==='
-          grep -RIn --include='*.ts' 'gate\.status\|status = "exclude"\|status = "conditional"\|status = "historical_only"\|status = "needs_data"' packages/clinical-engine/src/decision-graph-v2 || true
-          echo '=== preference/access mutations ==='
-          grep -RIn --include='*.ts' 'routePreference\|costPreference\|preferenceConflicts\|insuranceFit\|monthlyMedicationBudgetToman' packages/clinical-engine/src/decision-graph-v2 || true
-          echo '=== gate consumers ==='
-          grep -RIn --include='*.ts' 'gate\.status' packages/clinical-engine/src apps/web/lib apps/web/app | head -n 300 || true
-
-      - name: Inventory retained compatibility boundaries
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -RIn --include='*.ts' 'filterHardExcludedLegacyType2Assessment\|legacyType2HardExclusionReasons\|priorityScore\|blockedBy' packages/clinical-engine/src apps/web/lib | head -n 300 || true
+          git config user.name "abbaselotfi"
+          git config user.email "167691975+abbaselotfi@users.noreply.github.com"
+          git add \
+            docs/PROJECT_OVERVIEW_AND_ROADMAP.md \
+            docs/REMAINING_ROADMAP_REBASELINE_2026-09-08.md \
+            docs/architecture/CLINICAL_RULE_PRECEDENCE.md \
+            packages/clinical-engine/src/decision-graph-v2/types.ts \
+            packages/clinical-engine/src/decision-graph-v2/index.ts \
+            packages/clinical-engine/src/decision-graph-v2/selection-constraints.ts \
+            packages/clinical-engine/src/decision-graph-v2/regimens.ts \
+            packages/clinical-engine/src/decision-graph-v2/gates.ts \
+            packages/clinical-engine/src/decision-graph-v2/enrich.ts \
+            packages/clinical-engine/src/decision-graph-v2/engine.ts \
+            packages/clinical-engine/src/decision-graph-v2/composer.ts \
+            packages/clinical-engine/test/type2-authority-channel-separation-v2.test.ts
+          git diff --cached --check
+          git commit -m "refactor: separate Type 2 selection authority channels"
+          git push origin HEAD:refactor/type2-authority-channel-separation-20260908
