@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - 'refactor/type2-authority-channel-separation-20260908'
+    paths:
+      - '.github/workflows/type2-authority-channel-audit-oneshot.yml'
+      - 'scripts/type2-authority-channel-separation-finalize.py'
 
 permissions:
   contents: write
@@ -22,8 +25,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Set up Node
         uses: actions/setup-node@v6
