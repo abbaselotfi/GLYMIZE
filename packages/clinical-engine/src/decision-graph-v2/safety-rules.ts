@@ -40,6 +40,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
   for (const masterDrugId of metforminIds(knowledge)) {
     medicationGateRules.push({
       id: `ADA2026-METFORMIN-EGFR30:${masterDrugId}`,
+      reviewState: "approved",
       masterDrugId,
       when: { fact: "kidney.eGfr", op: "lt", value: metforminContraindicatedBelowEgfr },
       effect: "exclude",
@@ -48,6 +49,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
     });
     medicationGateRules.push({
       id: `METFORMIN-EGFR30-44-REVIEW:${masterDrugId}`,
+      reviewState: "approved",
       masterDrugId,
       when: { all: [
         { fact: "kidney.eGfr", op: "gte", value: metforminContraindicatedBelowEgfr },
@@ -61,6 +63,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
 
   medicationGateRules.push({
     id: "ADA2026-TZD-HF",
+    reviewState: "approved",
     therapyGroup: "thiazolidinedione",
     when: { fact: "cardiovascular.heartFailure", op: "eq", value: true },
     effect: "exclude",
@@ -71,6 +74,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
   const regimenConflictRules: RegimenConflictRuleV2[] = [
     {
       id: "ADA2026-DPP4-GLP1-CONCURRENT",
+      reviewState: "approved",
       tagA: "dpp4_inhibitor",
       tagB: "glp_1_receptor_agonist",
       reason: "Concurrent DPP-4 inhibitor and GLP-1 RA therapy is not recommended because it adds no meaningful glucose lowering beyond GLP-1-based therapy.",
@@ -78,6 +82,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
     },
     {
       id: "ADA2026-DPP4-DUALGIPGLP1-CONCURRENT",
+      reviewState: "approved",
       tagA: "dpp4_inhibitor",
       tagB: "dual_gip_glp_1_receptor_agonist",
       reason: "Concurrent DPP-4 inhibitor and dual GIP/GLP-1 therapy is not recommended.",
@@ -85,6 +90,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
     },
     {
       id: "ADA2026-FRC-GLP1-DUPLICATION",
+      reviewState: "approved",
       tagA: "fixed_ratio_combination",
       tagB: "glp_1_receptor_agonist",
       reason: "A basal-insulin/GLP-1 fixed-ratio combination must not be layered with another GLP-1 receptor agonist.",
@@ -92,6 +98,7 @@ export function buildCoreAda2026DecisionRulesV2(knowledge: readonly KnowledgeMed
     },
     {
       id: "ADA2026-FRC-DUALGIPGLP1-DUPLICATION",
+      reviewState: "approved",
       tagA: "fixed_ratio_combination",
       tagB: "dual_gip_glp_1_receptor_agonist",
       reason: "A basal-insulin/GLP-1 fixed-ratio combination must not be combined with a dual GIP/GLP-1 agonist.",

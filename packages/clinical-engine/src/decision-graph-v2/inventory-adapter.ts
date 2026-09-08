@@ -118,6 +118,7 @@ function evidenceFromMaster(entry: MasterDrugRegistryEntry): EvidenceReferenceV2
   return entry.sourceCodes.map((sourceId, index) => ({
     sourceId,
     title: sourceId,
+    version: entry.sourceObservedAt ?? `source-code:${sourceId}`,
     url: entry.sourceUrls[index] ?? entry.sourceUrls[0] ?? "about:blank",
     strength: "supportive" as const,
   }));

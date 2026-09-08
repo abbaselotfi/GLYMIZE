@@ -169,6 +169,7 @@ export function applyHardGatesV2(
     }
 
     const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>
+      rule.reviewState === "approved" &&
       (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&
       (!rule.therapyGroup || rule.therapyGroup === medication.therapyGroup) &&
       evaluatePredicateV2(rule.when, facts),

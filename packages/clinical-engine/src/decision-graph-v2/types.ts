@@ -18,7 +18,7 @@ export type EvidenceStrengthV2 =
 export interface EvidenceReferenceV2 {
   sourceId: string;
   title: string;
-  version?: string;
+  version: string;
   url: string;
   locator?: string;
   strength?: EvidenceStrengthV2;
@@ -371,6 +371,7 @@ export type PredicateV2 =
 
 export interface MedicationGateRuleV2 {
   id: string;
+  reviewState: "candidate" | "approved" | "retired";
   masterDrugId?: string;
   therapyGroup?: string;
   when: PredicateV2;
@@ -381,6 +382,7 @@ export interface MedicationGateRuleV2 {
 
 export interface RegimenConflictRuleV2 {
   id: string;
+  reviewState: "candidate" | "approved" | "retired";
   tagA: string;
   tagB: string;
   reason: string;
@@ -631,6 +633,7 @@ export type InsulinConversionEvidenceTierV2 = "regulatory_label" | "reviewed_int
 
 export interface InsulinConversionRuleV2 {
   id: string;
+  reviewState: "candidate" | "approved" | "retired";
   sourceMasterDrugId: string;
   targetMasterDrugId: string;
   sourceFrequencyPerDay?: number[];

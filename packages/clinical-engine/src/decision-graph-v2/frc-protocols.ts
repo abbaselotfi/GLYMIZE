@@ -19,6 +19,7 @@ export const soliquaUs2026EvidenceV2: EvidenceReferenceV2 = {
 export const suliquaEuEvidenceV2: EvidenceReferenceV2 = {
   sourceId: "EU-LABEL-SULIQUA",
   title: "Suliqua (insulin glargine/lixisenatide) — EU Product Information",
+  version: "2026-07-02",
   url: "https://www.ema.europa.eu/en/medicines/human/EPAR/suliqua",
   locator: "Product information and two-pen dosing table",
   strength: "regulatory_label",

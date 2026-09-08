@@ -9,6 +9,7 @@ import type {
 export const lantusLabelEvidenceV2: EvidenceReferenceV2 = {
   sourceId: "US-LABEL-LANTUS",
   title: "LANTUS (insulin glargine U-100) — U.S. Prescribing Information",
+  version: "2025-05-31",
   url: "https://products.sanofi.us/Lantus/Lantus.html",
   locator: "Dosage and Administration 2.4: switching from TOUJEO and NPH",
   strength: "regulatory_label",
@@ -73,8 +74,13 @@ function regularKnowledge(knowledge: readonly KnowledgeMedicationV2[]) {
   return findOne(knowledge, (item) => item.therapyGroup === "human_insulin" && /regular/.test(norm(item.genericName)));
 }
 
-function pushRule(rules: InsulinConversionRuleV2[], rule: InsulinConversionRuleV2 | undefined) {
-  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) rules.push(rule);
+function pushRule(
+  rules: InsulinConversionRuleV2[],
+  rule: Omit<InsulinConversionRuleV2, "reviewState"> | undefined,
+) {
+  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) {
+    rules.push({ ...rule, reviewState: "approved" });
+  }
 }
 
 /**
@@ -167,7 +173,7 @@ export function calculateInsulinConversionV2(
   }
   if (request.sourceMasterDrugId === request.targetMasterDrugId) return { ...base, rationale: ["Source and target insulin are identical; no conversion is required."] };
 
-  const rule = rules.find((item) => item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));
+  const rule = rules.find((item) => item.reviewState === "approved" && item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));
   if (!rule) return { ...base, rationale: ["No reviewed conversion edge exists for this source/target/frequency combination. Decision Graph will not invent a dose conversion."] };
 
   const targetTdd = roundUnits(request.sourceTotalDailyUnits * rule.factor);

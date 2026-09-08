@@ -481,6 +481,7 @@ export function buildReviewedCardiometabolicGateRulesV2(
     if (!medication) continue;
     rules.push({
       id: `PHASE4-PREGNANCY-EXCLUDE:${medication.masterDrugId}`,
+      reviewState: "approved",
       masterDrugId: medication.masterDrugId,
       when: { fact: "pregnancy", op: "eq", value: true },
       effect: "exclude",
@@ -494,6 +495,7 @@ export function buildReviewedCardiometabolicGateRulesV2(
     if (!medication) continue;
     rules.push({
       id: `PHASE4-PREGNANCY-STATIN-REVIEW:${medication.masterDrugId}`,
+      reviewState: "approved",
       masterDrugId: medication.masterDrugId,
       when: { fact: "pregnancy", op: "eq", value: true },
       effect: "conditional",

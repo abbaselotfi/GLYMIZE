@@ -95,6 +95,7 @@ function baseRegimens(request: DecisionGraphRequestV2, medication: KnowledgeMedi
 
 function conflictReason(tagsA: readonly string[], tagsB: readonly string[], rules: readonly RegimenConflictRuleV2[]) {
   for (const rule of rules) {
+    if (rule.reviewState !== "approved") continue;
     const direct = tagsA.includes(rule.tagA) && tagsB.includes(rule.tagB);
     const reverse = tagsA.includes(rule.tagB) && tagsB.includes(rule.tagA);
     if (direct || reverse) return rule;

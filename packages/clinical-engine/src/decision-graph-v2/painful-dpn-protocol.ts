@@ -226,6 +226,7 @@ export function buildReviewedPainfulDpnGateRulesV2(
   if (pregabalin) {
     rules.push({
       id: `LABEL-PREGABALIN-HYPERSENSITIVITY:${pregabalin.masterDrugId}`,
+      reviewState: "approved",
       masterDrugId: pregabalin.masterDrugId,
       when: { fact: "medicationSafety.knownPregabalinHypersensitivity", op: "eq", value: true },
       effect: "exclude",
@@ -238,6 +239,7 @@ export function buildReviewedPainfulDpnGateRulesV2(
     rules.push(
       {
         id: `LABEL-DULOXETINE-MAOI:${duloxetine.masterDrugId}`,
+        reviewState: "approved",
         masterDrugId: duloxetine.masterDrugId,
         when: { fact: "medicationSafety.maoiUseOrRecentExposure", op: "eq", value: true },
         effect: "exclude",
@@ -246,6 +248,7 @@ export function buildReviewedPainfulDpnGateRulesV2(
       },
       {
         id: `LABEL-DULOXETINE-RENAL-LT30:${duloxetine.masterDrugId}`,
+        reviewState: "approved",
         masterDrugId: duloxetine.masterDrugId,
         when: { fact: "kidney.eGfr", op: "lt", value: 30 },
         effect: "exclude",
@@ -254,6 +257,7 @@ export function buildReviewedPainfulDpnGateRulesV2(
       },
       {
         id: `LABEL-DULOXETINE-CHRONIC-LIVER:${duloxetine.masterDrugId}`,
+        reviewState: "approved",
         masterDrugId: duloxetine.masterDrugId,
         when: {
           any: [
@@ -267,6 +271,7 @@ export function buildReviewedPainfulDpnGateRulesV2(
       },
       {
         id: `LABEL-DULOXETINE-SUBSTANTIAL-ALCOHOL:${duloxetine.masterDrugId}`,
+        reviewState: "approved",
         masterDrugId: duloxetine.masterDrugId,
         when: { fact: "medicationSafety.substantialAlcoholUse", op: "eq", value: true },
         effect: "exclude",
