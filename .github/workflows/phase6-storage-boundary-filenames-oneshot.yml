@@ -1,0 +1,35 @@
+name: One-shot Phase 6 browser storage filenames
+
+on:
+  push:
+    branches:
+      - audit/phase6-remaining-schema-boundaries-20260908
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: audit/phase6-remaining-schema-boundaries-20260908
+      - name: List production storage files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- local/session storage production files ---'
+          grep -RIlE 'localStorage|sessionStorage' apps/web --include='*.ts' --include='*.tsx' \
+            | grep -Ev '/test/|\.test\.|\.spec\.' | sort || true
+          echo '--- structured local/session write sites ---'
+          grep -RInE '(localStorage|sessionStorage)\.setItem' apps/web --include='*.ts' --include='*.tsx' \
+            | grep -Ev '/test/|\.test\.|\.spec\.' | sort || true
+          echo '--- JSON parse/stringify in storage-bearing files ---'
+          files=$(grep -RIlE 'localStorage|sessionStorage' apps/web --include='*.ts' --include='*.tsx' | grep -Ev '/test/|\.test\.|\.spec\.' || true)
+          for f in $files; do
+            if grep -qE 'JSON\.(parse|stringify)' "$f"; then
+              echo "### $f"
+              grep -nE 'localStorage|sessionStorage|JSON\.(parse|stringify)|schemaVersion|runtimeSchemaVersion' "$f" || true
+            fi
+          done
