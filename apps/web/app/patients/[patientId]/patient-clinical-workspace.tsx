@@ -15,6 +15,7 @@ import {
 } from "../../../lib/patient-clinical-brief";
 import { useGlymizeLocale } from "../../components/use-glymize-locale";
 import styles from "./patient-clinical-workspace.module.css";
+import { PatientWorkspaceC1Completion } from "./patient-workspace-c1-completion";
 
 function formatDate(value: string | undefined, fa: boolean) {
   if (!value) return fa ? "ثبت نشده" : "Not recorded";
@@ -426,6 +427,8 @@ export default function PatientClinicalWorkspace({ patientId }: { patientId: str
           </article>
         </div>
       </section>
+
+      <PatientWorkspaceC1Completion model={model} patientId={patientId} locale={locale} />
 
       <div className={styles.lowerGrid}>
         <section className={styles.panel} data-patient-workspace="timeline">
