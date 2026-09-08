@@ -42,7 +42,7 @@ export async function readPatientCoreTimeline(
   }));
 
   for (const order of orders) {
-    const label = order.orderKind === "medication"
+    const label = "genericName" in order.order
       ? order.order.genericName
       : order.order.displayName;
     items.push({
