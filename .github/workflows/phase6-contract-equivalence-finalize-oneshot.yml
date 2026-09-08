@@ -30,6 +30,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build API dependency closure
+        run: pnpm turbo run build --filter=@glymize/api...
       - name: Test API compatibility contract
         run: pnpm --filter @glymize/api test
       - name: Typecheck monorepo
