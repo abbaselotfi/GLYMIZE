@@ -660,9 +660,9 @@ export async function loadClinicianMarketV2() {
         { cache: "no-store" },
       );
       if (metaResponse.ok) {
-        const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };
-        runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;
-      }
+          const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };
+          runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;
+        }
     } catch {
       // Runtime remains usable if the small metadata file is temporarily unavailable.
     }
