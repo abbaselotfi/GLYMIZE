@@ -1,0 +1,93 @@
+name: One-shot Phase 6 shared seed ownership audit
+
+on:
+  push:
+    branches:
+      - 'refactor/phase6-shared-seed-ownership-20260908'
+    paths:
+      - '.github/workflows/phase6-shared-seed-audit-oneshot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CBM_VERSION: '0.10.8'
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+
+      - name: Inventory API-owned shared seed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== catalogue/guideline files under apps/api/src ==='
+          find apps/api/src/catalog apps/api/src/guidelines -maxdepth 3 -type f | sort
+          echo '=== checksums of seed/reference payload files ==='
+          sha256sum \
+            apps/api/src/catalog/ada-2026-type2-seed.ts \
+            apps/api/src/catalog/global-reference-catalog.ts \
+            apps/api/src/guidelines/guideline-sources.ts
+
+      - name: Inventory cross-boundary imports and symbol consumers
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== direct path/name references ==='
+          grep -RInE \
+            --include='*.ts' --include='*.tsx' --include='*.mjs' --include='*.cjs' \
+            'ada-2026-type2-seed|guideline-sources|global-reference-catalog|apps/api/src|api/src/catalog|api/src/guidelines' \
+            apps packages scripts .github 2>/dev/null || true
+          echo '=== relative imports that climb from web/packages into apps/api ==='
+          grep -RInE \
+            --include='*.ts' --include='*.tsx' \
+            'from[[:space:]]+["'"'](\.\./)+.*api/' \
+            apps/web packages 2>/dev/null || true
+
+      - name: Inventory workspace ownership and build boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== workspace ==='
+          cat pnpm-workspace.yaml
+          echo '=== package names/dependencies ==='
+          node - <<'NODE'
+          const fs = require('fs');
+          for (const p of [
+            'apps/api/package.json',
+            'apps/web/package.json',
+            'packages/contracts/package.json',
+            'packages/clinical-engine/package.json',
+          ]) {
+            const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+            console.log(p, JSON.stringify({name:j.name, dependencies:j.dependencies, devDependencies:j.devDependencies}, null, 2));
+          }
+          NODE
+          echo '=== next/tsconfig external-boundary settings ==='
+          cat apps/web/next.config.ts
+          cat apps/web/tsconfig.json
