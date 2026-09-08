@@ -1,4 +1,5 @@
 import { isRuntimeOriginAllowed } from "./platform-cors";
+import { parseAiModelsKvPayload, serializeAiModelsKvPayload } from "./ai-model-storage";
 import {
   ADMIN_PERMISSION_KEYS,
   openPayload,
@@ -521,17 +522,15 @@ async function decryptAiToken(value: string, masterSecret: string) {
 async function readAiModels(env: Env): Promise<AiModelConfig[]> {
   const raw = await env.AI_CONFIG_KV.get(AI_MODELS_KEY);
   if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is AiModelConfig => Boolean(item) && typeof item === "object" && validAiModel(item as AiModelConfig));
-  } catch {
-    return [];
-  }
+  const parsed = parseAiModelsKvPayload(
+    raw,
+    (item): item is AiModelConfig => Boolean(item) && typeof item === "object" && validAiModel(item as AiModelConfig),
+  );
+  return parsed?.models ?? [];
 }
 
 async function writeAiModels(env: Env, models: AiModelConfig[]) {
-  await env.AI_CONFIG_KV.put(AI_MODELS_KEY, JSON.stringify(models));
+  await env.AI_CONFIG_KV.put(AI_MODELS_KEY, serializeAiModelsKvPayload(models));
 }
 
 async function publicAiModel(env: Env, model: AiModelConfig): Promise<AiModelPublic> {
