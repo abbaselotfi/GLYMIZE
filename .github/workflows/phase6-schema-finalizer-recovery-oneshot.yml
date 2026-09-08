@@ -23,24 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('apps/web/lib/clinician-market-v2.ts')
-          text = path.read_text(encoding='utf-8')
-          old = '''      if (metaResponse.ok) {
-        const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };
-        runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;
-      }
-'''
-          new = '''      if (metaResponse.ok) {
-          const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };
-          runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;
-        }
-'''
-          if old not in text:
-              raise SystemExit('clinician-market metadata marker not found')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
-          PY
+          python -c 'from pathlib import Path; p=Path("apps/web/lib/clinician-market-v2.ts"); t=p.read_text(encoding="utf-8"); old="      if (metaResponse.ok) {\n        const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };\n        runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;\n      }\n"; new="      if (metaResponse.ok) {\n          const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };\n          runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;\n        }\n"; assert old in t, "clinician-market metadata marker not found"; p.write_text(t.replace(old,new,1),encoding="utf-8")'
 
       - name: Commit marker normalization
         shell: bash
