@@ -76,6 +76,7 @@ apps/
   admin-worker/        Cloudflare Worker for secure admin publishing
 
 packages/
+  catalog-data/        Shared compiled catalogue/reference seed data
   clinical-engine/     Clinical pathway and medication ranking logic
   contracts/           Shared type-safe contracts
 

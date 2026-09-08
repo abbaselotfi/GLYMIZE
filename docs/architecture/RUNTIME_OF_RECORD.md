@@ -79,7 +79,7 @@ The global patient account architecture is additive. A practice-scoped patient r
 - catalogue routes used by the web app are browser-owned even if `NEXT_PUBLIC_API_URL` is set;
 - patient/encounter clients use the Cloudflare Worker runtime instead.
 
-Some web build-time imports still reuse catalogue and guideline seed files located under `apps/api/src`. That source-code dependency does not make the NestJS process a production runtime or source of truth. Moving those shared seeds to a neutral package remains planned cleanup.
+Shared compiled catalogue/reference seed data now live in the neutral `@glymize/catalog-data` package, while the active guideline-source registry is consumed directly from `@glymize/clinical-engine`. The web build/runtime no longer imports seed modules from `apps/api/src`; the NestJS process remains local-development-only compatibility code and is not promoted into production authority by this cleanup.
 
 Do not point production traffic or real patient data at `apps/api` unless a future reviewed architecture decision, persistence design, authorization model, and deployment plan explicitly promote it.
 

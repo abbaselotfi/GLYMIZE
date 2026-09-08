@@ -19,8 +19,12 @@ import type {
   UpdateMedicationBrandInput,
   UpdateMedicationVisibilityInput
 } from "@glymize/contracts";
-import { ada2026Type2GenericSeed, type2ProtocolSeed } from "./ada-2026-type2-seed.js";
-import { globalReferenceCatalogue, globalReferenceCatalogueSources } from "./global-reference-catalog.js";
+import {
+  ada2026Type2GenericSeed,
+  globalReferenceCatalogue,
+  globalReferenceCatalogueSources,
+  type2ProtocolSeed,
+} from "@glymize/catalog-data";
 
 function rankableType2InsuranceCoverages(
   coverages: InsuranceCoverage[],

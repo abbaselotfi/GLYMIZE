@@ -39,6 +39,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@glymize/catalog-data':
+        specifier: workspace:*
+        version: link:../../packages/catalog-data
       '@glymize/clinical-engine':
         specifier: workspace:*
         version: link:../../packages/clinical-engine
@@ -67,6 +70,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@glymize/catalog-data':
+        specifier: workspace:*
+        version: link:../../packages/catalog-data
       '@glymize/clinical-engine':
         specifier: workspace:*
         version: link:../../packages/clinical-engine
@@ -104,6 +110,12 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@26.1.2)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(tsx@4.23.1))
+
+  packages/catalog-data:
+    dependencies:
+      '@glymize/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/clinical-engine:
     dependencies:

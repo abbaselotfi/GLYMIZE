@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   globalReferenceCatalogue,
   globalReferenceCatalogueSources,
-} from "../../api/src/catalog/global-reference-catalog";
+} from "@glymize/catalog-data";
 import {
   draftFingerprint,
   isPersianCalendarDate,
