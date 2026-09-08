@@ -1,0 +1,54 @@
+name: One-shot Phase 6 schema finalizer recovery
+
+on:
+  push:
+    branches:
+      - audit/phase6-schema-version-coverage-20260908
+    paths:
+      - .github/workflows/phase6-schema-finalizer-recovery-oneshot.yml
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Normalize finalizer marker only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/lib/clinician-market-v2.ts')
+          text = path.read_text(encoding='utf-8')
+          old = '''      if (metaResponse.ok) {
+        const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };
+        runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;
+      }
+'''
+          new = '''      if (metaResponse.ok) {
+          const meta = await metaResponse.json() as { deploymentSha256?: string; canonicalSha256?: string };
+          runtimeVersion = meta.deploymentSha256 ?? meta.canonicalSha256 ?? runtimeVersion;
+        }
+'''
+          if old not in text:
+              raise SystemExit('clinician-market metadata marker not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Commit marker normalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name abbaselotfi
+          git config user.email 167691975+abbaselotfi@users.noreply.github.com
+          git add apps/web/lib/clinician-market-v2.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: normalize schema finalizer marker"
+          git push origin HEAD:audit/phase6-schema-version-coverage-20260908
