@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/type2-authority-channel-audit-oneshot.yml'
       - 'scripts/type2-authority-channel-separation-finalize.py'
+      - 'scripts/type2-authority-channel-separation-test-fixtures.py'
 
 permissions:
   contents: write
@@ -41,6 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/type2-authority-channel-separation-finalize.py
+          python scripts/type2-authority-channel-separation-test-fixtures.py
           git diff --check
           git status --short
 
@@ -50,7 +52,7 @@ jobs:
 
       - name: Run focused authority-channel regression
         shell: bash
-        run: pnpm --filter @glymize/clinical-engine exec vitest run test/type2-authority-channel-separation-v2.test.ts
+        run: pnpm --filter @glymize/clinical-engine exec vitest run test/type2-authority-channel-separation-v2.test.ts test/mash-wegovy-titration-cost-v2.test.ts test/wegovy-continuation-window-cost-v2.test.ts
 
       - name: Run full clinical engine suite
         shell: bash
@@ -94,7 +96,9 @@ jobs:
             packages/clinical-engine/src/decision-graph-v2/enrich.ts \
             packages/clinical-engine/src/decision-graph-v2/engine.ts \
             packages/clinical-engine/src/decision-graph-v2/composer.ts \
-            packages/clinical-engine/test/type2-authority-channel-separation-v2.test.ts
+            packages/clinical-engine/test/type2-authority-channel-separation-v2.test.ts \
+            packages/clinical-engine/test/mash-wegovy-titration-cost-v2.test.ts \
+            packages/clinical-engine/test/wegovy-continuation-window-cost-v2.test.ts
           git diff --cached --check
           git commit -m "refactor: separate Type 2 selection authority channels"
           git push origin HEAD:refactor/type2-authority-channel-separation-20260908
