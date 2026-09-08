@@ -1,4 +1,4 @@
-import type { PatientCoreFactMeta } from "./provenance.js";
+import type { PatientCoreFactBase } from "./facts.js";
 
 export const patientMedicationStatuses = [
   "active",
@@ -26,11 +26,9 @@ export const patientMedicationAdherenceStates = [
 export type PatientMedicationAdherenceState =
   (typeof patientMedicationAdherenceStates)[number];
 
-export interface PatientMedicationStateView {
-  medicationStateId: string;
+export interface PatientMedicationStateView extends PatientCoreFactBase {
   /** Stable catalogue/master-registry identity when an explicit link exists. */
   medicationId?: string;
-  displayName: string;
   status: PatientMedicationStatus;
   sourceState: PatientMedicationSourceState;
   adherence: PatientMedicationAdherenceState;
@@ -40,5 +38,4 @@ export interface PatientMedicationStateView {
   indication?: string;
   startedAt?: string;
   stoppedAt?: string;
-  meta: PatientCoreFactMeta;
 }

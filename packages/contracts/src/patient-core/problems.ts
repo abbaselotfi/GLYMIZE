@@ -1,4 +1,4 @@
-import type { PatientCoreFactMeta } from "./provenance.js";
+import type { PatientCoreFactBase } from "./facts.js";
 
 export const patientProblemStatuses = [
   "active",
@@ -10,13 +10,16 @@ export const patientProblemStatuses = [
 export type PatientProblemStatus =
   (typeof patientProblemStatuses)[number];
 
-export interface PatientProblemView {
-  problemId: string;
-  conceptKey?: string;
-  displayName: string;
+export interface PatientProblemCoding {
+  system: string;
+  code: string;
+  display?: string;
+}
+
+export interface PatientProblemView extends PatientCoreFactBase {
   status: PatientProblemStatus;
+  coding?: PatientProblemCoding;
   onsetAt?: string;
   resolvedAt?: string;
-  relatedProblemIds?: string[];
-  meta: PatientCoreFactMeta;
+  relatedProblemFactIds?: string[];
 }

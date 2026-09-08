@@ -1,4 +1,4 @@
-import type { PatientCoreFactMeta } from "./provenance.js";
+import type { PatientCoreFactBase } from "./facts.js";
 
 export const patientClinicalContextStates = [
   "present",
@@ -8,11 +8,12 @@ export const patientClinicalContextStates = [
 export type PatientClinicalContextState =
   (typeof patientClinicalContextStates)[number];
 
-export interface PatientClinicalContextView {
-  contextId: string;
-  contextKey: string;
-  displayName: string;
+/**
+ * Cross-cutting state that may affect multiple specialties simultaneously.
+ * A context is not automatically a diagnosis and must not be promoted into the
+ * problem list without an explicit reviewed workflow.
+ */
+export interface PatientClinicalContextView extends PatientCoreFactBase {
   state: PatientClinicalContextState;
   value?: string | number | boolean;
-  meta: PatientCoreFactMeta;
 }
