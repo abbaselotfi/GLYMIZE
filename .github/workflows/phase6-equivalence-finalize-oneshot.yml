@@ -29,10 +29,10 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Focused route-equivalence regression
-        run: pnpm --filter @glymize/web test -- browser-api-route-equivalence.test.ts
       - name: Typecheck monorepo
         run: pnpm typecheck
+      - name: Focused route-equivalence regression
+        run: pnpm --filter @glymize/web exec vitest run test/browser-api-route-equivalence.test.ts
       - name: Lint monorepo
         run: pnpm lint
       - name: Test monorepo
