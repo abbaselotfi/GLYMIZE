@@ -1,0 +1,115 @@
+name: One-shot Phase 6 AI model KV schema finalizer
+
+on:
+  push:
+    branches:
+      - chore/phase6-worker-ai-model-kv-versioning-20260908
+    paths:
+      - .github/workflows/phase6-ai-model-kv-schema-finalize-oneshot.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    env:
+      CBM_VERSION: 0.10.8
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v4
+        with:
+          ref: chore/phase6-worker-ai-model-kv-versioning-20260908
+          fetch-depth: 0
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+      - name: Wire versioned AI model KV codec and policy docs
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          index=Path('apps/admin-worker/src/index.ts')
+          text=index.read_text()
+          import_anchor='import { isRuntimeOriginAllowed } from "./platform-cors";\n'
+          import_line='import { parseAiModelsKvPayload, serializeAiModelsKvPayload } from "./ai-model-storage";\n'
+          assert text.count(import_anchor)==1
+          assert import_line not in text
+          text=text.replace(import_anchor, import_anchor+import_line, 1)
+
+          old='''async function readAiModels(env: Env): Promise<AiModelConfig[]> {\n  const raw = await env.AI_CONFIG_KV.get(AI_MODELS_KEY);\n  if (!raw) return [];\n  try {\n    const parsed = JSON.parse(raw) as unknown;\n    if (!Array.isArray(parsed)) return [];\n    return parsed.filter((item): item is AiModelConfig => Boolean(item) && typeof item === "object" && validAiModel(item as AiModelConfig));\n  } catch {\n    return [];\n  }\n}\n\nasync function writeAiModels(env: Env, models: AiModelConfig[]) {\n  await env.AI_CONFIG_KV.put(AI_MODELS_KEY, JSON.stringify(models));\n}\n'''
+          new='''async function readAiModels(env: Env): Promise<AiModelConfig[]> {\n  const raw = await env.AI_CONFIG_KV.get(AI_MODELS_KEY);\n  if (!raw) return [];\n  const parsed = parseAiModelsKvPayload(\n    raw,\n    (item): item is AiModelConfig => Boolean(item) && typeof item === "object" && validAiModel(item as AiModelConfig),\n  );\n  return parsed?.models ?? [];\n}\n\nasync function writeAiModels(env: Env, models: AiModelConfig[]) {\n  await env.AI_CONFIG_KV.put(AI_MODELS_KEY, serializeAiModelsKvPayload(models));\n}\n'''
+          assert text.count(old)==1, 'AI model storage block drifted'
+          text=text.replace(old,new,1)
+          index.write_text(text)
+
+          policy=Path('docs/architecture/SCHEMA_VERSIONING.md')
+          p=policy.read_text()
+          anchor='| AI admin local preview | `schemaVersion` in the local-storage envelope | Current writes use v1. Legacy unwrapped model arrays are migrated deterministically on read; malformed and explicit unknown future versions are rejected. Browser persistence never restores `tokenConfigured=true`. Secure Worker-backed AI configuration is unchanged. |\n'
+          row='| Worker AI model configuration | `schemaVersion` in the `ai:models:v1` KV value envelope | Current writes use v1. Legacy raw model arrays remain readable as an explicit backward-read path; malformed and explicit unknown future envelopes fail closed. Provider tokens remain separately encrypted under `ai:secret:v1:*` and are never moved into the model envelope. |\n'
+          assert p.count(anchor)==1
+          assert row not in p
+          policy.write_text(p.replace(anchor,anchor+row,1))
+
+          rebase=Path('docs/REMAINING_ROADMAP_REBASELINE_2026-09-08.md')
+          r=rebase.read_text()
+          old_row='| Version all schemas | **Partial — active static catalogue boundary enforced** | `docs/architecture/SCHEMA_VERSIONING.md` now defines the compatibility owner for D1/PostgreSQL migrations, `/v1` transports, persisted catalogue/browser snapshots, clinician-market assets and clinical bundles. Active admin-catalogue and clinician-market readers enforce supported schema versions, while legacy local drafts retain an explicit backward-read path. The broad roadmap item remains open until equivalent coverage is proven for every other persisted/public boundary rather than inferred from internal TypeScript types. |'
+          new_row='| Version all schemas | **Partial — active persisted/public coverage expanded** | `docs/architecture/SCHEMA_VERSIONING.md` defines compatibility owners for D1/PostgreSQL migrations, `/v1` transports, persisted catalogue/browser snapshots, clinician-market assets, clinical bundles, AI admin local preview, and the Worker AI-model KV configuration. The Worker AI-model reader now preserves the deployed raw-array legacy shape explicitly while current writes use a versioned envelope and unknown future versions fail closed. The broad roadmap item remains open until equivalent coverage is proven for every other persisted/public boundary rather than inferred from internal TypeScript types. |'
+          assert r.count(old_row)==1, 'rebaseline row drifted'
+          rebase.write_text(r.replace(old_row,new_row,1))
+          PY
+      - name: Assert secret and communications boundaries are untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'const AI_SECRET_PREFIX = "ai:secret:v1:";' apps/admin-worker/src/index.ts
+          grep -Fq 'value.version !== 1' apps/admin-worker/src/index.ts
+          grep -Fq 'AI_CONFIG_KV.put(COMMUNICATIONS_CONFIG_KEY, JSON.stringify(config))' apps/admin-worker/src/index.ts
+          grep -Fq 'serializeAiModelsKvPayload(models)' apps/admin-worker/src/index.ts
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run focused AI model storage regression
+        run: pnpm --filter @glymize/admin-worker test -- ai-model-storage-schema.test.ts
+      - name: Typecheck monorepo
+        run: pnpm typecheck
+      - name: Lint monorepo
+        run: pnpm lint
+      - name: Test monorepo
+        run: pnpm test
+      - name: Run normative POST graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase post -RoadmapReviewed -GraphRelevant
+      - name: Commit verified final state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name abbaselotfi
+          git config user.email 167691975+abbaselotfi@users.noreply.github.com
+          git add apps/admin-worker/src/index.ts docs/architecture/SCHEMA_VERSIONING.md docs/REMAINING_ROADMAP_REBASELINE_2026-09-08.md
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: version Worker AI model KV payload"
+          git push origin HEAD:chore/phase6-worker-ai-model-kv-versioning-20260908
