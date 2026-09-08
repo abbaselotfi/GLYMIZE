@@ -14,7 +14,9 @@ import {
   attachPhaseAwareTitrationCostV2,
   buildWegovyMashInitiationTitrationCostV2,
 } from "./wegovy-titration-cost.js";
+import { blockCandidateSelectionV2 } from "./selection-constraints.js";
 import type {
+  ClinicalObjectiveV2,
   DecisionGraphRequestV2,
   GenericCostBenchmarkV2,
   IranMarketProductV2,
@@ -202,6 +204,7 @@ function scheduledClaimsForPlan(
 export function enrichCandidateWithDoseMarketCostV2(
   request: DecisionGraphRequestV2,
   candidate: RegimenCandidateV2,
+  objectives: readonly ClinicalObjectiveV2[] = [],
 ): RegimenCandidateV2 {
   const result = structuredClone(candidate);
   let totalPatientCost = 0;
@@ -400,8 +403,8 @@ export function enrichCandidateWithDoseMarketCostV2(
     result.insuranceFit !== "conditional"
   ) {
     const mandatoryInsulin =
-      result.components.some((component) => /insulin/.test(component.therapyGroup)) &&
-      result.preferenceConflicts.some((item) => item.includes("الزام بالینی"));
+      result.components.some((component) => /insulin|fixed_ratio_combination/.test(component.therapyGroup)) &&
+      objectives.some((objective) => objective.level === "mandatory" && objective.id === "insulin_replacement");
 
     if (mandatoryInsulin) {
       const message = result.insuranceFit === "unknown"
@@ -409,12 +412,11 @@ export function enrichCandidateWithDoseMarketCostV2(
         : "بیمه انتخاب‌شده این رژیم را پوشش نمی‌دهد، اما الزام بالینی مانع حذف کورکورانه آن شده است.";
       if (!result.preferenceConflicts.includes(message)) result.preferenceConflicts.push(message);
     } else {
-      result.gate.status = "exclude";
-      result.gate.reasons.push(
-        result.insuranceFit === "unknown"
-          ? "insured-only فعال است اما پوشش قابل استفاده برای بیمه انتخاب‌شده تأیید نشده است."
-          : "insured-only فعال است و پوشش قابل استفاده برای این رژیم یافت نشد.",
-      );
+      const accessConstraintReason = result.insuranceFit === "unknown"
+        ? "insured-only فعال است اما پوشش قابل استفاده برای بیمه انتخاب‌شده تأیید نشده است."
+        : "insured-only فعال است و پوشش قابل استفاده برای این رژیم یافت نشد.";
+      blockCandidateSelectionV2(result, "access", accessConstraintReason);
+      if (!result.preferenceConflicts.includes(accessConstraintReason)) result.preferenceConflicts.push(accessConstraintReason);
     }
   }
   if (request.preferences.monthlyMedicationBudgetToman !== undefined && result.monthlyPatientCostToman !== undefined && result.monthlyPatientCostToman > request.preferences.monthlyMedicationBudgetToman) {

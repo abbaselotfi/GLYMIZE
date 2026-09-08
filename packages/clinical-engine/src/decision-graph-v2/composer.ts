@@ -1,4 +1,5 @@
 import { paretoPruneV2 } from "./pareto.js";
+import { candidateSelectionEligibleV2 } from "./selection-constraints.js";
 import { selectLexicographicallyV2 } from "./selector.js";
 import { phaseAwareTitrationCostV2 } from "./wegovy-titration-cost.js";
 import type {
@@ -157,6 +158,7 @@ function laneCandidateForObjective(
 ) {
   const pool = candidates.filter((candidate) =>
     candidate.gate.status === "pass" &&
+    candidateSelectionEligibleV2(candidate) &&
     candidate.lane === objective.lane &&
     candidate.objectiveCoverage.includes(objective.id) &&
     candidateCompatibleWithComponents(request, candidate, selected),

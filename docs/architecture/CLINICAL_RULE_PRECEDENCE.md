@@ -47,6 +47,19 @@ A downstream preference, price, insurance result, or display score therefore can
 
 The retained unconfigured legacy fallback has a separate `filterHardExcludedLegacyType2Assessment()` firewall for the same safety reason: legacy score arithmetic is never sufficient authority to keep a true hard contraindication in returned ranked compatibility choices.
 
+### 2.5.1 Request/access selection constraints are a separate authority channel
+
+The live Type 2 candidate contract separates `gate` from `selectionConstraint`. `gate` remains clinical/execution authority (`pass`, `conditional`, `needs_data`, `historical_only`, `exclude`). `selectionConstraint` carries request/access restrictions that may prevent a clinically valid candidate from entering primary/alternative selection without representing that restriction as a contraindication.
+
+- `oral_only` against an otherwise clinically valid injectable is a `route` selection constraint, not `gate.status = exclude`.
+- `insured_only` without proved usable coverage is an `access` selection constraint for non-mandatory therapy, not a clinical contraindication.
+- when insulin replacement is a resolved mandatory clinical objective, unresolved insurance cannot erase the clinical requirement; access remains unresolved and the overall result is not labelled complete. This mandatory status is derived from resolved objectives, never from localized display strings.
+- budget excess remains a preference conflict. Cost and insurance values remain enrichment/ranking inputs inside the already-safe candidate pool; they do not manufacture clinical exclusion authority.
+
+Primary/alternative selection and regimen composition require both a passing clinical/execution gate and an unblocked selection constraint. Constraint-blocked candidates may remain inspectable as non-primary options, preserving transparency without conflating user/access restrictions with contraindications.
+
+Cautions and presentation remain non-authoritative channels: cautions explain uncertainty/monitoring/execution limits, while `toRecommendationV2()` and compatibility projections can display only already-resolved authority and cannot promote a blocked candidate.
+
 ### 2.6 Reviewed dose/product/market/access enrichment cannot create clinical eligibility
 
 After hard gating, `enrichCandidateWithDoseMarketCostV2()` binds reviewed dose/product and current-market/access information. Missing exact execution prerequisites remain fail-closed. Market presence, insurance, or price cannot convert an otherwise clinically ineligible candidate into an executable one.
@@ -136,7 +149,7 @@ This record is sufficient to close the narrow roadmap item **Define rule precede
 
 The following broader Phase 2 items remain open or partial:
 
-- **Separate hard blocks, cautions, preferences, cost, and display:** strongly implemented and now documented for live Type 2, but the roadmap item spans retained compatibility and other clinical modules.
+- **Separate hard blocks, cautions, preferences, cost, and display:** implemented for the live Type 2 authority boundary. Clinical/execution gates, route/access selection constraints, cautions, preferences, cost/insurance enrichment, and display are structurally distinct; unrelated future modules still require their own authority review.
 - **Create traceable rule metadata:** implemented for live Type 2 authority; stable identity and reviewed evidence provenance are formalized, without claiming universal coverage across unrelated future rule families.
 - **Define minimum safe inputs per pathway:** Type 2 has machine-readable capability/input contracts, but not every clinical module has the same completeness contract. `cardiovascular.nyha_class` remains intentionally uncollected until a real consumer exists.
 - **Add source versioning and review fields:** implemented for live Type 2 authority; evidence versions are required and decision-bearing gate/conflict/conversion consumers are approved-only, without claiming universal schema coverage outside that authority boundary.

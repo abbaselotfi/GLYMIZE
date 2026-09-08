@@ -236,7 +236,10 @@ describe("phase-aware WEGOVY MASH titration cost", () => {
 
     expect(enriched.monthlyPatientCostToman).toBeUndefined();
     expect(enriched.insuranceFit).toBe("unknown");
-    expect(enriched.gate.status).toBe("exclude");
+    expect(enriched.gate.status).toBe("pass");
+    expect(enriched.selectionConstraint?.status).toBe("blocked");
+    expect(enriched.selectionConstraint?.kinds).toContain("access");
+    expect(enriched.selectionConstraint?.reasons.join(" ")).toContain("insured-only");
     expect(enriched.cautions.join(" ").toLocaleLowerCase()).toContain("claim timing");
     expect(scheduledInsuranceProjectionsV2(enriched.components[0]!)[0]?.eligibility).toBe("unknown");
   });

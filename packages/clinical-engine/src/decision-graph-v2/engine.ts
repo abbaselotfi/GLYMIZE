@@ -9,6 +9,7 @@ import { paretoPruneV2 } from "./pareto.js";
 import { buildDecisionGraphPolicyV2FromActiveRulePack } from "./policy.js";
 import { generateRegimenCandidatesV2 } from "./regimens.js";
 import { diversityKeyV2, selectLexicographicallyV2 } from "./selector.js";
+import { candidateSelectionEligibleV2 } from "./selection-constraints.js";
 import { runInsulinDecisionSubgraphV2 } from "./insulin-subgraph.js";
 import type {
   ClinicalObjectiveV2,
@@ -25,7 +26,7 @@ function mandatoryObjectivesForLane(objectives: readonly ClinicalObjectiveV2[], 
 }
 
 function isTopEligible(candidate: RegimenCandidateV2) {
-  return candidate.gate.status === "pass";
+  return candidate.gate.status === "pass" && candidateSelectionEligibleV2(candidate);
 }
 
 /**
@@ -74,7 +75,7 @@ export function runDecisionGraphV2(
   trace.push({ nodeId: "generate-regimens", status: "passed", summary: `Generated ${generated.length} regimen candidate(s) without free-form combinatorial prescribing.` });
 
   const gated = generated.map((candidate) => applyHardGatesV2(request, clinicalState, objectives, candidate));
-  const enriched = gated.map((candidate) => enrichCandidateWithDoseMarketCostV2(request, candidate));
+  const enriched = gated.map((candidate) => enrichCandidateWithDoseMarketCostV2(request, candidate, objectives));
   trace.push({ nodeId: "hard-gates", status: "passed", summary: `${enriched.filter(isTopEligible).length} candidate(s) survived hard gates for executable consideration.` });
 
   const historical = enriched.filter((candidate) => candidate.gate.status === "historical_only");
@@ -156,10 +157,10 @@ export function runDecisionGraphV2(
     request.preferences.costPreference === "insured_only" &&
     Boolean(
       primary &&
-      primary.components.some((component) => /insulin/.test(component.therapyGroup)) &&
+      primary.components.some((component) => /insulin|fixed_ratio_combination/.test(component.therapyGroup)) &&
+      objectives.some((objective) => objective.level === "mandatory" && objective.id === "insulin_replacement") &&
       primary.insuranceFit !== "eligible" &&
-      primary.insuranceFit !== "conditional" &&
-      primary.preferenceConflicts.some((item) => item.includes("الزام بالینی")),
+      primary.insuranceFit !== "conditional",
     );
 
   let status: DecisionGraphResultV2["status"] = "complete";

@@ -3,6 +3,7 @@ import { resolveExactCurrentRegimenFdcPlansV2 } from "./fdc-execution.js";
 import { evaluateReviewedResmetiromProtocolV2 } from "./mash-protocols.js";
 import { evaluateReviewedWegovyMashProtocolV2 } from "./wegovy-mash-protocol.js";
 import { buildFactMapV2, evaluatePredicateV2 } from "./predicates.js";
+import { blockCandidateSelectionV2 } from "./selection-constraints.js";
 import type {
   ClinicalObjectiveV2,
   ClinicalStateV2,
@@ -187,8 +188,10 @@ export function applyHardGatesV2(
         result.routeFit = "conflict_overridden";
         result.preferenceConflicts.push("ترجیح oral-only با ضرورت بالینی بررسی انسولین تعارض دارد؛ الزام بالینی بر preference مقدم شده است.");
       } else {
-        status = "exclude";
-        reasons.push("پزشک/بیمار مسیر oral-only را به‌عنوان constraint انتخاب کرده است.");
+        result.routeFit = "neutral";
+        const routeConstraintReason = "پزشک/بیمار مسیر oral-only را به‌عنوان constraint انتخاب کرده است.";
+        blockCandidateSelectionV2(result, "route", routeConstraintReason);
+        result.preferenceConflicts.push(routeConstraintReason);
       }
     } else if (request.preferences.routePreference === "prefer_oral" && routes.every(isInjectableRoute)) {
       result.routeFit = "neutral";

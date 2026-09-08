@@ -712,6 +712,18 @@ export interface GateOutcomeV2 {
   evidence: EvidenceReferenceV2[];
 }
 
+/**
+ * Request/access constraints may block primary selection without becoming a
+ * clinical contraindication. Generated live candidates always carry this field;
+ * it remains optional only for backward-compatible serialized/test fixtures.
+ */
+export type SelectionConstraintKindV2 = "route" | "access";
+export interface SelectionConstraintV2 {
+  status: "pass" | "blocked";
+  kinds: SelectionConstraintKindV2[];
+  reasons: string[];
+}
+
 export type RegimenKindV2 =
   | "single"
   | "fixed_dose_combination"
@@ -751,6 +763,7 @@ export interface RegimenCandidateV2 {
   objectiveStrength: Partial<Record<ClinicalObjectiveIdV2, "benefit" | "strong_benefit">>;
   evidence: EvidenceReferenceV2[];
   gate: GateOutcomeV2;
+  selectionConstraint?: SelectionConstraintV2;
   routeFit: "match" | "neutral" | "conflict_overridden";
   insuranceFit: "eligible" | "conditional" | "unknown" | "not_covered";
   monthlyPatientCostToman?: number;
