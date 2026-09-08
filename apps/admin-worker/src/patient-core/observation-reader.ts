@@ -82,7 +82,6 @@ export async function readPatientCoreObservations(
       optionalText(payload.rawName) ?? canonicalKey;
 
     items.push({
-      observationId: row.id,
       factId: row.id,
       factKey: `observation:${canonicalKey}:${unit ?? ""}:${specimen ?? ""}`,
       displayName,
