@@ -1,0 +1,77 @@
+name: One-shot Phase 6 equivalence coverage audit
+
+on:
+  push:
+    branches:
+      - audit/phase6-equivalence-coverage-20260908
+    paths:
+      - .github/workflows/phase6-equivalence-audit-oneshot.yml
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      CBM_VERSION: 0.10.8
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v4
+        with:
+          ref: audit/phase6-equivalence-coverage-20260908
+          fetch-depth: 0
+      - name: Install pinned Codebase Memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh -o /tmp/install-cbm.sh
+          chmod +x /tmp/install-cbm.sh
+          CBM_DOWNLOAD_URL="https://github.com/DeusData/codebase-memory-mcp/releases/download/v${CBM_VERSION}" /tmp/install-cbm.sh --skip-config --dir="$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Verify Codebase Memory version
+        shell: bash
+        run: |
+          set -euo pipefail
+          codebase-memory-mcp --version | tee /tmp/cbm-version.txt
+          grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+      - name: Inventory compatibility routes and equivalence guards
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          roots=[Path('apps/web'),Path('apps/api'),Path('packages')]
+          pats={
+            'route': re.compile(r'/v1/[^\"\'\s`]+|@(?:Get|Post|Put|Patch|Delete)\([^)]*\)'),
+            'equiv': re.compile(r'equival|parity|compatib|browser-owned|static adapter|runtime authority',re.I),
+          }
+          for label,pat in pats.items():
+            print(f'=== {label} ===')
+            n=0
+            for root in roots:
+              if not root.exists(): continue
+              for p in root.rglob('*'):
+                if p.suffix not in {'.ts','.tsx','.md'} or any(x in p.parts for x in ('node_modules','.next','dist','coverage')): continue
+                for i,line in enumerate(p.read_text(errors='ignore').splitlines(),1):
+                  if pat.search(line):
+                    print(f'{p}:{i}:{line[:220]}')
+                    n+=1
+                    if n>=500: break
+                if n>=500: break
+              if n>=500: break
+            print('COUNT',n)
+          PY
+      - name: Inventory tests touching browser API compatibility
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          pat=re.compile(r'api-client|browser|catalog|guideline|type2|preview|equival|parity|compatib',re.I)
+          for root in [Path('apps/web/test'),Path('apps/api/test'),Path('packages/clinical-engine/test')]:
+            if not root.exists(): continue
+            print('===',root,'===')
+            for p in sorted(root.glob('*.test.ts*')):
+              if pat.search(p.read_text(errors='ignore')): print(p)
+          PY
