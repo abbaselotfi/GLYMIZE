@@ -173,7 +173,6 @@ export function projectSnapshotObservations(
     const observedAt = lab.observedAt?.trim() || source.encounterAt;
     const displayName = lab.canonicalName?.trim() || lab.rawName.trim() || lab.canonicalKey!.trim();
     const item: PatientObservationView = {
-      observationId: lab.id || `${source.snapshotId}:lab:${index}`,
       factId: lab.id || `${source.snapshotId}:lab:${index}`,
       factKey,
       displayName,
