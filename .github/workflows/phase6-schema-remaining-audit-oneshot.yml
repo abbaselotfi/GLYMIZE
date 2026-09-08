@@ -1,0 +1,62 @@
+name: One-shot Phase 6 remaining schema boundary audit
+
+on:
+  push:
+    branches:
+      - audit/phase6-schema-version-coverage-20260908
+    paths:
+      - .github/workflows/phase6-schema-remaining-audit-oneshot.yml
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v4
+        with:
+          ref: audit/phase6-schema-version-coverage-20260908
+          fetch-depth: 0
+
+      - name: Install pinned Codebase Memory
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://github.com/codebase-memory/codebase-memory/releases/download/v0.10.8/codebase-memory-linux-x64 -OutFile ./codebase-memory
+          chmod +x ./codebase-memory
+          sudo mv ./codebase-memory /usr/local/bin/codebase-memory
+
+      - name: Verify Codebase Memory version
+        run: codebase-memory --version
+
+      - name: Run normative PRE graph gate
+        shell: pwsh
+        run: ./scripts/codebase-memory-gate.ps1 -Phase pre -RoadmapReviewed -GraphRelevant
+
+      - name: Inventory browser persistence boundaries
+        shell: bash
+        run: |
+          echo '=== browser persistence ==='
+          grep -RInE 'localStorage|sessionStorage|indexedDB|CacheStorage|caches\.' apps/web packages --include='*.ts' --include='*.tsx' || true
+
+      - name: Inventory Worker KV and R2 persistence boundaries
+        shell: bash
+        run: |
+          echo '=== worker KV/R2 writes and JSON persistence ==='
+          grep -RInE '\.put\(|JSON\.stringify|JSON\.parse|R2|KV' apps/admin-worker/src --include='*.ts' || true
+
+      - name: Inventory active static JSON readers
+        shell: bash
+        run: |
+          echo '=== static/runtime JSON readers ==='
+          grep -RInE 'fetch\(|\.json\(\)|JSON\.parse' apps/web/lib apps/web/app packages --include='*.ts' --include='*.tsx' || true
+
+      - name: Inventory public JSON artifacts
+        shell: bash
+        run: |
+          echo '=== public json artifacts ==='
+          find apps/web/public -type f -name '*.json' -print 2>/dev/null | sort || true
+
+      - name: Inventory explicit version markers around persistence
+        shell: bash
+        run: |
+          echo '=== version markers ==='
+          grep -RInE 'schemaVersion|schema_version|runtimeSchemaVersion|storageVersion|formatVersion|kind:' apps/web apps/admin-worker packages --include='*.ts' --include='*.tsx' || true
