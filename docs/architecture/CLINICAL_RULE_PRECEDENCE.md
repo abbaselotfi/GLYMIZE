@@ -137,9 +137,9 @@ This record is sufficient to close the narrow roadmap item **Define rule precede
 The following broader Phase 2 items remain open or partial:
 
 - **Separate hard blocks, cautions, preferences, cost, and display:** strongly implemented and now documented for live Type 2, but the roadmap item spans retained compatibility and other clinical modules.
-- **Create traceable rule metadata:** substantial versioned rule/evidence infrastructure exists, but universal coverage across every future rule family is not yet proven.
+- **Create traceable rule metadata:** implemented for live Type 2 authority; stable identity and reviewed evidence provenance are formalized, without claiming universal coverage across unrelated future rule families.
 - **Define minimum safe inputs per pathway:** Type 2 has machine-readable capability/input contracts, but not every clinical module has the same completeness contract. `cardiovascular.nyha_class` remains intentionally uncollected until a real consumer exists.
-- **Add source versioning and review fields:** substantial coverage exists, but universal schema coverage is not yet proven.
+- **Add source versioning and review fields:** implemented for live Type 2 authority; evidence versions are required and decision-bearing gate/conflict/conversion consumers are approved-only, without claiming universal schema coverage outside that authority boundary.
 - **Add clinical golden cases:** deterministic and stress suites are extensive, but clinician-reviewed/sign-off golden-case governance is a separate release-governance requirement.
 
 ## 6. Deletion boundary for the legacy builder
