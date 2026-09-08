@@ -1,4 +1,4 @@
-name: One-shot Type 2 source and review lifecycle finalizer
+name: One-shot Type 2 lifecycle roadmap truth sync
 
 on:
   push:
@@ -9,9 +9,9 @@ permissions:
   contents: write
 
 jobs:
-  finalize:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
     env:
       CBM_VERSION: '0.10.8'
     steps:
@@ -19,6 +19,69 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Apply qualified roadmap truth sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              s = p.read_text(encoding="utf-8")
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one occurrence, found {count}: {old!r}")
+              p.write_text(s.replace(old, new, 1), encoding="utf-8")
+
+          roadmap = "docs/PROJECT_OVERVIEW_AND_ROADMAP.md"
+          replace_once(
+              roadmap,
+              "- [ ] Create traceable rule metadata\n",
+              "- [x] Create traceable rule metadata — implemented for live Type 2 Decision Graph authority; no repository-wide future-module universality claim.\n",
+          )
+          replace_once(
+              roadmap,
+              "- [ ] Add source versioning and review fields\n",
+              "- [x] Add source versioning and review fields — implemented for live Type 2 Decision Graph authority with approved-only lifecycle enforcement; broader unrelated modules retain their own governance reviews.\n",
+          )
+
+          rebaseline = "docs/REMAINING_ROADMAP_REBASELINE_2026-09-08.md"
+          replace_once(
+              rebaseline,
+              "| Add source versioning and review fields | **Partial — substantial foundation present** | Rule-pack/evidence and reviewed product-safety authorities carry source/version/review identity. A blanket all-schema/all-module completion claim is not yet proven. |",
+              "| Add source versioning and review fields | **Implemented — live Type 2 authority boundary** | `EvidenceReferenceV2.version` is required across live Decision Graph evidence; medication/safety gates, regimen conflicts, insulin-conversion edges, dose/titration protocols, regimen templates, FRC protocol bindings, and reviewed product-safety authorities carry explicit review/version identity where they bear live Type 2 authority. Live gate/conflict/conversion consumers apply only `approved` rules. This does not claim universal governance for unrelated modules or future schemas. |",
+          )
+          replace_once(
+              rebaseline,
+              "With live Type 2 precedence, compatibility-score boundaries, and rule-metadata provenance now formalized, the safest remaining Phase 2 work is governance/consolidation: audit source versioning/review fields, close only proven minimum-safe-input gaps with active consumers, and define clinician-approved golden-case governance. New clinical values still require exact reviewed evidence.",
+              "With live Type 2 precedence, compatibility-score boundaries, rule-metadata provenance, and source/review lifecycle now formalized, the safest remaining Phase 2 work is governance/consolidation: close only proven minimum-safe-input gaps with active consumers, complete the broader hard-block/caution/preference/cost/display separation boundary where still unproven, and define clinician-approved golden-case governance. New clinical values still require exact reviewed evidence.",
+          )
+
+          precedence = "docs/architecture/CLINICAL_RULE_PRECEDENCE.md"
+          replace_once(
+              precedence,
+              "- **Create traceable rule metadata:** substantial versioned rule/evidence infrastructure exists, but universal coverage across every future rule family is not yet proven.",
+              "- **Create traceable rule metadata:** implemented for live Type 2 authority; stable identity and reviewed evidence provenance are formalized, without claiming universal coverage across unrelated future rule families.",
+          )
+          replace_once(
+              precedence,
+              "- **Add source versioning and review fields:** substantial coverage exists, but universal schema coverage is not yet proven.",
+              "- **Add source versioning and review fields:** implemented for live Type 2 authority; evidence versions are required and decision-bearing gate/conflict/conversion consumers are approved-only, without claiming universal schema coverage outside that authority boundary.",
+          )
+          PY
+          git diff --check
+
+      - name: Assert only qualified Phase 2 items closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq -- '- [x] Create traceable rule metadata — implemented for live Type 2 Decision Graph authority' docs/PROJECT_OVERVIEW_AND_ROADMAP.md
+          grep -Fq -- '- [x] Add source versioning and review fields — implemented for live Type 2 Decision Graph authority' docs/PROJECT_OVERVIEW_AND_ROADMAP.md
+          grep -Fq -- '- [ ] Separate hard blocks, cautions, preferences, cost, and display' docs/PROJECT_OVERVIEW_AND_ROADMAP.md
+          grep -Fq -- '- [ ] Define minimum safe inputs per pathway' docs/PROJECT_OVERVIEW_AND_ROADMAP.md
+          grep -Fq -- '- [ ] Add clinical golden cases' docs/PROJECT_OVERVIEW_AND_ROADMAP.md
 
       - name: Install pinned Codebase Memory
         shell: bash
@@ -36,183 +99,19 @@ jobs:
           codebase-memory-mcp --version | tee /tmp/cbm-version.txt
           grep -Fq "${CBM_VERSION}" /tmp/cbm-version.txt
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.7.0
-
-      - name: Set up Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Apply exact source and governance patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          def replace_once(path: str, old: str, new: str):
-              p = Path(path)
-              s = p.read_text(encoding="utf-8")
-              count = s.count(old)
-              if count != 1:
-                  raise SystemExit(f"{path}: expected exactly one occurrence, found {count}: {old!r}")
-              p.write_text(s.replace(old, new, 1), encoding="utf-8")
-
-          types = "packages/clinical-engine/src/decision-graph-v2/types.ts"
-          replace_once(types, "  version?: string;\n", "  version: string;\n")
-          for name in ("MedicationGateRuleV2", "RegimenConflictRuleV2", "InsulinConversionRuleV2"):
-              replace_once(
-                  types,
-                  f"export interface {name} {{\n  id: string;\n",
-                  f"export interface {name} {{\n  id: string;\n  reviewState: \"candidate\" | \"approved\" | \"retired\";\n",
-              )
-
-          replace_once(
-              "packages/clinical-engine/src/decision-graph-v2/frc-protocols.ts",
-              "  title: \"Suliqua (insulin glargine/lixisenatide) — EU Product Information\",\n  url:",
-              "  title: \"Suliqua (insulin glargine/lixisenatide) — EU Product Information\",\n  version: \"2026-07-02\",\n  url:",
-          )
-          insulin = "packages/clinical-engine/src/decision-graph-v2/insulin-execution.ts"
-          replace_once(
-              insulin,
-              "  title: \"LANTUS (insulin glargine U-100) — U.S. Prescribing Information\",\n  url:",
-              "  title: \"LANTUS (insulin glargine U-100) — U.S. Prescribing Information\",\n  version: \"2025-05-31\",\n  url:",
-          )
-          replace_once(
-              "packages/clinical-engine/src/decision-graph-v2/inventory-adapter.ts",
-              "    title: sourceId,\n    url: entry.sourceUrls[index] ?? entry.sourceUrls[0] ?? \"about:blank\",",
-              "    title: sourceId,\n    version: entry.sourceObservedAt ?? `source-code:${sourceId}`,\n    url: entry.sourceUrls[index] ?? entry.sourceUrls[0] ?? \"about:blank\",",
-          )
-
-          safety = "packages/clinical-engine/src/decision-graph-v2/safety-rules.ts"
-          for marker in (
-              "      id: `ADA2026-METFORMIN-EGFR30:${masterDrugId}`,\n",
-              "      id: `METFORMIN-EGFR30-44-REVIEW:${masterDrugId}`,\n",
-              "    id: \"ADA2026-TZD-HF\",\n",
-              "      id: \"ADA2026-DPP4-GLP1-CONCURRENT\",\n",
-              "      id: \"ADA2026-DPP4-DUALGIPGLP1-CONCURRENT\",\n",
-              "      id: \"ADA2026-FRC-GLP1-DUPLICATION\",\n",
-              "      id: \"ADA2026-FRC-DUALGIPGLP1-DUPLICATION\",\n",
-          ):
-              indent = marker[:len(marker) - len(marker.lstrip())]
-              replace_once(safety, marker, marker + indent + "reviewState: \"approved\",\n")
-
-          cardio = "packages/clinical-engine/src/decision-graph-v2/cardiometabolic-protocols.ts"
-          replace_once(
-              cardio,
-              "      id: `PHASE4-PREGNANCY-EXCLUDE:${medication.masterDrugId}`,\n      masterDrugId:",
-              "      id: `PHASE4-PREGNANCY-EXCLUDE:${medication.masterDrugId}`,\n      reviewState: \"approved\",\n      masterDrugId:",
-          )
-          replace_once(
-              cardio,
-              "      id: `PHASE4-PREGNANCY-STATIN-REVIEW:${medication.masterDrugId}`,\n      masterDrugId:",
-              "      id: `PHASE4-PREGNANCY-STATIN-REVIEW:${medication.masterDrugId}`,\n      reviewState: \"approved\",\n      masterDrugId:",
-          )
-
-          dpn = "packages/clinical-engine/src/decision-graph-v2/painful-dpn-protocol.ts"
-          for marker in (
-              "      id: `LABEL-PREGABALIN-HYPERSENSITIVITY:${pregabalin.masterDrugId}`,\n",
-              "        id: `LABEL-DULOXETINE-MAOI:${duloxetine.masterDrugId}`,\n",
-              "        id: `LABEL-DULOXETINE-RENAL-LT30:${duloxetine.masterDrugId}`,\n",
-              "        id: `LABEL-DULOXETINE-CHRONIC-LIVER:${duloxetine.masterDrugId}`,\n",
-              "        id: `LABEL-DULOXETINE-SUBSTANTIAL-ALCOHOL:${duloxetine.masterDrugId}`,\n",
-          ):
-              indent = marker[:len(marker) - len(marker.lstrip())]
-              replace_once(dpn, marker, marker + indent + "reviewState: \"approved\",\n")
-
-          replace_once(
-              insulin,
-              "function pushRule(rules: InsulinConversionRuleV2[], rule: InsulinConversionRuleV2 | undefined) {\n  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) rules.push(rule);\n}",
-              "function pushRule(\n  rules: InsulinConversionRuleV2[],\n  rule: Omit<InsulinConversionRuleV2, \"reviewState\"> | undefined,\n) {\n  if (rule && rule.sourceMasterDrugId !== rule.targetMasterDrugId) {\n    rules.push({ ...rule, reviewState: \"approved\" });\n  }\n}",
-          )
-          replace_once(
-              "packages/clinical-engine/src/decision-graph-v2/gates.ts",
-              "    const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>\n      (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&",
-              "    const applicableRules = (request.inventory.medicationGateRules ?? []).filter((rule) =>\n      rule.reviewState === \"approved\" &&\n      (!rule.masterDrugId || rule.masterDrugId === medication.masterDrugId) &&",
-          )
-          replace_once(
-              "packages/clinical-engine/src/decision-graph-v2/regimens.ts",
-              "  for (const rule of rules) {\n    const direct = tagsA.includes(rule.tagA) && tagsB.includes(rule.tagB);",
-              "  for (const rule of rules) {\n    if (rule.reviewState !== \"approved\") continue;\n    const direct = tagsA.includes(rule.tagA) && tagsB.includes(rule.tagB);",
-          )
-          replace_once(
-              insulin,
-              "  const rule = rules.find((item) => item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));",
-              "  const rule = rules.find((item) => item.reviewState === \"approved\" && item.sourceMasterDrugId === request.sourceMasterDrugId && item.targetMasterDrugId === request.targetMasterDrugId && (!item.sourceFrequencyPerDay || item.sourceFrequencyPerDay.includes(request.sourceFrequencyPerDay)));",
-          )
-
-          metadata = "docs/architecture/CLINICAL_RULE_METADATA.md"
-          replace_once(
-              metadata,
-              "Repository baseline for this closure: `main@b0d9f614b0fb88a99ffa21e244be6c598a365025`.",
-              "Repository baseline for this lifecycle closure: `main@a1f78be10900e11ff75570f6cd9e4ccfc9586012`.",
-          )
-          replace_once(
-              metadata,
-              "| Medication/safety gate | `id` | non-empty `evidence` | governed by reviewed rule source; no new generic review field is introduced here |\n| Regimen conflict rule | `id` | non-empty `evidence` | governed by reviewed rule source |",
-              "| Medication/safety gate | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |\n| Regimen conflict rule | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |",
-          )
-          replace_once(
-              metadata,
-              "| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type already requires it |\n| Product-safety review set |",
-              "| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type requires it |\n| Insulin conversion edge | conversion rule `id` | non-empty `evidence` | explicit `reviewState`; live conversion considers only `approved` edges |\n| Product-safety review set |",
-          )
-          replace_once(
-              metadata,
-              "Every evidence reference used for this closure carries at least `sourceId`, `title`, `version`, and `url`; locators and evidence strength remain available where the source module already provides them.",
-              "`EvidenceReferenceV2.version` is required for live Decision Graph evidence. Static guideline/regulatory sources carry their reviewed edition or effective date. Supportive evidence projected from the Master Registry carries `sourceObservedAt` when present and otherwise an explicit `source-code:<sourceId>` provenance identity; that fallback is not represented as a guideline edition.",
-          )
-          old = "## 4. Boundary with source review/version governance\n\nThis closure satisfies the Roadmap requirement to make current clinical rule metadata traceable; it does **not** claim that every public schema or every future clinical module has a universal review/version lifecycle.\n\nThe separate Phase 2 item **Add source versioning and review fields** remains independently auditable. A future task may standardize review-state/version metadata more broadly, but it must not fabricate review approval for artifacts that have not undergone that governance process.\n"
-          new = "## 4. Source version and review lifecycle governance\n\nThe Phase 2 source/review lifecycle is now explicit for live Type 2 authority. Evidence references are versioned, and decision-bearing medication gates, regimen conflicts and insulin-conversion edges carry `candidate | approved | retired`.\n\nLifecycle state is not display-only metadata: live consumers fail closed and apply only `approved` rules. Existing builders that were already the reviewed authority emit `approved`; this task does not promote any new clinical rule, threshold, dose, indication or recommendation. Candidate or retired rules remain non-authoritative until a separate reviewed change explicitly promotes them.\n"
-          replace_once(metadata, old, new)
-          PY
-
-      - name: Build contracts dependency
-        run: pnpm --filter @glymize/contracts build
-
-      - name: Typecheck clinical engine
-        run: pnpm --filter @glymize/clinical-engine typecheck
-
-      - name: Run focused lifecycle regression
-        run: pnpm --filter @glymize/clinical-engine exec vitest run test/type2-source-review-lifecycle-v2.test.ts
-
-      - name: Run full clinical engine suite
-        run: pnpm --filter @glymize/clinical-engine test
-
-      - name: Locate roadmap lifecycle item
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -RIn --include='*.md' -E 'source version|source versioning|review fields|review lifecycle|versioning and review' docs | head -n 120 || true
-
-      - name: Run normative POST graph gate
+      - name: Run normative POST graph gate on final truth state
         shell: pwsh
         run: ./scripts/codebase-memory-gate.ps1 -Phase post -RoadmapReviewed -GraphRelevant
 
-      - name: Commit verified implementation
+      - name: Commit verified truth sync
         shell: bash
         run: |
           set -euo pipefail
-          git status --short
           git config user.name "abbaselotfi"
           git config user.email "167691975+abbaselotfi@users.noreply.github.com"
-          git add packages/clinical-engine/src/decision-graph-v2/types.ts \
-                  packages/clinical-engine/src/decision-graph-v2/frc-protocols.ts \
-                  packages/clinical-engine/src/decision-graph-v2/insulin-execution.ts \
-                  packages/clinical-engine/src/decision-graph-v2/inventory-adapter.ts \
-                  packages/clinical-engine/src/decision-graph-v2/safety-rules.ts \
-                  packages/clinical-engine/src/decision-graph-v2/cardiometabolic-protocols.ts \
-                  packages/clinical-engine/src/decision-graph-v2/painful-dpn-protocol.ts \
-                  packages/clinical-engine/src/decision-graph-v2/gates.ts \
-                  packages/clinical-engine/src/decision-graph-v2/regimens.ts \
-                  docs/architecture/CLINICAL_RULE_METADATA.md
+          git add docs/PROJECT_OVERVIEW_AND_ROADMAP.md \
+                  docs/REMAINING_ROADMAP_REBASELINE_2026-09-08.md \
+                  docs/architecture/CLINICAL_RULE_PRECEDENCE.md
           git diff --cached --check
-          git commit -m "feat: enforce Type 2 source review lifecycle"
+          git commit -m "docs: close live Type 2 lifecycle roadmap item"
           git push origin HEAD:chore/type2-source-review-lifecycle-20260908
