@@ -1,0 +1,404 @@
+.completion {
+  display: grid;
+  gap: 18px;
+}
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.22));
+  border-radius: 22px;
+  background: var(--panel, rgba(255, 255, 255, 0.035));
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 15px;
+}
+
+.panelHeader > div {
+  min-width: 0;
+}
+
+.panelHeader span,
+.assistantDock span,
+.assistantDrawer header span {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  opacity: 0.62;
+}
+
+.panelHeader h2,
+.assistantDrawer h2 {
+  margin: 3px 0 0;
+  font-size: clamp(1rem, 1.8vw, 1.28rem);
+  line-height: 1.3;
+}
+
+.panelHeader > small {
+  max-width: 260px;
+  text-align: end;
+  font-size: 0.67rem;
+  line-height: 1.5;
+  opacity: 0.62;
+}
+
+.problemList,
+.trendList {
+  display: grid;
+  gap: 8px;
+}
+
+.problemList > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border, rgba(120, 130, 145, 0.14));
+}
+
+.problemList > div:last-child {
+  border-bottom: 0;
+}
+
+.problemList > div > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.problemList strong {
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.problemList small {
+  font-size: 0.64rem;
+  opacity: 0.62;
+}
+
+.problemList > div > span {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.22));
+  border-radius: 999px;
+  font-size: 0.61rem;
+  font-weight: 800;
+}
+
+.problemList > div > span[data-problem-status="suspected"],
+.problemList > div > span[data-problem-status="unknown"] {
+  border-style: dashed;
+}
+
+.explicitGap {
+  padding: 15px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.18));
+  border-radius: 14px;
+  background: color-mix(in srgb, currentColor 2%, transparent);
+}
+
+.explicitGap[data-coverage-limited="true"] {
+  border-style: dashed;
+}
+
+.explicitGap strong {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.explicitGap p,
+.safetyNote,
+.moduleCard p,
+.assistantDrawer p {
+  margin: 7px 0 0;
+  font-size: 0.7rem;
+  line-height: 1.65;
+  opacity: 0.7;
+}
+
+.trendRow {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(130px, 1fr) minmax(150px, 0.8fr);
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.17));
+  border-radius: 14px;
+  background: color-mix(in srgb, currentColor 1.8%, transparent);
+}
+
+.trendIdentity,
+.trendValue {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.trendIdentity strong,
+.trendValue strong {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.trendIdentity small,
+.trendValue small {
+  font-size: 0.62rem;
+  line-height: 1.4;
+  opacity: 0.62;
+}
+
+.trendValue {
+  text-align: end;
+}
+
+.sparkline {
+  width: 100%;
+  height: 42px;
+  opacity: 0.78;
+  overflow: visible;
+}
+
+.safetyNote {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border, rgba(120, 130, 145, 0.14));
+}
+
+.moduleGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.moduleCard {
+  min-height: 154px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.2));
+  border-radius: 16px;
+  color: inherit;
+  text-decoration: none;
+  background: color-mix(in srgb, currentColor 2%, transparent);
+}
+
+.moduleCard[data-maturity="reference_only"] {
+  border-style: dashed;
+}
+
+.moduleCard:focus-visible,
+.moduleCard:hover {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.moduleCard > div {
+  display: grid;
+  gap: 5px;
+}
+
+.moduleCard span {
+  width: fit-content;
+  padding: 4px 7px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.22));
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
+.moduleCard strong {
+  font-size: 0.96rem;
+}
+
+.moduleCard p {
+  flex: 1;
+  margin: 0;
+}
+
+.moduleCard b {
+  font-size: 0.7rem;
+}
+
+.assistantDock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.22));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--panel, #fff) 96%, currentColor 4%);
+}
+
+.assistantDock > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.assistantDock strong {
+  font-size: 0.86rem;
+}
+
+.assistantDock small {
+  font-size: 0.66rem;
+  opacity: 0.64;
+}
+
+.assistantDock button,
+.assistantDrawer button,
+.assistantLink {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.28));
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.assistantDrawer {
+  position: fixed;
+  inset-inline-end: 18px;
+  inset-block-end: 18px;
+  z-index: 80;
+  width: min(430px, calc(100vw - 24px));
+  max-height: min(680px, calc(100vh - 36px));
+  overflow: auto;
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.28));
+  border-radius: 22px;
+  background: var(--background, #fff);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+}
+
+.assistantDrawer header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.assistantDrawer header > div {
+  min-width: 0;
+}
+
+.assistantDrawer header button {
+  min-width: 46px;
+  padding: 0;
+  font-size: 1.2rem;
+}
+
+.contextSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.contextSummary > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border: 1px solid var(--border, rgba(120, 130, 145, 0.18));
+  border-radius: 13px;
+  text-align: center;
+}
+
+.contextSummary b {
+  font-size: 1.25rem;
+}
+
+.contextSummary span {
+  font-size: 0.61rem;
+  opacity: 0.62;
+}
+
+.patientKey {
+  padding: 10px 11px;
+  border: 1px dashed var(--border, rgba(120, 130, 145, 0.22));
+  border-radius: 12px;
+}
+
+.assistantLink {
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .twoColumn {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .moduleGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .completion {
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 16px;
+    border-radius: 17px;
+  }
+
+  .panelHeader,
+  .assistantDock {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .panelHeader > small {
+    text-align: start;
+  }
+
+  .trendRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trendValue {
+    text-align: start;
+  }
+
+  .moduleGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .assistantDock button {
+    width: 100%;
+  }
+
+  .assistantDrawer {
+    inset-inline: 8px;
+    inset-block-end: 8px;
+    width: auto;
+    max-height: calc(100vh - 16px);
+    border-radius: 18px;
+  }
+}
