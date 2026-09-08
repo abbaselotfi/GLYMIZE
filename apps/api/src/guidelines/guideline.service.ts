@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { getActiveClinicalRulePack } from "@glymize/clinical-engine";
-import { guidelineSources } from "./guideline-sources.js";
+import {
+  activeGuidelineSources as guidelineSources,
+  getActiveClinicalRulePack,
+} from "@glymize/clinical-engine";
 
 type SourceFingerprint = {
   sha256: string;

@@ -1,4 +1,8 @@
-import { buildType2Assessment, buildType2MedicationConsiderations } from "@glymize/clinical-engine";
+import {
+  activeGuidelineSources as guidelineSources,
+  buildType2Assessment,
+  buildType2MedicationConsiderations,
+} from "@glymize/clinical-engine";
 import type {
   AdminNotification,
   CreateAdminNotificationInput,
@@ -23,9 +27,12 @@ import type {
   Type2AssessmentResult,
   Type2ConsiderationRequest
 } from "@glymize/contracts";
-import { ada2026Type2GenericSeed, type2ProtocolSeed } from "../../api/src/catalog/ada-2026-type2-seed";
-import { globalReferenceCatalogue, globalReferenceCatalogueSources } from "../../api/src/catalog/global-reference-catalog";
-import { guidelineSources } from "../../api/src/guidelines/guideline-sources";
+import {
+  ada2026Type2GenericSeed,
+  globalReferenceCatalogue,
+  globalReferenceCatalogueSources,
+  type2ProtocolSeed,
+} from "@glymize/catalog-data";
 import {
   createBrowserCatalogStateStore,
   type BrowserCatalogState,
