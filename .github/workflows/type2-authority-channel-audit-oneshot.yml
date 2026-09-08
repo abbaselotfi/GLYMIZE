@@ -44,9 +44,9 @@ jobs:
           git diff --check
           git status --short
 
-      - name: Typecheck clinical engine
+      - name: Typecheck monorepo with dependency builds
         shell: bash
-        run: pnpm --filter @glymize/clinical-engine typecheck
+        run: pnpm typecheck
 
       - name: Run focused authority-channel regression
         shell: bash
