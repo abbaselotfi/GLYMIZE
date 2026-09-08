@@ -52,10 +52,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== schemaVersion markers ==='
-          grep -RIn --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude='*.lock' 'schemaVersion' apps packages infra scripts docs | head -n 400 || true
-          echo '=== explicit contract/version type markers ==='
-          grep -RInE --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.next --exclude='*.lock' '(contractVersion|schema_version|schemaVersion|version:[[:space:]]*["'"'`]|version\??:)' apps packages infra scripts | head -n 600 || true
+          echo '=== named schema/contract version markers ==='
+          grep -RIn \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=.next \
+            --exclude='*.lock' \
+            -e 'schemaVersion' \
+            -e 'schema_version' \
+            -e 'contractVersion' \
+            apps packages infra scripts docs | head -n 600 || true
+          echo '=== TypeScript object/type version fields ==='
+          grep -RInE \
+            --include='*.ts' \
+            --include='*.tsx' \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=.next \
+            '(^|[,{[:space:]])version\??[[:space:]]*:' \
+            apps packages | head -n 600 || true
 
       - name: Inventory persisted JSON and browser storage boundaries
         shell: bash
