@@ -1,4 +1,5 @@
 import type { PatientWorkspaceSnapshot } from "@glymize/contracts";
+import { patientClinicalCoreRoute } from "./patient-core/route";
 import {
   patientRecordV2Route as patientRecordV2CoreRoute,
 } from "./platform-patient-record-v2-core";
@@ -10,15 +11,17 @@ export type { PatientRecordV2RouteContext } from "./patient-record-v2/context";
 /**
  * Patient Record v2 route facade.
  *
- * The historical route implementation remains in the core module. This facade
- * enriches the already-authorized Patient Workspace response with the signed
- * physician-order read model. No parallel patient authority or storage is
- * introduced here.
+ * New bounded Patient Clinical Core read concerns are intercepted here before
+ * the historical core route. The legacy implementation remains the write/
+ * compatibility authority while new read-model logic stays modular.
  */
 export async function patientRecordV2Route(
   request: Request,
   context: PatientRecordV2RouteContext,
 ): Promise<Response | null> {
+  const patientCoreResponse = await patientClinicalCoreRoute(request, context);
+  if (patientCoreResponse) return patientCoreResponse;
+
   const response = await patientRecordV2CoreRoute(request, context);
   if (!response) return null;
 

@@ -2,6 +2,7 @@ import type { PatientCoreFactBase } from "./facts.js";
 
 export const patientMedicationStatuses = [
   "active",
+  "held",
   "stopped",
   "uncertain",
 ] as const;
