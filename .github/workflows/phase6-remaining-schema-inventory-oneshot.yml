@@ -1,0 +1,72 @@
+name: One-shot Phase 6 remaining schema inventory
+
+on:
+  push:
+    branches:
+      - audit/phase6-remaining-schema-boundaries-20260908
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@v4
+        with:
+          ref: audit/phase6-remaining-schema-boundaries-20260908
+          fetch-depth: 0
+
+      - name: Inventory browser persistence boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RInE "localStorage|sessionStorage|indexedDB|JSON\.parse|JSON\.stringify" apps/web packages \
+            --include='*.ts' --include='*.tsx' --exclude-dir=node_modules > /tmp/browser-persistence.txt || true
+          sed -n '1,500p' /tmp/browser-persistence.txt
+
+      - name: Inventory Worker KV and R2 persistence boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RInE "\.put\(|\.get\(|\.delete\(|R2Bucket|KVNamespace|JSON\.parse|JSON\.stringify" packages/api-worker apps/web/cloudflare \
+            --include='*.ts' --include='*.tsx' --exclude-dir=node_modules > /tmp/worker-persistence.txt || true
+          sed -n '1,600p' /tmp/worker-persistence.txt
+
+      - name: Inventory active static JSON readers and public artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RInE "fetch\([^)]*\.json|readFile[^\n]*\.json|import[^\n]*\.json|public/.*\.json|schemaVersion|runtimeSchemaVersion" apps packages \
+            --include='*.ts' --include='*.tsx' --include='*.json' --exclude-dir=node_modules > /tmp/static-json.txt || true
+          sed -n '1,600p' /tmp/static-json.txt
+          echo '--- public JSON files ---'
+          find apps packages -path '*/public/*' -type f -name '*.json' -print | sort | sed -n '1,300p'
+
+      - name: Inventory explicit version markers around persistence and transport
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RInE "schemaVersion|schema_version|runtimeSchemaVersion|snapshotVersion|contractVersion|apiVersion|version:[[:space:]]*[0-9]|version:[[:space:]]*['\"]|reviewSetVersion|packVersion" apps packages \
+            --include='*.ts' --include='*.tsx' --include='*.json' --exclude-dir=node_modules > /tmp/version-markers.txt || true
+          sed -n '1,800p' /tmp/version-markers.txt
+
+      - name: Inventory public request response and DTO boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -RInE "export (interface|type) .*Request|export (interface|type) .*Response|Dto|DTO|/v1/|ResponseV[0-9]|RequestV[0-9]" apps packages \
+            --include='*.ts' --include='*.tsx' --exclude-dir=node_modules > /tmp/public-boundaries.txt || true
+          sed -n '1,800p' /tmp/public-boundaries.txt
+
+      - name: Show schema policy and migration ownership anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '--- schema policy ---'
+          sed -n '1,240p' docs/architecture/SCHEMA_VERSIONING.md
+          echo '--- D1 migrations ---'
+          find apps/web/cloudflare/migrations packages/api-worker/migrations -maxdepth 1 -type f -name '*.sql' -print | sort
+          echo '--- PostgreSQL migrations ---'
+          find packages/db/migrations -maxdepth 1 -type f -name '*.sql' -print | sort
