@@ -915,9 +915,9 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 - [x] Define rule precedence
 - [ ] Separate hard blocks, cautions, preferences, cost, and display
 - [x] Replace unexplained score constants
-- [ ] Create traceable rule metadata
+- [x] Create traceable rule metadata — implemented for live Type 2 Decision Graph authority; no repository-wide future-module universality claim.
 - [ ] Define minimum safe inputs per pathway
-- [ ] Add source versioning and review fields
+- [x] Add source versioning and review fields — implemented for live Type 2 Decision Graph authority with approved-only lifecycle enforcement; broader unrelated modules retain their own governance reviews.
 - [ ] Add clinical golden cases
 
 ### Phase 3 — Clinical engine convergence

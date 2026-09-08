@@ -2,7 +2,7 @@
 
 Status: accepted architecture boundary for the current GLYMIZE clinical engine.
 
-Repository baseline for this closure: `main@b0d9f614b0fb88a99ffa21e244be6c598a365025`.
+Repository baseline for this lifecycle closure: `main@a1f78be10900e11ff75570f6cd9e4ccfc9586012`.
 
 This document defines how executable or decision-bearing clinical artifacts remain traceable to reviewed evidence. It does not add, approve, or change any clinical threshold, eligibility rule, dose, ranking policy, or product indication.
 
@@ -12,14 +12,15 @@ Decision Graph artifacts that carry clinical authority must have a stable identi
 
 | Artifact | Stable identity | Evidence requirement | Review-state requirement |
 | --- | --- | --- | --- |
-| Medication/safety gate | `id` | non-empty `evidence` | governed by reviewed rule source; no new generic review field is introduced here |
-| Regimen conflict rule | `id` | non-empty `evidence` | governed by reviewed rule source |
+| Medication/safety gate | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |
+| Regimen conflict rule | `id` | non-empty `evidence` | explicit `reviewState`; live consumers apply only `approved` |
 | Clinical objective | objective `id` | non-empty `evidence` when the objective is guideline-derived and can influence selection/composition | no new review-state field is introduced by this task |
 | Clinically-derived missing-data requirement | requirement `key` | non-empty `evidence` when the requirement is justified by clinical guidance and can block or shape clinical reasoning | no new review-state field is introduced by this task |
-| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type already requires it |
+| Dose/titration/approved protocol | rule/protocol `id` | non-empty `evidence` | explicit `reviewState` where the executable protocol type requires it |
+| Insulin conversion edge | conversion rule `id` | non-empty `evidence` | explicit `reviewState`; live conversion considers only `approved` edges |
 | Product-safety review set | review-set and criterion IDs | reviewed evidence attached to the criterion set | explicit reviewed version/state boundary |
 
-Every evidence reference used for this closure carries at least `sourceId`, `title`, `version`, and `url`; locators and evidence strength remain available where the source module already provides them.
+`EvidenceReferenceV2.version` is required for live Decision Graph evidence. Static guideline/regulatory sources carry their reviewed edition or effective date. Supportive evidence projected from the Master Registry carries `sourceObservedAt` when present and otherwise an explicit `source-code:<sourceId>` provenance identity; that fallback is not represented as a guideline edition.
 
 ## 2. Current Type 2 provenance closure
 
@@ -49,11 +50,11 @@ An empty `evidence` array is not automatically a provenance defect. The followin
 
 These cases must not be used as precedent to omit evidence from a new guideline-derived clinical objective, gate, dose rule, or clinically-derived blocking requirement.
 
-## 4. Boundary with source review/version governance
+## 4. Source version and review lifecycle governance
 
-This closure satisfies the Roadmap requirement to make current clinical rule metadata traceable; it does **not** claim that every public schema or every future clinical module has a universal review/version lifecycle.
+The Phase 2 source/review lifecycle is now explicit for live Type 2 authority. Evidence references are versioned, and decision-bearing medication gates, regimen conflicts and insulin-conversion edges carry `candidate | approved | retired`.
 
-The separate Phase 2 item **Add source versioning and review fields** remains independently auditable. A future task may standardize review-state/version metadata more broadly, but it must not fabricate review approval for artifacts that have not undergone that governance process.
+Lifecycle state is not display-only metadata: live consumers fail closed and apply only `approved` rules. Existing builders that were already the reviewed authority emit `approved`; this task does not promote any new clinical rule, threshold, dose, indication or recommendation. Candidate or retired rules remain non-authoritative until a separate reviewed change explicitly promotes them.
 
 ## 5. Regression expectation
 
