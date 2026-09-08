@@ -12,6 +12,7 @@ export * from "./reviewed-insurance-policy-merge.js";
 export * from "./cost.js";
 export * from "./regimens.js";
 export * from "./gates.js";
+export * from "./selection-constraints.js";
 export * from "./enrich.js";
 export * from "./pareto.js";
 export * from "./selector.js";

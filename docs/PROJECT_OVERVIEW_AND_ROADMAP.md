@@ -913,7 +913,7 @@ The sequence below is the canonical order accepted on 2026-09-03. Numbered tasks
 ### Phase 2 — Clinical logic safety foundation
 
 - [x] Define rule precedence
-- [ ] Separate hard blocks, cautions, preferences, cost, and display
+- [x] Separate hard blocks, cautions, preferences, cost, and display — implemented for live Type 2 authority; request/access constraints block selection without becoming clinical contraindications, while unrelated future modules require their own authority review.
 - [x] Replace unexplained score constants
 - [x] Create traceable rule metadata — implemented for live Type 2 Decision Graph authority; no repository-wide future-module universality claim.
 - [ ] Define minimum safe inputs per pathway

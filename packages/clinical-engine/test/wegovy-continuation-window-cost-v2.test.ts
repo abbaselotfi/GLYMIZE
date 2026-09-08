@@ -331,7 +331,10 @@ describe("WEGOVY continuation-window phase-aware cost", () => {
     expect(wegovyMashContinuationCostV2(enriched.components[0]!)?.costAuthority).toBe("conditional_projection");
     expect(enriched.insuranceFit).toBe("unknown");
     expect(enriched.monthlyPatientCostToman).toBeUndefined();
-    expect(enriched.gate.status).toBe("exclude");
+    expect(enriched.gate.status).toBe("pass");
+    expect(enriched.selectionConstraint?.status).toBe("blocked");
+    expect(enriched.selectionConstraint?.kinds).toContain("access");
+    expect(enriched.selectionConstraint?.reasons.join(" ")).toContain("insured-only");
     expect(enriched.cautions.join(" ")).toContain("display-only");
   });
 
