@@ -1,7 +1,7 @@
 # GLYMIZE Current State
 
 Snapshot date: 2026-09-09
-Repository baseline: `main` at `37f6bbf1d5c89878e871587253e75713a7973ffa` after R28-02 Patient Workspace active-context binding.
+Repository baseline: `main` at `8419ffa6b11698f81c36ba785226239895c301b0` after R28-03 executable Patient Core completeness.
 
 This document is a factual repository snapshot, not a product promise or replacement for the ordered [Project Overview and Roadmap](PROJECT_OVERVIEW_AND_ROADMAP.md). The remaining open roadmap families are status-classified in [Remaining Roadmap Re-baseline](REMAINING_ROADMAP_REBASELINE_2026-09-08.md); that audit does not convert implemented code into V1 scope or deployment claims. It describes code, routes, tests, migrations, workflow configuration, and checked-in default feature state present in the repository. It does not assert that an uninspected remote environment has been deployed or activated.
 
@@ -17,7 +17,7 @@ Run `node scripts/generate-current-state.mjs` from the repository root to reprod
 | Repository fact | Count |
 | --- | ---: |
 | Web App Router entries | 29 (29 pages, 0 route handlers) |
-| Automated test files | 161 (155 JS/TS, 6 Python) |
+| Automated test files | 163 (157 JS/TS, 6 Python) |
 | SQL migration files | 23 (18 Worker/D1, 5 PostgreSQL foundation) |
 <!-- current-state:generated:end -->
 
@@ -30,7 +30,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 - The public README, landing page, application metadata and install manifest present GLYMIZE as a patient-centered, multispecialty clinical intelligence workspace. Diabetes is identified as the first mature module rather than the whole product boundary.
 - A bilingual Next.js application with landing, account, dashboard, profile/security, Type 2, Type 1, pregnancy, Care Team, patient archive, Evidence Assistant, insulin tools, patient-facing Care Hub, and multi-page admin surfaces.
 - A canonical patient entry at `/patient` with a patient-specific Care Hub shell separated from the physician/assistant application shell. The older `/portal` surface remains part of the repository for portal compatibility and patient-record access flows.
-- Physician Patient Workspace surfaces for patient context/header, medication reconciliation, investigations/orders, lab trends, encounter timeline, and change summaries, backed by the existing patient-record runtime contracts rather than a second patient store. Longitudinal reads are now bound to the active actor/practice/patient context: obsolete overlapping reads are cancelled/ignored, auth or practice changes invalidate visible patient state, and response version/scope plus nested workspace-consumed values are validated fail-closed before rendering.
+- Physician Patient Workspace surfaces for patient context/header, medication reconciliation, investigations/orders, lab trends, encounter timeline, and change summaries, backed by the existing patient-record runtime contracts rather than a second patient store. Longitudinal reads are bound to the active actor/practice/patient context: obsolete overlapping reads are cancelled/ignored, auth or practice changes invalidate visible patient state, and response version/scope plus nested workspace-consumed values are validated fail-closed before rendering.
 - Patient-facing provider discovery, referral redemption, care-relationship, and scheduling UI foundations that consume capability-gated runtime contracts.
 - App-shell session restoration and permission-aware navigation for physician and assistant users, plus patient-specific authentication/session boundaries.
 - GitHub OAuth owner authentication for central catalogue publication and runtime-account authorization for permitted admin surfaces.
@@ -54,6 +54,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 - A Cloudflare Worker entry point combines admin publishing with runtime authentication, profile/team management, Evidence Assistant, Patient Record v2, portal, provider, referral, relationship, practice-context, and scheduling route modules.
 - D1 migrations through `0018` include runtime accounts, longitudinal patients and encounters, immutable snapshot revisions, patient portal sessions, additive global patient identity, provider/referral/relationship foundations, practice contexts, availability, slot holds, appointments, appointment policy snapshots, and practice-scoped patient-access roles.
 - Patient Record v2 provides practice-scoped resolve/create, identifier attachment, monotonic file-number allocation, Care Team atomic intake, encounters, snapshot revisions, observations, archive, workspace reads, and reviewed compatibility bridges.
+- The longitudinal Patient Core observation projection now declares its eligible source universe as observations from the latest immutable snapshot revision per encounter. Rejected observations and `raw:*` keys are explicit intentional exclusions; an eligible row skipped for unusable key/value forces `partial`; decryption failure remains a hard read error. Projection diagnostics account for source, eligible, included, intentionally excluded, invalid-skipped, and truncated counts, with runtime accounting invariants preventing a silently false `complete` result.
 - Request-time `editor`/`approver` authorization protects patient-adjacent Worker routes, with existing fine-grained permissions retained as a second gate and self-approval denied for encounter and reviewed legacy-link changes.
 - Care Team OCR/manual intake and reviewed handoff creation include explicit create/update intent, duplicate-code guard, optimistic revision conflict handling, and actionable Runtime failure messages.
 - A practice-local patient registry remains the clinical record. Global patient identity and verified legacy links are additive and do not replace or silently merge practice-local records.
@@ -64,6 +65,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 - Repository-wide TypeScript typechecking, Biome linting, Vitest suites, the 325,000-case established clinical stress/release campaign, and Playwright critical-flow coverage are wired into validation.
 - Every pull request targeting `main` runs frozen install, typecheck, lint, monorepo tests/stress suites, and critical Playwright flows; the PR template additionally requires explicit Roadmap and Graph Gate declarations.
 - R28-02 adds a modular Patient Workspace read guard and a separate longitudinal-response validator rather than extending the page component into a mixed concurrency/schema-validation module. Behavioral tests cover out-of-order patient responses, overlapping refreshes, actor/practice invalidation, current access failure, malformed nested payloads, unsupported versions, and patient/practice scope mismatch.
+- R28-03 adds executable projection accounting and controlled reader tests. The tests cover missing/unusable eligible values, rejected/raw intentional exclusions, latest snapshot-revision scoping, practice/patient query binding, decryption failure, snapshot partial semantics, and preservation of the change detector rule that partial-family absence is not a removal.
 - Codebase Memory is pinned at `0.10.8` for the current graph-gate workflow, with PRE/POST graph checks used for graph-relevant tasks.
 - The five previously oversized modules identified in roadmap §8.24 expose compatibility façades over cohesive archive, portal-media, generated-catalogue, Care Team form-model, and browser-catalogue state modules, with equivalence tests.
 - Versioned/hotfix CSS identified by Phase 0 Task 8 was consolidated and superseded styling files were removed after screenshot comparison.
@@ -86,18 +88,19 @@ The counts are file inventory, not a claim that every route or migration is acti
 - Phase 3 Tasks 1–5 are complete. The live Type 2 authority convergence, threshold consolidation, structural hard-exclusion firewall, and product/dose evidence indexing were merged in PRs #37–#41.
 - Phase 4 Tasks 6–10 are complete. The verified multidomain catalogue, reviewed cardiometabolic dose protocols, BP/lipid objective wiring, scenario-diversity acceptance, and expanded multidomain release gate were merged through PRs #42 and #47–#50. Task 6 merged before both clinical-logic tasks; after the first Task 7 attempt exposed an ordering dependency, Task 8 dose protocols were completed before the final Task 7 objective activation.
 - Subsequent Type 2 hardening through PR #116 added structured specialist intake, authority/coverage truth contracts, runtime parity, current-medication interval reconciliation, insurer/claims boundaries, WEGOVY MASH protocol/product-safety convergence, authoritative safety metadata, and active UI collection without changing the completed Phase 3/4 task definitions.
-- Roadmap §28 R28-01 status reconciliation is complete, and R28-02 Patient Workspace active-context binding is complete at `37f6bbf1d5c89878e871587253e75713a7973ffa`; its evidence is recorded in [R28-02 completion record](R28_02_PATIENT_WORKSPACE_ASYNC_BINDING_2026-09-09.md).
+- Roadmap §28 R28-01 status reconciliation is complete; R28-02 Patient Workspace active-context binding is complete at `37f6bbf1d5c89878e871587253e75713a7973ffa`; and R28-03 executable read-model completeness is complete at `8419ffa6b11698f81c36ba785226239895c301b0`. Evidence is recorded in the corresponding R28 completion records.
 - Remaining unchecked roadmap phases contain a mix of genuinely planned work, already-partial implementation, and owner/product/clinical decisions. They require the execution ordering in canonical Roadmap §28 and this document's stated continuation boundary rather than treating any unchecked historical item as automatically next.
 
 ## Immediate continuation boundary
 
-R28-01 status reconciliation and R28-02 active-context binding are complete. The next implementation task is R28-03, followed by R28-04/R28-05/R28-06, R28-07, R28-08 and R28-09 as ordered in canonical Roadmap §28.4.
+R28-01, R28-02, and R28-03 are complete. The next convergence group is R28-04/R28-05/R28-06, followed by R28-07, R28-08 and R28-09 as ordered in canonical Roadmap §28.4.
 
 During that sequence:
 
 - do not collect NYHA merely to remove the last Type 2 UI gap without a demonstrated downstream consumer;
 - do not implement the catalogue storage migration without the owner confirmation required by its ADR;
-- do not invent clinical thresholds, contraindications, dose rules, evidence, or product scope to satisfy an unchecked roadmap box.
+- do not introduce a new Patient Core authority without the separate review/ADR required by R28-06;
+- do not invent clinical thresholds, contraindications, dose rules, evidence, freshness cutoffs, or product scope to satisfy an unchecked roadmap box.
 
 ## Safety status
 
