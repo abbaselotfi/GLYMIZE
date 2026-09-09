@@ -119,8 +119,12 @@ function model(
 }
 
 describe("C1 10-second Patient Workspace", () => {
-  const pageSource = fs.readFileSync(
+  const loaderSource = fs.readFileSync(
     new URL("../app/patients/[patientId]/patient-clinical-workspace.tsx", import.meta.url),
+    "utf8",
+  );
+  const viewSource = fs.readFileSync(
+    new URL("../app/patients/[patientId]/patient-clinical-workspace-view.tsx", import.meta.url),
     "utf8",
   );
   const clientSource = fs.readFileSync(
@@ -163,18 +167,20 @@ describe("C1 10-second Patient Workspace", () => {
     expect(clientSource).toContain("runtimeFetch");
     expect(clientSource).toContain("/longitudinal");
     expect(clientSource).toContain("PatientLongitudinalReadModel");
-    expect(pageSource).toContain('data-patient-workspace="ten-second-brief"');
-    expect(pageSource).toContain('data-patient-workspace="attention-now"');
-    expect(pageSource).toContain('data-patient-workspace="what-changed"');
-    expect(pageSource).toContain('data-patient-workspace="current-clinical-picture"');
-    expect(pageSource).toContain('data-patient-workspace="data-coverage"');
+    expect(loaderSource).toContain("getPatientLongitudinalReadModel");
+    expect(loaderSource).toContain("PatientClinicalWorkspaceView");
+    expect(viewSource).toContain('data-patient-workspace="ten-second-brief"');
+    expect(viewSource).toContain('data-patient-workspace="attention-now"');
+    expect(viewSource).toContain('data-patient-workspace="what-changed"');
+    expect(viewSource).toContain('data-patient-workspace="current-clinical-picture"');
+    expect(viewSource).toContain('data-patient-workspace="data-coverage"');
   });
 
   it("keeps explicit safety language in the physician-facing brief", () => {
-    expect(pageSource).toContain("does not infer disease severity");
-    expect(pageSource).toContain("This does not mean the patient is clinically stable");
-    expect(pageSource).toContain("Missing data is not evidence of clinical absence");
-    expect(pageSource).not.toContain("healthScore");
-    expect(pageSource).not.toContain("severityScore");
+    expect(viewSource).toContain("does not infer disease severity");
+    expect(viewSource).toContain("This does not mean the patient is clinically stable");
+    expect(viewSource).toContain("Missing data is not evidence of clinical absence");
+    expect(viewSource).not.toContain("healthScore");
+    expect(viewSource).not.toContain("severityScore");
   });
 });
