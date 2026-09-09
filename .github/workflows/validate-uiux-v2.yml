@@ -35,8 +35,7 @@ jobs:
         run: pnpm test
       - name: Build Worker
         run: pnpm --filter @glymize/admin-worker build
-      - name: Build static web
+      - name: Build current web target
         env:
-          GITHUB_PAGES: "true"
           NEXT_PUBLIC_ADMIN_API_URL: "https://shiny-block-9d4a.abbaselotfi.workers.dev"
         run: pnpm --filter @glymize/web... build
