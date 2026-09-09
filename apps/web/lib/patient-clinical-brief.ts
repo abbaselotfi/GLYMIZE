@@ -2,6 +2,12 @@ import type {
   PatientCoreCollectionCompleteness,
   PatientLongitudinalReadModel,
 } from "@glymize/contracts/patient-core";
+import {
+  buildPatientWorkspaceSelection,
+  type PatientWorkspaceSelection,
+} from "./patient-workspace-selection";
+
+export { isSourceFlaggedObservation } from "./patient-workspace-selection";
 
 export type PatientReviewPosture =
   | "review_recorded_changes"
@@ -24,27 +30,18 @@ export interface PatientTenSecondBrief {
   posture: PatientReviewPosture;
   recordedChangeCount: number;
   medicationAttentionCount: number;
+  /** Newest-per-exact-series source flags only; historical flags are separate. */
   flaggedObservationCount: number;
+  unverifiedObservationCount: number;
+  historicalFlaggedObservationCount: number;
   incompleteFamilyCount: number;
   coverage: PatientDataCoverageItem[];
 }
 
-export function isSourceFlaggedObservation(flag: string | undefined) {
-  const normalized = flag?.trim().toLocaleUpperCase();
-  return Boolean(normalized && !["N", "NORMAL", "NONE"].includes(normalized));
-}
-
 export function buildPatientTenSecondBrief(
   model: PatientLongitudinalReadModel,
+  selected: PatientWorkspaceSelection = buildPatientWorkspaceSelection(model),
 ): PatientTenSecondBrief {
-  const medicationAttentionCount = model.context.medications.items.filter(
-    (medication) => medication.status === "held" || medication.status === "uncertain",
-  ).length;
-  const flaggedObservationCount = model.context.observations.items.filter(
-    (observation) => isSourceFlaggedObservation(observation.abnormalFlag),
-  ).length;
-  const recordedChangeCount = model.changesSincePreviousEncounter.changes.length;
-
   const coverage: PatientDataCoverageItem[] = [
     { family: "allergies", completeness: model.context.allergies.completeness },
     { family: "problems", completeness: model.context.problems.completeness },
@@ -56,6 +53,12 @@ export function buildPatientTenSecondBrief(
     },
     { family: "timeline", completeness: model.timeline.completeness },
   ];
+
+  const recordedChangeCount = selected.changes.items.length;
+  const medicationAttentionCount = selected.attentionMedications.items.length;
+  const flaggedObservationCount = selected.currentFlaggedObservations.items.length;
+  const unverifiedObservationCount = selected.currentUnverifiedObservations.items.length;
+  const historicalFlaggedObservationCount = selected.historicalFlaggedObservations.length;
   const incompleteFamilyCount = coverage.filter(
     (item) => item.completeness !== "complete",
   ).length;
@@ -63,7 +66,8 @@ export function buildPatientTenSecondBrief(
   const hasReviewTrigger =
     recordedChangeCount > 0 ||
     medicationAttentionCount > 0 ||
-    flaggedObservationCount > 0;
+    flaggedObservationCount > 0 ||
+    unverifiedObservationCount > 0;
   const comparison = model.changesSincePreviousEncounter;
 
   let posture: PatientReviewPosture;
@@ -82,6 +86,8 @@ export function buildPatientTenSecondBrief(
     recordedChangeCount,
     medicationAttentionCount,
     flaggedObservationCount,
+    unverifiedObservationCount,
+    historicalFlaggedObservationCount,
     incompleteFamilyCount,
     coverage,
   };

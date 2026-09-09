@@ -13,6 +13,7 @@ type Row = {
   canonical_key: string;
   observed_at: string;
   verification: "unverified" | "confirmed" | "rejected";
+  snapshot_revision: number;
   payload_ciphertext: string;
   payload_iv: string;
   payload_auth_tag: string;
@@ -23,6 +24,7 @@ function row(
   id: string,
   canonicalKey: string,
   verification: Row["verification"] = "confirmed",
+  snapshotRevision = 2,
 ): Row {
   return {
     id,
@@ -30,6 +32,7 @@ function row(
     canonical_key: canonicalKey,
     observed_at: `2026-09-0${Math.min(9, Number(id.replace(/\D/g, "")) || 1)}T08:00:00.000Z`,
     verification,
+    snapshot_revision: snapshotRevision,
     payload_ciphertext: id,
     payload_iv: `iv-${id}`,
     payload_auth_tag: `tag-${id}`,
@@ -77,7 +80,7 @@ describe("Patient Core observation completeness contract", () => {
     );
 
     const fixture = context([
-      row("valid", "hba1c"),
+      row("valid", "hba1c", "confirmed", 7),
       row("rejected", "potassium", "rejected"),
       row("raw", "raw:free-text"),
       row("invalid", "creatinine"),
@@ -91,7 +94,14 @@ describe("Patient Core observation completeness contract", () => {
       factId: "valid",
       factKey: "observation:hba1c:%:",
       value: 7.1,
-      meta: { scope: { practiceId: "practice-1", patientId: "patient-1" } },
+      meta: {
+        scope: { practiceId: "practice-1", patientId: "patient-1" },
+        revision: 7,
+        source: {
+          recordId: "valid",
+          encounterId: "encounter-valid",
+        },
+      },
     });
     expect(result.diagnostics).toEqual({
       sourceScope: "latest_snapshot_revision_per_encounter",
@@ -145,6 +155,7 @@ describe("Patient Core observation completeness contract", () => {
     const inspected = fixture.inspect();
     expect(inspected.bound).toEqual(["practice-1", "patient-from-another-practice"]);
     expect(inspected.sql).toContain("o.practice_id=? AND o.patient_id=?");
+    expect(inspected.sql).toContain("o.snapshot_revision");
     expect(inspected.sql).toContain("o.snapshot_revision=(");
     expect(inspected.sql).toContain("SELECT MAX(s.revision)");
     expect(inspected.sql).not.toContain("o.verification<>'rejected'");

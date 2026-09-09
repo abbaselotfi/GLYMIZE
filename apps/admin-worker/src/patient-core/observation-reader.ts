@@ -16,6 +16,7 @@ type ObservationRow = {
   canonical_key: string;
   observed_at: string;
   verification: "unverified" | "confirmed" | "rejected";
+  snapshot_revision: number;
   payload_ciphertext: string;
   payload_iv: string;
   payload_auth_tag: string;
@@ -54,7 +55,7 @@ export async function readPatientCoreObservations(
   patientId: string,
 ): Promise<PatientCoreCollection<PatientObservationView>> {
   const rows = await context.database.prepare(
-    `SELECT o.id,o.encounter_id,o.canonical_key,o.observed_at,o.verification,
+    `SELECT o.id,o.encounter_id,o.canonical_key,o.observed_at,o.verification,o.snapshot_revision,
             o.payload_ciphertext,o.payload_iv,o.payload_auth_tag,o.created_at
      FROM patient_observations o
      WHERE o.practice_id=? AND o.patient_id=?
@@ -131,6 +132,7 @@ export async function readPatientCoreObservations(
         recordedAt: row.created_at,
         freshness: "unknown",
         verification: verification(row.verification),
+        revision: row.snapshot_revision,
       },
     });
   }

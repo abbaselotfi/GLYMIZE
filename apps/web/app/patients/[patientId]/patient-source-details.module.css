@@ -1,0 +1,34 @@
+.details {
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+}
+
+.details summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.details dl {
+  margin: 0.5rem 0 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.details dl > div {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 0.7fr) minmax(0, 1.3fr);
+  gap: 0.5rem;
+}
+
+.details dt {
+  opacity: 0.66;
+}
+
+.details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
