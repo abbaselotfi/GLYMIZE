@@ -62,3 +62,31 @@ B3 must explicitly address:
 - PCC-G26 — physician usability validation.
 
 The target is not maximum information density. It is the shortest safe path from opening a patient to understanding current clinical state, meaningful change, and the next relevant action.
+
+---
+
+## R28-06 authority audit — 2026-09-09
+
+This section is a factual append to the historical B1 matrix. It does not retroactively rewrite the B1 baseline and does not create a new source of truth.
+
+| Patient Core family | Current authoritative source / write owner | Current Patient Core projection | Safety-facing state that can be asserted now | Unresolved authority decision |
+| --- | --- | --- | --- | --- |
+| Allergies / intolerances | **No canonical allergy authority is exposed by the current Patient Record v2 snapshot contract or D1 schema.** | `not_available / source_not_exposed` | Missing/not-collected must remain unavailable; it is never known absence or medication clearance. | Selecting/creating an allergy write authority or persistence shape requires a separate reviewed gap/ADR and is owner-gated. |
+| Problems / diagnoses | **No canonical problem-list authority is exposed by the current Patient Record v2 snapshot contract or D1 schema.** Bounded `clinicalFlags` are contexts, not a problem list. | `not_available / source_not_exposed` | Missing problem data remains unavailable; notes/flags must not be promoted to diagnoses by projection. | Selecting/creating a problem write authority or persistence shape requires a separate reviewed gap/ADR and is owner-gated. |
+| Medication reconciliation | Immutable Patient Record v2 encounter snapshots written through the existing encounter/snapshot workflow. | Snapshot-derived `PatientMedicationStateView`; rejected entries excluded; invalid eligible entries make the collection partial. | `not_collected`, known-empty for the declared snapshot source, unverified/verified, status, source state, snapshot revision/time and reconciliation stage can be preserved. | No new authority is required for the current snapshot-derived reconciliation view. Broader longitudinal medication-history authority remains a separate future decision. |
+| Cross-cutting Clinical Context | Existing Patient Record v2 encounter snapshot `clinicalFlags` for the currently enumerated bounded subset. | Explicit true/false flags are projected as present/absent, while the family remains `partial / not_supported`. | Explicit represented flag state can be preserved with snapshot provenance; absence of an unrepresented context cannot be inferred. | Broad pregnancy/lactation/frailty/hepatic/acute-illness context authority beyond the existing flag subset requires separate reviewed source/ADR work. |
+| Observations used by medication safety | Patient Record v2 indexed observations from the latest immutable snapshot revision per encounter. | R28-03/R28-05 bounded Patient Core observations with explicit completeness/provenance. | Verification, source/effective/recorded time, revision and current `freshness` state are transportable to reviewed safety consumers. | Freshness policy is use-specific. No universal cutoff may be invented in Patient Core. |
+
+### R28-06 non-negotiable state semantics
+
+1. `not_available` / `not_collected` is not `known_absent`.
+2. `known_absent` is only valid for a collection that is `complete` for its declared source scope and contains no facts.
+3. A `partial` collection remains partial even when it contains zero items.
+4. `unverified`, `freshness: unknown`, `stale`, and `current` are distinct transport states. Patient Core does not calculate a universal staleness threshold.
+5. Care-Team/pre-visit reconciliation, physician-review/final snapshot reconciliation, clinical-engine decision output, and signed physician order are separate objects/stages. A reconciled medication fact is not itself an order.
+6. Missing safety facts must never become an implicit eligibility or clearance decision.
+7. Existing reviewed medication/product safety registries remain the clinical-rule authority. The Patient Core adapter may carry state into those consumers but must not duplicate their criteria or ranking logic.
+
+### R28-06 gate status
+
+The current repository supports a non-authoritative structural adapter for existing medication/context/observation facts. **Allergy and problem authority selection remains unresolved and owner-gated.** No migration or new write authority is authorized by this audit.
