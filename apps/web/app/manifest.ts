@@ -5,9 +5,9 @@ export const dynamic = "force-static";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "GLYMIZE | دستیار بالینی دیابت",
+    name: "GLYMIZE | فضای هوشمند بالینی بیمارمحور",
     short_name: "GLYMIZE",
-    description: "فضای کار قابل نصب برای پشتیبانی تصمیم بالینی دیابت",
+    description: "فضای کار چندتخصصی برای پرونده طولی بیمار، شواهد، ایمنی دارویی و تصمیم‌های بالینی",
     start_url: withBasePath("/"),
     scope: withBasePath("/"),
     display: "standalone",
@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
     dir: "rtl",
     icons: [
       { src: withBasePath("/icon-192.png"), sizes: "192x192", type: "image/png" },
-      { src: withBasePath("/icon-512.png"), sizes: "512x512", type: "image/png" }
-    ]
+      { src: withBasePath("/icon-512.png"), sizes: "512x512", type: "image/png" },
+    ],
   };
 }

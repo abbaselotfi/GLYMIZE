@@ -17,8 +17,9 @@ import "./type-2/type2-adaptive-cards-v3.css";
 import "./type-2/type2-final-ux-v4.css";
 
 export const metadata: Metadata = {
-  title: "GLYMIZE | Diabetes Prescribing Intelligence",
-  description: "A bilingual clinical decision-support platform for diabetes prescribing.",
+  title: "GLYMIZE | Patient-Centered Clinical Intelligence",
+  description:
+    "A bilingual physician workspace for longitudinal patient records, evidence, medication intelligence, and specialty clinical modules.",
   manifest: withBasePath("/manifest.webmanifest"),
   appleWebApp: {
     capable: true,

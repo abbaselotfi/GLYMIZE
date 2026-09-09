@@ -1,206 +1,191 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect } from "react";
 
 import { migrateLegacyGlymizeStorage } from "../lib/glymize-brand-migration";
+import { useGlymizeLocale } from "./components/use-glymize-locale";
 import styles from "./page.module.css";
 
 type Locale = "fa" | "en";
 
 type Copy = {
-  clinicianLabel: string;
-  intelligence: string;
+  platform: string;
   headline: string;
   description: string;
-  start: string;
+  physicianStart: string;
   patientStart: string;
   entryLabel: string;
   patientEntry: string;
   clinicianEntry: string;
-  disclaimer: string;
-  patientTitle: string;
-  patientBody: string;
-  guidelineTitle: string;
-  guidelineBody: string;
-  coverageTitle: string;
-  coverageBody: string;
-  resultTitle: string;
-  resultBody: string;
+  safety: string;
+  briefLabel: string;
+  briefTitle: string;
+  changedLabel: string;
+  changedTitle: string;
+  changedBody: string;
+  factsLabel: string;
+  factsTitle: string;
+  factsBody: string;
+  modulesLabel: string;
+  modulesTitle: string;
+  modulesBody: string;
+  actionLabel: string;
+  actionTitle: string;
+  actionBody: string;
+  domainsLabel: string;
+  domains: string[];
 };
 
 const COPY: Record<Locale, Copy> = {
   fa: {
-    clinicianLabel: "ویژه پزشکان",
-    intelligence: "هوش تجویز در دیابت",
-    headline: "از عوامل فردی بیمار تا برنامه درمانی بهینه.",
+    platform: "فضای هوشمند بالینی بیمارمحور",
+    headline: "داستان کامل بیمار؛ از داده تا اقدام روشن.",
     description:
-      "توصیه‌هایی مبتنی بر شواهد و منطبق با دستورالعمل‌های بالینی، فهرست دارویی، پوشش بیمه و ملاحظات هزینه.",
-    start: "ورود پزشک و دستیار",
+      "پروندهٔ طولی، آزمایش‌ها، داروها، شواهد و ماژول‌های تخصصی در یک فضای کاری مشترک برای پزشک.",
+    physicianStart: "ورود پزشک و دستیار",
     patientStart: "ورود به فضای بیمار",
     entryLabel: "مسیرهای ورود به GLYMIZE",
     patientEntry: "بیمار",
     clinicianEntry: "پزشک و دستیار",
-    disclaimer:
-      "پشتیبانی تصمیم بالینی جایگزین قضاوت پزشک نیست و مسئولیت نهایی تصمیم درمانی بر عهده پزشک است.",
-    patientTitle: "مشخصات بیمار",
-    patientBody: "اطلاعات بالینی، ترجیحات و شرایط فردی",
-    guidelineTitle: "دستورالعمل‌ها",
-    guidelineBody: "توصیه‌های مبتنی بر شواهد و راهنماهای بالینی",
-    coverageTitle: "پوشش و هزینه",
-    coverageBody: "پوشش بیمه، دسترسی و ملاحظات هزینه",
-    resultTitle: "برنامه درمانی بهینه",
-    resultBody: "پیشنهاد شخصی‌سازی‌شده برای بررسی پزشک",
+    safety:
+      "GLYMIZE داده، تغییرات و گزینه‌های قابل‌استناد را کنار هم می‌گذارد؛ تصمیم و اقدام نهایی با پزشک است.",
+    briefLabel: "خلاصهٔ ۱۰ ثانیه‌ای",
+    briefTitle: "وضعیت امروز بیمار",
+    changedLabel: "چه چیزی تغییر کرده؟",
+    changedTitle: "روند و تغییرات مهم",
+    changedBody: "ویزیت، آزمایش، دارو و رویدادهای طولی با منبع و زمان مشخص.",
+    factsLabel: "Patient Clinical Core",
+    factsTitle: "یک واقعیت، یک منبع",
+    factsBody: "همهٔ تخصص‌ها از همان پرونده و زمینهٔ بالینی مشترک استفاده می‌کنند.",
+    modulesLabel: "ماژول‌های تخصصی",
+    modulesTitle: "هوش بالینی قابل توسعه",
+    modulesBody: "دیابت نخستین ماژول بالغ است؛ تخصص‌های بعدی روی همان هسته اضافه می‌شوند.",
+    actionLabel: "اقدام بعدی",
+    actionTitle: "پیشنهاد قابل‌ردیابی",
+    actionBody: "دارو، آزمایش، پایش یا ارجاع با شواهد و تأیید پزشک.",
+    domainsLabel: "یک بیمار، چند نگاه تخصصی",
+    domains: [
+      "دیابت",
+      "قلب",
+      "کلیه",
+      "ریه",
+      "گوارش",
+      "عفونی",
+      "نورولوژی",
+      "روماتولوژی",
+      "هماتولوژی",
+    ],
   },
   en: {
-    clinicianLabel: "For clinicians",
-    intelligence: "Diabetes Prescribing Intelligence",
-    headline: "From patient factors to an optimized treatment plan.",
+    platform: "Patient-centered clinical intelligence workspace",
+    headline: "The whole patient story—from data to clear action.",
     description:
-      "Evidence-aligned recommendations informed by clinical guidelines, formulary, coverage, and cost.",
-    start: "Physician & assistant sign in",
+      "Longitudinal records, labs, medications, evidence, and specialty modules in one shared physician workspace.",
+    physicianStart: "Physician & assistant sign in",
     patientStart: "Open patient area",
     entryLabel: "GLYMIZE sign-in paths",
     patientEntry: "Patient",
     clinicianEntry: "Physician & assistant",
-    disclaimer:
-      "For healthcare professionals. Clinical decision support does not replace physician judgment.",
-    patientTitle: "Patient profile",
-    patientBody: "Clinical data, preferences, and individual factors",
-    guidelineTitle: "Guidelines",
-    guidelineBody: "Evidence-aligned clinical recommendations",
-    coverageTitle: "Coverage & cost",
-    coverageBody: "Insurance, access, and affordability",
-    resultTitle: "Optimized regimen",
-    resultBody: "A personalized option set for clinician review",
+    safety:
+      "GLYMIZE brings traceable facts, change, and options together; the physician owns the final decision and action.",
+    briefLabel: "10-second clinical brief",
+    briefTitle: "The patient today",
+    changedLabel: "What changed?",
+    changedTitle: "Meaningful longitudinal change",
+    changedBody: "Encounters, labs, medications, and events with explicit source and time.",
+    factsLabel: "Patient Clinical Core",
+    factsTitle: "One fact, one source",
+    factsBody: "Every specialty works from the same shared record and clinical context.",
+    modulesLabel: "Specialty modules",
+    modulesTitle: "Clinical intelligence that can grow",
+    modulesBody: "Diabetes is the first mature module; new specialties build on the same core.",
+    actionLabel: "Next action",
+    actionTitle: "A traceable proposal",
+    actionBody:
+      "Medication, investigation, monitoring, or referral with evidence and physician confirmation.",
+    domainsLabel: "One patient, multiple clinical lenses",
+    domains: [
+      "Diabetes",
+      "Cardiology",
+      "Kidney",
+      "Pulmonary",
+      "GI & liver",
+      "Infectious",
+      "Neurology",
+      "Rheumatology",
+      "Hematology",
+    ],
   },
 };
-
-const storageKey = "glymize-ui-language";
 
 function publicAsset(path: string): string {
   const configuredBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   return `${configuredBasePath}${path}`;
 }
 
-function PatientIcon() {
-  return (
-    <svg viewBox="0 0 48 48" aria-hidden="true">
-      <circle cx="24" cy="14" r="8" />
-      <path d="M10 40c0-8 6.3-14 14-14s14 6 14 14" />
-    </svg>
-  );
-}
-
-function BookIcon() {
-  return (
-    <svg viewBox="0 0 48 48" aria-hidden="true">
-      <path d="M24 39c-4-4-9-6-16-6V9c7 0 12 2 16 6v24Z" />
-      <path d="M24 39c4-4 9-6 16-6V9c-7 0-12 2-16 6v24Z" />
-    </svg>
-  );
-}
-
-function WalletIcon() {
-  return (
-    <svg viewBox="0 0 48 48" aria-hidden="true">
-      <path d="M8 12h27a5 5 0 0 1 5 5v22H12a6 6 0 0 1-6-6V14a6 6 0 0 1 6-6h23" />
-      <path d="M31 22h11v10H31a5 5 0 0 1 0-10Z" />
-      <circle cx="33" cy="27" r="1.5" className={styles.iconFill} />
-    </svg>
-  );
-}
-
-function ChecklistIcon() {
-  return (
-    <svg viewBox="0 0 48 48" aria-hidden="true">
-      <rect x="10" y="7" width="27" height="34" rx="3" />
-      <path d="m15 17 3 3 5-6M26 17h6M15 29l3 3 5-6M26 29h6" />
-      <path d="m31 38 4 4 8-9" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true">
-      <path d="M16 3 27 7v8c0 7-4.5 11.5-11 14-6.5-2.5-11-7-11-14V7l11-4Z" />
-      <path d="m11 16 3 3 7-8" />
-    </svg>
-  );
-}
-
 function ArrowIcon({ rtl }: { rtl: boolean }) {
   return (
-    <svg
-      className={rtl ? styles.arrowRtl : undefined}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
+    <svg className={rtl ? styles.arrowRtl : undefined} viewBox="0 0 24 24" aria-hidden="true">
       <path d="M5 12h14M14 6l6 6-6 6" />
     </svg>
   );
 }
 
+function PulseMark() {
+  return (
+    <svg viewBox="0 0 56 56" aria-hidden="true">
+      <circle cx="28" cy="28" r="25" />
+      <path d="M10 29h10l4-10 7 19 5-9h10" />
+    </svg>
+  );
+}
+
 export default function HomePage() {
-  const [locale, setLocale] = useState<Locale>("fa");
+  const { locale, setLocale, isRtl } = useGlymizeLocale();
+  const copy = COPY[locale];
 
   useEffect(() => {
     migrateLegacyGlymizeStorage();
-    const savedLocale = window.localStorage.getItem(storageKey);
-    if (savedLocale === "fa" || savedLocale === "en") {
-      setLocale(savedLocale);
-    }
   }, []);
-
-  useEffect(() => {
-    document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "fa" ? "rtl" : "ltr";
-    window.localStorage.setItem(storageKey, locale);
-  }, [locale]);
-
-  const copy = useMemo(() => COPY[locale], [locale]);
-  const isRtl = locale === "fa";
 
   return (
     <main className={styles.page} dir={isRtl ? "rtl" : "ltr"}>
       <header className={styles.header}>
-        <a className={styles.brandLink} href="/" aria-label="GLYMIZE home">
-          <img
+        <Link className={styles.brandLink} href="/" aria-label="GLYMIZE home">
+          <Image
             className={styles.wordmark}
             src={publicAsset("/glymize-logo.png")}
             alt="GLYMIZE"
+            width={180}
+            height={48}
+            priority
           />
-        </a>
+        </Link>
 
         <div className={styles.headerActions}>
-          <div className={styles.languageSwitch} aria-label="Language selector">
-            <button
-              type="button"
-              className={locale === "fa" ? styles.languageActive : undefined}
-              aria-pressed={locale === "fa"}
-              onClick={() => setLocale("fa")}
-            >
+          <fieldset className={styles.languageSwitch}>
+            <legend className={styles.srOnly}>Language selector</legend>
+            <button type="button" aria-pressed={locale === "fa"} onClick={() => setLocale("fa")}>
               FA
             </button>
-            <span aria-hidden="true">|</span>
-            <button
-              type="button"
-              className={locale === "en" ? styles.languageActive : undefined}
-              aria-pressed={locale === "en"}
-              onClick={() => setLocale("en")}
-            >
+            <span aria-hidden="true">/</span>
+            <button type="button" aria-pressed={locale === "en"} onClick={() => setLocale("en")}>
               EN
             </button>
-          </div>
-
+          </fieldset>
           <nav className={styles.entryNav} aria-label={copy.entryLabel}>
             <Link className={styles.entryLink} data-actor="patient" href="/patient">
-              <span className={styles.entryMark} aria-hidden="true">P</span>
+              <span className={styles.entryMark} aria-hidden="true">
+                P
+              </span>
               <span>{copy.patientEntry}</span>
             </Link>
             <Link className={styles.entryLink} data-actor="clinician" href="/account">
-              <span className={styles.entryMark} aria-hidden="true">MD</span>
+              <span className={styles.entryMark} aria-hidden="true">
+                MD
+              </span>
               <span>{copy.clinicianEntry}</span>
             </Link>
           </nav>
@@ -210,127 +195,105 @@ export default function HomePage() {
       <section className={styles.hero} aria-labelledby="glymize-headline">
         <div className={styles.heroCopy}>
           <div className={styles.eyebrow}>
-            <img
-              className={styles.eyebrowIcon}
-              src={publicAsset("/glymize-app-icon.png")}
-              alt=""
-              aria-hidden="true"
-            />
-            <span>{copy.intelligence}</span>
+            <span className={styles.eyebrowLine} />
+            {copy.platform}
           </div>
-
           <h1 id="glymize-headline">{copy.headline}</h1>
           <p className={styles.description}>{copy.description}</p>
 
           <div className={styles.ctaRow}>
             <Link className={styles.primaryCta} href="/account">
-              <span>{copy.start}</span>
+              <span>{copy.physicianStart}</span>
               <ArrowIcon rtl={isRtl} />
             </Link>
-
-            <Link
-              className={styles.secondaryCta}
-              href="/patient"
-            >
+            <Link className={styles.secondaryCta} href="/patient">
               <span>{copy.patientStart}</span>
               <ArrowIcon rtl={isRtl} />
             </Link>
           </div>
 
-          <div className={styles.disclaimer}>
-            <ShieldIcon />
-            <p>{copy.disclaimer}</p>
+          <div className={styles.safetyNote}>
+            <PulseMark />
+            <p>{copy.safety}</p>
           </div>
         </div>
 
-        <div
-          className={styles.diagram}
-          id="how-it-works"
-          aria-label={copy.resultTitle}
-        >
-          <div className={styles.diagramGlow} aria-hidden="true" />
-
-          <div className={styles.inputCards}>
-            <article className={styles.inputCard}>
-              <div className={styles.cardIcon}>
-                <PatientIcon />
-              </div>
-              <h2>{copy.patientTitle}</h2>
-              <p>{copy.patientBody}</p>
-            </article>
-
-            <article className={styles.inputCard}>
-              <div className={styles.cardIcon}>
-                <BookIcon />
-              </div>
-              <h2>{copy.guidelineTitle}</h2>
-              <p>{copy.guidelineBody}</p>
-            </article>
-
-            <article className={styles.inputCard}>
-              <div className={styles.cardIcon}>
-                <WalletIcon />
-              </div>
-              <h2>{copy.coverageTitle}</h2>
-              <p>{copy.coverageBody}</p>
-            </article>
-          </div>
-
-          <div className={styles.flowStage} aria-hidden="true">
-            <svg
-              className={styles.flowGraphic}
-              viewBox="0 0 820 520"
-              preserveAspectRatio="xMidYMid meet"
-              role="presentation"
-              focusable="false"
-            >
-              <defs>
-                <linearGradient
-                  id="glymize-flow-y-gradient"
-                  x1="316"
-                  y1="448"
-                  x2="508"
-                  y2="170"
-                  gradientUnits="userSpaceOnUse"
-                >
-                  <stop offset="0" stopColor="#075d76" />
-                  <stop offset="0.48" stopColor="#008d91" />
-                  <stop offset="1" stopColor="#00d2be" />
-                </linearGradient>
-              </defs>
-
-              <g className={styles.flowConnectors}>
-                <path d="M136 14v118c0 31 21 52 61 52h73c28 0 47 13 58 38" />
-                <path d="M410 14v206" />
-                <path d="M684 14v118c0 31-21 52-61 52h-73c-28 0-47 13-58 38" />
-                <circle cx="136" cy="14" r="7" />
-                <circle cx="410" cy="14" r="7" />
-                <circle cx="684" cy="14" r="7" />
-              </g>
-
-              <path
-                className={styles.flowY}
-                pathLength="1"
-                d="M300 220 L410 330 L520 220 M410 330 V470"
-              />
-
-              <g className={styles.flowOutput}>
-                <path d="M410 470v36" />
-                <circle cx="410" cy="470" r="7" />
-                <circle cx="410" cy="506" r="7" />
-              </g>
-            </svg>
-          </div>
-
-          <article className={styles.resultCard}>
-            <div className={styles.resultIcon}>
-              <ChecklistIcon />
-            </div>
+        <section className={styles.clinicalCanvas} aria-label={copy.briefTitle}>
+          <div className={styles.canvasGlow} aria-hidden="true" />
+          <article className={styles.briefCard}>
             <div>
-              <h2>{copy.resultTitle}</h2>
-              <p>{copy.resultBody}</p>
+              <span>{copy.briefLabel}</span>
+              <h2>{copy.briefTitle}</h2>
+            </div>
+            <div className={styles.patientSignal} aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
             </div>
           </article>
+
+          <div className={styles.canvasGrid}>
+            <article className={styles.canvasCard} data-tone="change">
+              <span>{copy.changedLabel}</span>
+              <h3>{copy.changedTitle}</h3>
+              <p>{copy.changedBody}</p>
+              <div className={styles.trend} aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+            </article>
+            <article className={styles.canvasCard} data-tone="core">
+              <span>{copy.factsLabel}</span>
+              <h3>{copy.factsTitle}</h3>
+              <p>{copy.factsBody}</p>
+              <div className={styles.factOrbit} aria-hidden="true">
+                <b>01</b>
+                <i />
+                <i />
+                <i />
+              </div>
+            </article>
+            <article className={styles.canvasCard} data-tone="module">
+              <span>{copy.modulesLabel}</span>
+              <h3>{copy.modulesTitle}</h3>
+              <p>{copy.modulesBody}</p>
+              <div className={styles.moduleDots} aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+            </article>
+          </div>
+
+          <article className={styles.actionCard}>
+            <div className={styles.actionMark} aria-hidden="true">
+              →
+            </div>
+            <div>
+              <span>{copy.actionLabel}</span>
+              <h3>{copy.actionTitle}</h3>
+              <p>{copy.actionBody}</p>
+            </div>
+          </article>
+        </section>
+      </section>
+
+      <section className={styles.domainRail} aria-label={copy.domainsLabel}>
+        <strong>{copy.domainsLabel}</strong>
+        <div>
+          {copy.domains.map((domain, index) => (
+            <span key={domain} data-active={index === 0}>
+              {domain}
+            </span>
+          ))}
         </div>
       </section>
     </main>
