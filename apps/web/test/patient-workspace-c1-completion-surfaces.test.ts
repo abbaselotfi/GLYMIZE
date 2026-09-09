@@ -39,8 +39,12 @@ describe("C1 Patient Workspace completion surfaces", () => {
     ),
     "utf8",
   );
-  const workspaceSource = fs.readFileSync(
+  const workspaceLoaderSource = fs.readFileSync(
     new URL("../app/patients/[patientId]/patient-clinical-workspace.tsx", import.meta.url),
+    "utf8",
+  );
+  const workspaceViewSource = fs.readFileSync(
+    new URL("../app/patients/[patientId]/patient-clinical-workspace-view.tsx", import.meta.url),
     "utf8",
   );
 
@@ -63,12 +67,13 @@ describe("C1 Patient Workspace completion surfaces", () => {
     expect(buildPatientObservationTrends([observation("o1", 62, "2026-07-01T00:00:00.000Z")])).toEqual([]);
   });
 
-  it("completes every remaining C1 roadmap surface", () => {
+  it("completes every remaining C1 roadmap surface through the decomposed view", () => {
     expect(completionSource).toContain('data-patient-workspace="problems"');
     expect(completionSource).toContain('data-patient-workspace="trends"');
     expect(completionSource).toContain('data-patient-workspace="clinical-modules-launcher"');
     expect(completionSource).toContain('data-patient-workspace="contextual-ai-drawer"');
-    expect(workspaceSource).toContain("PatientWorkspaceC1Completion");
+    expect(workspaceLoaderSource).toContain("PatientClinicalWorkspaceView");
+    expect(workspaceViewSource).toContain("PatientWorkspaceC1Completion");
   });
 
   it("treats an empty or incomplete problem projection as uncertainty, not absence", () => {
