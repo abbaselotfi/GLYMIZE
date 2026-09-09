@@ -1,11 +1,13 @@
 # GLYMIZE Current State
 
-Snapshot date: 2026-09-08
-Repository baseline: `main` at `1825c23de4193f2b49e2af0eff165869d0616a41` before this documentation-only truth-sync task.
+Snapshot date: 2026-09-09
+Repository baseline: `main` at `fa275156e250244180cc9bd2b846590652bc3a7c` before the R28-01 status reconciliation.
 
 This document is a factual repository snapshot, not a product promise or replacement for the ordered [Project Overview and Roadmap](PROJECT_OVERVIEW_AND_ROADMAP.md). The remaining open roadmap families are status-classified in [Remaining Roadmap Re-baseline](REMAINING_ROADMAP_REBASELINE_2026-09-08.md); that audit does not convert implemented code into V1 scope or deployment claims. It describes code, routes, tests, migrations, workflow configuration, and checked-in default feature state present in the repository. It does not assert that an uninspected remote environment has been deployed or activated.
 
 For runtime ownership, see the accepted [Runtime of Record](architecture/RUNTIME_OF_RECORD.md). For the physician-facing Type 2 clinical authority, see [Clinical Engine Authority](architecture/CLINICAL_ENGINE_AUTHORITY.md).
+
+The current B1/B2/B3/C1 foundation status, remaining engineering, physician-evaluation state, environment activation state, and B4/B5/B6 alias mapping are recorded in the [Roadmap Status Crosswalk](ROADMAP_STATUS_CROSSWALK_2026-09-09.md). That crosswalk is the execution control for R28-01 and prevents completed foundations from being restarted under local task names.
 
 ## Generated repository inventory
 
@@ -14,8 +16,8 @@ Run `node scripts/generate-current-state.mjs` from the repository root to reprod
 <!-- current-state:generated:start -->
 | Repository fact | Count |
 | --- | ---: |
-| Web App Router entries | 28 (28 pages, 0 route handlers) |
-| Automated test files | 147 (141 JS/TS, 6 Python) |
+| Web App Router entries | 29 (29 pages, 0 route handlers) |
+| Automated test files | 160 (154 JS/TS, 6 Python) |
 | SQL migration files | 23 (18 Worker/D1, 5 PostgreSQL foundation) |
 <!-- current-state:generated:end -->
 
@@ -25,6 +27,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ### Product surfaces
 
+- The public README, landing page, application metadata and install manifest present GLYMIZE as a patient-centered, multispecialty clinical intelligence workspace. Diabetes is identified as the first mature module rather than the whole product boundary.
 - A bilingual Next.js application with landing, account, dashboard, profile/security, Type 2, Type 1, pregnancy, Care Team, patient archive, Evidence Assistant, insulin tools, patient-facing Care Hub, and multi-page admin surfaces.
 - A canonical patient entry at `/patient` with a patient-specific Care Hub shell separated from the physician/assistant application shell. The older `/portal` surface remains part of the repository for portal compatibility and patient-record access flows.
 - Physician Patient Workspace surfaces for patient context/header, medication reconciliation, investigations/orders, lab trends, encounter timeline, and change summaries, backed by the existing patient-record runtime contracts rather than a second patient store.
@@ -86,9 +89,9 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Immediate continuation boundary
 
-The next documentation/control task is to re-baseline the remaining Phase 1, Phase 2, and Phase 5–10 items against the post-PR-116 repository. That audit must classify every unchecked item as implemented, partial, planned, deferred, out of scope, or owner-decision-required; it must not close product/clinical decisions by inference.
+R28-01 status reconciliation is complete in the [Roadmap Status Crosswalk](ROADMAP_STATUS_CROSSWALK_2026-09-09.md). The next implementation sequence is R28-02 and R28-03, followed by R28-04/R28-05/R28-06, R28-07, R28-08 and R28-09 as ordered in canonical Roadmap §28.4.
 
-Until that re-baseline is complete:
+During that sequence:
 
 - do not collect NYHA merely to remove the last Type 2 UI gap without a demonstrated downstream consumer;
 - do not implement the catalogue storage migration without the owner confirmation required by its ADR;

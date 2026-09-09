@@ -1304,9 +1304,12 @@ That is the product baseline on which Kidney, Cardiovascular, Pulmonary, GI/Hepa
 
 ## 28. Snapshot-based project review and proposed follow-up — 2026-09-09
 
-**Status:** Proposed follow-up backlog; not an implementation or release approval.  
+**Status:** Owner-authorized execution backlog; R28-01 complete.
+
 **Reviewed source:** `main@5673eb92f146d2951531acdfd511509b0da18a65`.  
 **Scope of this update:** append analysis and recommendations to this Roadmap only. Existing phase definitions, completed work, clinical authority and separate owner decisions remain unchanged.
+
+**Execution authorization — 2026-09-09:** the owner authorized sequential implementation on `main`, with each completed section pushed to GitHub and no external deployment. Physician sign-off is not a prerequisite for implementing the private initial build; physician evaluation remains tracked separately from repository implementation and environment activation.
 
 ### 28.1 Evidence and limits
 
@@ -1346,6 +1349,7 @@ Priorities here are review priorities: **P0** = resolve before extending the aff
 - **Proposal:** produce one small current-status crosswalk: canonical phase/task → existing source/PR → remaining gap → acceptance evidence → dependency. Map local B4/B5/B6 labels to canonical D/E/F to avoid executing two versions of the same task. Flag older architecture descriptions for a later factual documentation sync against accepted runtime ADRs.
 - **Acceptance:** every B1/B2/B3/C1 entry distinguishes implemented foundation, remaining engineering, clinician review and environment activation. Historical checklists are retained. No feature becomes approved or production-ready merely through a status edit.
 - **Dependency:** none. This review records the need; it does not edit the companion documents.
+- **Execution status — complete (2026-09-09):** [`ROADMAP_STATUS_CROSSWALK_2026-09-09.md`](ROADMAP_STATUS_CROSSWALK_2026-09-09.md) records the canonical task/source/gap/evidence/dependency mapping, separates implementation, physician evaluation and activation states, and maps local B4/B5/B6 to canonical D1/E1/F1. `CURRENT_STATE.md` now points to that control document. No runtime or clinical behavior changed.
 
 #### R28-02 — Bind asynchronous workspace responses to the active patient
 
