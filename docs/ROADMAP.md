@@ -1298,3 +1298,127 @@ That is the product baseline on which Kidney, Cardiovascular, Pulmonary, GI/Hepa
 ## 27. Final North-Star statement
 
 > **GLYMIZE should become the physician's visual, patient-centered clinical workspace: one longitudinal record, one medication intelligence layer, evidence-grounded AI, modular specialty decision support, and the shortest possible path from patient context to safe physician-confirmed action.**
+
+
+---
+
+## 28. Snapshot-based project review and proposed follow-up — 2026-09-09
+
+**Status:** Proposed follow-up backlog; not an implementation or release approval.  
+**Reviewed source:** `main@5673eb92f146d2951531acdfd511509b0da18a65`.  
+**Scope of this update:** append analysis and recommendations to this Roadmap only. Existing phase definitions, completed work, clinical authority and separate owner decisions remain unchanged.
+
+### 28.1 Evidence and limits
+
+The downloaded `codebase-memory-snapshot.tar.gz` from the private `codebase-memory-latest` release was opened and its SQLite graph queried read-only after decompression. Its SHA-256 matched the published checksum:
+
+`55bec4f0f31acc209423ebee2c8843177d0b6e53db414af145fe29f241cd1006`
+
+Both `snapshot-source.json` and `artifact.json` identify the reviewed source SHA. Provenance: Codebase Memory `0.10.8`, workflow run `34292864232`, graph generation `2026-09-08T23:57:33Z`. The source graph contains **7,112 nodes and 27,317 edges**, excluding the separate missed-coverage graph. These are navigation counts, not product-quality or test-coverage scores.
+
+The available workstation MCP index was older (coverage generation `2026-09-07T08:39:31Z`); its coverage check reported missing or changed evidence paths. Consequently, findings below use the canonical downloaded graph and exact-SHA GitHub source instead. Relevant incoming/outgoing call edges and recorded file coverage were inspected in the snapshot. The directly cited Patient Core/workspace files have hash records and no recorded coverage gaps; this is best-effort evidence, not proof of exhaustive indexing. The snapshot records 22 partially parsed files overall. No migration-safety conclusion is drawn from those files.
+
+This was a bounded architecture/readiness review centered on the current patient workflow, not a full security, clinical, performance or production audit. Existing test source was read; tests, builds, RC acceptance and deployments were not run. Potential runtime failure scenarios below require reproduction before being reported as confirmed incidents.
+
+### 28.2 Current assessment: extend the implemented path
+
+The strongest foundation is the existing separation between practice-local patient persistence, shared contracts, deterministic clinical authority and the physician-facing projection. The reviewed source already contains:
+
+| Roadmap area | Evidence-backed present state | Remaining distinction |
+| --- | --- | --- |
+| B1 inventory/ADR | The [Patient Clinical Core inventory index](architecture/PATIENT_CLINICAL_CORE_README.md) and companion inventory, gap matrix and migration ADR exist. | Do not restart the inventory; reconcile it with subsequent implementation. |
+| B2 contracts | `packages/contracts/src/patient-core/` defines fact, provenance, context, collection and longitudinal contracts. | Typed contracts alone do not establish authoritative coverage for every data family. |
+| B3 longitudinal read/change model | [read-model.ts](../apps/admin-worker/src/patient-core/read-model.ts) combines existing readers and [change-detection.ts](../apps/admin-worker/src/patient-core/change-detection.ts) compares scoped snapshots. | The model remains partial in several families; preserve its no-false-removal behavior. |
+| C1 workspace | `/patients/[patientId]`, the [clinical brief](../apps/web/lib/patient-clinical-brief.ts), trends, a module launcher and an AI drawer exist. | UI presence is not full C1 usability acceptance, module-context integration or patient-aware AI. |
+| Patient data | [projection.ts](../apps/admin-worker/src/patient-core/projection.ts) reuses Patient Record v2. | Allergies/problems are explicitly `not_available/source_not_exposed`; medications come from the current snapshot; legacy contexts are explicitly partial. |
+| Module/AI entry | [C1 completion surfaces](../apps/web/app/patients/%5BpatientId%5D/patient-workspace-c1-completion.tsx) expose navigation and context counts. | Module links deliberately omit automatic patient handoff; the drawer deliberately sends no patient data to Evidence Assistant. |
+
+**Recommendation:** make the existing patient journey reliable, source-traceable and measurably useful before adding more specialty surfaces. B1/B2/B3/C1 should be treated as implemented foundations with specific remaining acceptance work, not collectively marked either “not started” or “complete.”
+
+### 28.3 Prioritized proposed tasks
+
+Priorities here are review priorities: **P0** = resolve before extending the affected patient-data path; **P1** = next convergence work; **P2** = dependent capability. Task IDs are additive and do not renumber the canonical phases or the B1 inventory's local B2–B8 sequence.
+
+#### R28-01 — Reconcile roadmap status and task identifiers
+
+- **Priority / phase:** P0; A, supporting B–H.
+- **Evidence:** §25 still lists B1/B2/B3/C1 as next tasks, while the implementation above exists. The [B1 gap matrix](architecture/PATIENT_CLINICAL_CORE_GAP_MATRIX.md) retains pre-B2 gaps, and [CURRENT_STATE.md](CURRENT_STATE.md) is dated before the new patient-core/workspace additions.
+- **Proposal:** produce one small current-status crosswalk: canonical phase/task → existing source/PR → remaining gap → acceptance evidence → dependency. Map local B4/B5/B6 labels to canonical D/E/F to avoid executing two versions of the same task. Flag older architecture descriptions for a later factual documentation sync against accepted runtime ADRs.
+- **Acceptance:** every B1/B2/B3/C1 entry distinguishes implemented foundation, remaining engineering, clinician review and environment activation. Historical checklists are retained. No feature becomes approved or production-ready merely through a status edit.
+- **Dependency:** none. This review records the need; it does not edit the companion documents.
+
+#### R28-02 — Bind asynchronous workspace responses to the active patient
+
+- **Priority / phase:** P0; C1 hardening.
+- **Evidence:** `load()` in [patient-clinical-workspace.tsx](../apps/web/app/patients/%5BpatientId%5D/patient-clinical-workspace.tsx) commits the response to state without a request-generation/identity check; its effect reruns for `patientId`. [patient-clinical-core-client.ts](../apps/web/lib/patient-clinical-core-client.ts) casts JSON to the TypeScript contract.
+- **Risk to verify:** when requests overlap, a late response could replace newer state. Cross-patient manifestation depends on actual route/component lifecycle and must be reproduced, not assumed.
+- **Proposal:** cancel/ignore obsolete reads, validate the response envelope/version and active patient/practice scope, and clear inaccessible context after logout, practice change or denied access.
+- **Acceptance:** behavioral tests resolve A/B requests out of order, overlap refreshes, change the active context and return malformed/unsupported/mismatched responses. Only the active authorized context may render; no old result may overwrite it.
+- **Dependency:** existing B2/B3 contracts; no new patient store.
+
+#### R28-03 — Make read-model completeness an executable contract
+
+- **Priority / phase:** P0; B3.
+- **Evidence:** [observation-reader.ts](../apps/admin-worker/src/patient-core/observation-reader.ts) filters rejected/raw observations, skips unusable values/empty keys, and returns `completeness: "complete"`. Snapshot projection already tracks skipped unusable labs as partial. [read-model contract tests](../apps/admin-worker/test/patient-core-read-model-contract.test.ts) mainly inspect source strings and AAD helpers.
+- **Proposal:** define the exact eligible observation universe and distinguish intentional exclusions, unavailable source, invalid skipped data and truncated results. Preserve unknown/partial state through the UI and downstream consumers.
+- **Acceptance:** execute readers/routes against controlled data, including missing values, malformed payloads, excluded raw/rejected rows, latest snapshot revisions, decryption failure and another practice's patient. A skipped eligible fact cannot silently produce a complete projection; expected exclusions remain explicitly scoped. Preserve the existing change detector's rule that absence from a partial family is not a removal.
+- **Dependency:** R28-01; no edits to applied migrations.
+
+#### R28-04 — Align the brief, Attention Now and source drill-down
+
+- **Priority / phase:** P1; C1/C2.
+- **Evidence:** [buildPatientTenSecondBrief](../apps/web/lib/patient-clinical-brief.ts) counts flagged observations across the full collection; the workspace's Attention Now filters only the newest eight rows. Current display slicing also limits changes and timeline entries.
+- **Proposal:** derive counts and displayed items from one declared selection contract. Separate current per-series observations from historical flags, expose verification/freshness, and provide expansion/source links for omitted items. Historical abnormal results should remain reviewable without being silently presented as today's finding.
+- **Acceptance:** fixtures include an old flagged result followed by a newer normal result, repeated analytes, unverified observations, incompatible units/specimens and more items than each preview limit. Headline counts reconcile with expandable lists; every consequential item resolves to its source/revision. No new clinical threshold, severity class or automatic “resolved” interpretation is introduced.
+- **Dependency:** R28-03 and the existing [C1 design contract](architecture/PATIENT_WORKSPACE_C1_10_SECOND_BRIEF.md).
+
+#### R28-05 — Bound longitudinal reads and measure their cost
+
+- **Priority / phase:** P1; B3 and H performance gate.
+- **Evidence:** the observation reader selects all eligible history and awaits decryption row by row; [timeline-reader.ts](../apps/admin-worker/src/patient-core/timeline-reader.ts) limits encounters to 100 and explicitly marks the timeline partial.
+- **Proposal:** measure query count, rows, decryption time, response bytes and end-to-end latency on synthetic longitudinal records before choosing optimization. Define bounded summary/history retrieval and continuation metadata so larger records remain fully inspectable.
+- **Acceptance:** an agreed small/medium/large synthetic cohort has recorded latency and payload budgets; continuation has no duplicates or omissions under the declared revision semantics; summary limits cannot imply complete history. Any cache must include authorization scope and source version and respect revocation.
+- **Dependency:** R28-03. This is not evidence that production is currently slow and does not justify a datastore migration.
+
+#### R28-06 — Close Patient Core authority gaps before shared medication safety consumes them
+
+- **Priority / phase:** P1; B convergence → D1/D.
+- **Evidence:** allergies/problems are not exposed by the current projection; medication state is snapshot-derived; [provenance.ts](../packages/contracts/src/patient-core/provenance.ts) supports freshness states while current readers emit `unknown`.
+- **Proposal:** extend the existing gap matrix with one authoritative source/write owner per allergy, problem, medication-reconciliation and cross-cutting-context family. Add adapters to existing sources where possible; introduce a new authority only through a separately reviewed gap/ADR. Carry source time, verification and reconciliation state into eligibility consumers.
+- **Acceptance:** “not collected,” “known absent,” “unverified,” “stale” and “current” remain distinct. Freshness policies are reviewed and versioned per clinical use; no universal invented cutoff. Pre-visit medication state, physician decision and signed order remain separate. Missing safety facts never become implicit clearance.
+- **Dependency:** R28-03; the existing D1 audit. Reuse current safety registries instead of creating a parallel medication engine.
+
+#### R28-07 — Turn the module launcher into a governed context handoff
+
+- **Priority / phase:** P1; F1 → G.
+- **Evidence:** the C1 launcher has a local module list and maturity labels (`reviewed_cds`, `reviewed_tool`, `reference_only`), while §12 defines a broader canonical lifecycle. Its links intentionally do not transfer patient facts.
+- **Proposal:** define an explicit mapping to the canonical lifecycle, then a small typed registry and reviewed Patient Core → module-input adapter. Keep registration, treatment authority and release eligibility separate.
+- **Acceptance:** patient/practice identity, source revision and missing/unverified required inputs are checked at handoff; the clinician sees and confirms relevant facts. Type 2 equivalence and legacy routes remain intact. Demonstrate a second read-only domain registration without modifying Patient Core or claiming new treatment support.
+- **Dependency:** R28-02/R28-06 and stable F1 contract. A UI maturity badge is not clinician sign-off.
+
+#### R28-08 — Connect patient-aware AI through a constrained context boundary
+
+- **Priority / phase:** P2; E1/E after core contract acceptance.
+- **Evidence:** the existing C1 drawer explicitly leaves automatic context transfer disabled. It is a suitable integration point, not an already implemented chart-Q&A service.
+- **Proposal:** define the minimal versioned context payload, server-side authorization/revalidation, source references, approved-provider policy and conversation lifecycle before connecting the drawer. Reuse the existing provider abstraction.
+- **Acceptance:** patient/practice switches cannot reuse another context; tests cover permission revocation, missing evidence, contaminated document text, wrong-source citations and provider failure. Answers separate facts/rules/evidence/synthesis. Draft actions require current-context physician confirmation; AI never writes canonical facts or signs orders.
+- **Dependency:** R28-02/R28-03/R28-06 plus the existing E1 privacy/evaluation work. No patient data transfer is enabled by this roadmap entry.
+
+#### R28-09 — Build one evidence-based clinic-ready acceptance packet
+
+- **Priority / phase:** P1 planning now; H/N acceptance before release.
+- **Evidence:** §20/§21 already require usability and AI evaluation; the existing clinical stress investment and [remaining-roadmap re-baseline](REMAINING_ROADMAP_REBASELINE_2026-09-08.md) do not establish formal clinician-approved golden cases or production acceptance.
+- **Proposal:** bind the release candidate SHA, approved module/rule/catalogue versions, named review owners, golden-case decisions, RC workflow evidence and environment capability state in one acceptance packet. Give each blocker an owner and measurable exit condition.
+- **Acceptance:** observe representative physicians performing patient lookup → brief → reconciliation → evidence → confirmed action in Persian RTL and English LTR, with touch and keyboard. Record task success, time, navigation and misunderstanding of missing/stale data. Include scoped isolation/revocation checks, large-record performance, recovery/rollback evidence and explicit feature activation state. Agree numerical UX/operational targets before the pilot rather than inventing clinical efficacy claims afterward.
+- **Dependency:** affected R28 tasks and existing H release gates. Safety, recovery and release-critical hardening from M must be satisfied wherever H already depends on them; broader interoperability and owner-gated migrations remain later work.
+
+### 28.4 Suggested execution order and definition of completion
+
+1. **R28-01:** reconcile current state and assign exact remaining work.
+2. **R28-02/R28-03:** verify and harden patient binding and data completeness.
+3. **R28-04/R28-05/R28-06:** finish the usable, bounded and source-traceable patient path.
+4. **R28-07:** integrate the existing reviewed Diabetes module through an explicit context contract.
+5. **R28-08:** enable curated patient-aware AI only after its dependencies and evaluation gates pass.
+6. **R28-09:** collect acceptance evidence throughout; close the release gate only for the exact reviewed candidate.
+
+For each proposed task, “done” requires its focused behavioral evidence and the repository's applicable engineering gates, not a checkbox inferred from file existence. This review does not authorize implementation of these proposals, specialty activation, catalogue migration, PostgreSQL migration or deployment.
