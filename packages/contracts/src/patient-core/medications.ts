@@ -27,12 +27,27 @@ export const patientMedicationAdherenceStates = [
 export type PatientMedicationAdherenceState =
   (typeof patientMedicationAdherenceStates)[number];
 
+/**
+ * Structural stage of the immutable encounter snapshot that supplied a
+ * reconciled medication fact. This is not a prescribing or approval state.
+ * Signed physician orders remain separate workflow objects.
+ */
+export const patientMedicationReconciliationStages = [
+  "clinical_snapshot",
+  "care_team_snapshot",
+  "physician_review_snapshot",
+  "final_snapshot",
+] as const;
+export type PatientMedicationReconciliationStage =
+  (typeof patientMedicationReconciliationStages)[number];
+
 export interface PatientMedicationStateView extends PatientCoreFactBase {
   /** Stable catalogue/master-registry identity when an explicit link exists. */
   medicationId?: string;
   status: PatientMedicationStatus;
   sourceState: PatientMedicationSourceState;
   adherence: PatientMedicationAdherenceState;
+  reconciliationStage?: PatientMedicationReconciliationStage;
   dose?: string;
   route?: string;
   frequency?: string;
