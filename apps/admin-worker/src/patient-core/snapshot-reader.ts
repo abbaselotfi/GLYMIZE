@@ -3,6 +3,11 @@ import type {
   PatientEncounterSnapshotKind,
 } from "@glymize/contracts";
 import { decryptClinicalPayload } from "../runtime-security";
+import {
+  measureRuntimeReadDecryption,
+  measureRuntimeReadQuery,
+  type RuntimeReadMetricsCollector,
+} from "../runtime-read-metrics";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
 import { patientSnapshotAad } from "./aad";
 
@@ -30,46 +35,58 @@ export interface PatientCoreEncounterSnapshotSource {
   snapshot: PatientEncounterClinicalSnapshot;
 }
 
+export interface PatientCoreSnapshotReadOptions {
+  metrics?: RuntimeReadMetricsCollector;
+}
+
 export async function readRecentPatientCoreSnapshots(
   context: PatientRecordV2RouteContext,
   patientId: string,
   requestedLimit = 2,
+  options: PatientCoreSnapshotReadOptions = {},
 ): Promise<PatientCoreEncounterSnapshotSource[]> {
   const limit = Math.max(1, Math.min(10, Math.trunc(requestedLimit)));
-  const rows = await context.database.prepare(
-    `SELECT e.id AS encounter_id,e.encounter_at,e.status AS encounter_status,
-            s.id AS snapshot_id,s.revision,s.snapshot_kind,
-            s.payload_ciphertext,s.payload_iv,s.payload_auth_tag,s.created_at
-     FROM patient_encounters e
-     JOIN patient_encounter_snapshots s
-       ON s.practice_id=e.practice_id
-      AND s.patient_id=e.patient_id
-      AND s.encounter_id=e.id
-      AND s.revision=(
-        SELECT MAX(s2.revision)
-        FROM patient_encounter_snapshots s2
-        WHERE s2.practice_id=e.practice_id
-          AND s2.patient_id=e.patient_id
-          AND s2.encounter_id=e.id
-      )
-     WHERE e.practice_id=? AND e.patient_id=?
-     ORDER BY e.encounter_at DESC,e.created_at DESC,e.id DESC
-     LIMIT ?`,
-  ).bind(context.user.practiceId, patientId, limit).all<SnapshotRow>();
+  const rows = await measureRuntimeReadQuery(
+    options.metrics,
+    () => context.database.prepare(
+      `SELECT e.id AS encounter_id,e.encounter_at,e.status AS encounter_status,
+              s.id AS snapshot_id,s.revision,s.snapshot_kind,
+              s.payload_ciphertext,s.payload_iv,s.payload_auth_tag,s.created_at
+       FROM patient_encounters e
+       JOIN patient_encounter_snapshots s
+         ON s.practice_id=e.practice_id
+        AND s.patient_id=e.patient_id
+        AND s.encounter_id=e.id
+        AND s.revision=(
+          SELECT MAX(s2.revision)
+          FROM patient_encounter_snapshots s2
+          WHERE s2.practice_id=e.practice_id
+            AND s2.patient_id=e.patient_id
+            AND s2.encounter_id=e.id
+        )
+       WHERE e.practice_id=? AND e.patient_id=?
+       ORDER BY e.encounter_at DESC,e.created_at DESC,e.id DESC
+       LIMIT ?`,
+    ).bind(context.user.practiceId, patientId, limit).all<SnapshotRow>(),
+    (result) => result.results.length,
+  );
 
   const snapshots: PatientCoreEncounterSnapshotSource[] = [];
   for (const row of rows.results) {
-    const snapshot = await decryptClinicalPayload<PatientEncounterClinicalSnapshot>(
-      {
-        ciphertext: row.payload_ciphertext,
-        iv: row.payload_iv,
-        authTag: row.payload_auth_tag,
-      },
-      context.clinicalSecret,
-      patientSnapshotAad(
-        context.user.practiceId,
-        row.encounter_id,
-        row.revision,
+    const snapshot = await measureRuntimeReadDecryption(
+      options.metrics,
+      () => decryptClinicalPayload<PatientEncounterClinicalSnapshot>(
+        {
+          ciphertext: row.payload_ciphertext,
+          iv: row.payload_iv,
+          authTag: row.payload_auth_tag,
+        },
+        context.clinicalSecret,
+        patientSnapshotAad(
+          context.user.practiceId,
+          row.encounter_id,
+          row.revision,
+        ),
       ),
     );
     if (!snapshot) throw new Error("PATIENT_SNAPSHOT_DECRYPTION_FAILED");

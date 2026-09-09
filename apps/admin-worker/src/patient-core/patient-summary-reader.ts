@@ -1,5 +1,10 @@
 import type { PatientLongitudinalSummary } from "@glymize/contracts";
 import { decryptClinicalPayload } from "../runtime-security";
+import {
+  measureRuntimeReadDecryption,
+  measureRuntimeReadQuery,
+  type RuntimeReadMetricsCollector,
+} from "../runtime-read-metrics";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
 import { patientDemographicsAad } from "./aad";
 
@@ -21,6 +26,10 @@ type DemographicsRow = {
   payload_auth_tag: string;
 };
 
+export interface PatientCoreSummaryReadOptions {
+  metrics?: RuntimeReadMetricsCollector;
+}
+
 function optionalText(value: unknown) {
   const text = typeof value === "string" ? value.trim() : "";
   return text || undefined;
@@ -29,45 +38,65 @@ function optionalText(value: unknown) {
 export async function readPatientCoreSummary(
   context: PatientRecordV2RouteContext,
   patientId: string,
+  options: PatientCoreSummaryReadOptions = {},
 ): Promise<PatientLongitudinalSummary | null> {
-  const patient = await context.database.prepare(
-    `SELECT id,status
-     FROM patient_registry
-     WHERE practice_id=? AND id=?`,
-  ).bind(context.user.practiceId, patientId).first<PatientRow>();
+  const patient = await measureRuntimeReadQuery(
+    options.metrics,
+    () => context.database.prepare(
+      `SELECT id,status
+       FROM patient_registry
+       WHERE practice_id=? AND id=?`,
+    ).bind(context.user.practiceId, patientId).first<PatientRow>(),
+    (result) => result ? 1 : 0,
+  );
   if (!patient) return null;
 
   const [identifiers, demographicsRow, latestEncounter] = await Promise.all([
-    context.database.prepare(
-      `SELECT id,identifier_kind,display_mask,is_primary
-       FROM patient_identifiers
-       WHERE practice_id=? AND patient_id=?
-       ORDER BY is_primary DESC,created_at ASC`,
-    ).bind(context.user.practiceId, patientId).all<IdentifierRow>(),
-    context.database.prepare(
-      `SELECT payload_ciphertext,payload_iv,payload_auth_tag
-       FROM patient_demographics
-       WHERE practice_id=? AND patient_id=?`,
-    ).bind(context.user.practiceId, patientId).first<DemographicsRow>(),
-    context.database.prepare(
-      `SELECT encounter_at
-       FROM patient_encounters
-       WHERE practice_id=? AND patient_id=?
-       ORDER BY encounter_at DESC,created_at DESC
-       LIMIT 1`,
-    ).bind(context.user.practiceId, patientId).first<{ encounter_at: string }>(),
+    measureRuntimeReadQuery(
+      options.metrics,
+      () => context.database.prepare(
+        `SELECT id,identifier_kind,display_mask,is_primary
+         FROM patient_identifiers
+         WHERE practice_id=? AND patient_id=?
+         ORDER BY is_primary DESC,created_at ASC`,
+      ).bind(context.user.practiceId, patientId).all<IdentifierRow>(),
+      (result) => result.results.length,
+    ),
+    measureRuntimeReadQuery(
+      options.metrics,
+      () => context.database.prepare(
+        `SELECT payload_ciphertext,payload_iv,payload_auth_tag
+         FROM patient_demographics
+         WHERE practice_id=? AND patient_id=?`,
+      ).bind(context.user.practiceId, patientId).first<DemographicsRow>(),
+      (result) => result ? 1 : 0,
+    ),
+    measureRuntimeReadQuery(
+      options.metrics,
+      () => context.database.prepare(
+        `SELECT encounter_at
+         FROM patient_encounters
+         WHERE practice_id=? AND patient_id=?
+         ORDER BY encounter_at DESC,created_at DESC
+         LIMIT 1`,
+      ).bind(context.user.practiceId, patientId).first<{ encounter_at: string }>(),
+      (result) => result ? 1 : 0,
+    ),
   ]);
 
   let demographics: PatientLongitudinalSummary["demographics"] | undefined;
   if (demographicsRow) {
-    const payload = await decryptClinicalPayload<Record<string, unknown>>(
-      {
-        ciphertext: demographicsRow.payload_ciphertext,
-        iv: demographicsRow.payload_iv,
-        authTag: demographicsRow.payload_auth_tag,
-      },
-      context.clinicalSecret,
-      patientDemographicsAad(context.user.practiceId, patientId),
+    const payload = await measureRuntimeReadDecryption(
+      options.metrics,
+      () => decryptClinicalPayload<Record<string, unknown>>(
+        {
+          ciphertext: demographicsRow.payload_ciphertext,
+          iv: demographicsRow.payload_iv,
+          authTag: demographicsRow.payload_auth_tag,
+        },
+        context.clinicalSecret,
+        patientDemographicsAad(context.user.practiceId, patientId),
+      ),
     );
     if (!payload) throw new Error("PATIENT_DEMOGRAPHICS_DECRYPTION_FAILED");
 

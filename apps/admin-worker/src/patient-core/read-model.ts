@@ -1,4 +1,9 @@
-import type { PatientLongitudinalReadModel } from "@glymize/contracts/patient-core";
+import type {
+  PatientLongitudinalHistoryFamily,
+  PatientLongitudinalHistoryPage,
+  PatientLongitudinalReadModel,
+} from "@glymize/contracts/patient-core";
+import type { RuntimeReadMetricsCollector } from "../runtime-read-metrics";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
 import { comparePatientContexts, unavailablePatientChangeSet } from "./change-detection";
 import { readPatientCoreObservations } from "./observation-reader";
@@ -7,18 +12,33 @@ import { readPatientCoreSummary } from "./patient-summary-reader";
 import { readRecentPatientCoreSnapshots } from "./snapshot-reader";
 import { readPatientCoreTimeline } from "./timeline-reader";
 
+export interface PatientLongitudinalReadOptions {
+  metrics?: RuntimeReadMetricsCollector;
+}
+
 export async function readPatientLongitudinalModel(
   context: PatientRecordV2RouteContext,
   patientId: string,
+  options: PatientLongitudinalReadOptions = {},
 ): Promise<PatientLongitudinalReadModel | null> {
-  const patient = await readPatientCoreSummary(context, patientId);
+  const generatedAt = new Date().toISOString();
+  const patient = await readPatientCoreSummary(context, patientId, {
+    metrics: options.metrics,
+  });
   if (!patient) return null;
 
-  const generatedAt = new Date().toISOString();
   const [snapshots, observations, timeline] = await Promise.all([
-    readRecentPatientCoreSnapshots(context, patientId, 2),
-    readPatientCoreObservations(context, patientId),
-    readPatientCoreTimeline(context, patientId),
+    readRecentPatientCoreSnapshots(context, patientId, 2, {
+      metrics: options.metrics,
+    }),
+    readPatientCoreObservations(context, patientId, {
+      sourceVersion: generatedAt,
+      metrics: options.metrics,
+    }),
+    readPatientCoreTimeline(context, patientId, {
+      sourceVersion: generatedAt,
+      metrics: options.metrics,
+    }),
   ]);
 
   const currentSnapshot = snapshots[0];
@@ -27,9 +47,6 @@ export async function readPatientLongitudinalModel(
     ? projectSnapshotContext(patient, context.user.practiceId, currentSnapshot)
     : emptyPatientContext(patient, context.user.practiceId, generatedAt);
 
-  // Longitudinal observation index is more complete than the latest encounter
-  // snapshot alone, while medications and cross-cutting context remain current-
-  // snapshot projections until dedicated longitudinal authorities are introduced.
   const currentContext = {
     ...projectedCurrent,
     generatedAt,
@@ -77,5 +94,51 @@ export async function readPatientLongitudinalModel(
     context: currentContext,
     timeline,
     changesSincePreviousEncounter,
+  };
+}
+
+export async function readPatientLongitudinalHistoryPage(
+  context: PatientRecordV2RouteContext,
+  patientId: string,
+  family: PatientLongitudinalHistoryFamily,
+  cursor: string,
+  options: PatientLongitudinalReadOptions = {},
+): Promise<PatientLongitudinalHistoryPage | null> {
+  const patient = await readPatientCoreSummary(context, patientId, {
+    metrics: options.metrics,
+  });
+  if (!patient) return null;
+
+  const generatedAt = new Date().toISOString();
+  if (family === "observations") {
+    const collection = await readPatientCoreObservations(context, patientId, {
+      cursor,
+      metrics: options.metrics,
+    });
+    if (!collection.continuation) {
+      throw new Error("PATIENT_HISTORY_CONTINUATION_MISSING");
+    }
+    return {
+      schemaVersion: 1,
+      generatedAt,
+      scope: { practiceId: context.user.practiceId, patientId },
+      family,
+      collection: { ...collection, continuation: collection.continuation },
+    };
+  }
+
+  const collection = await readPatientCoreTimeline(context, patientId, {
+    cursor,
+    metrics: options.metrics,
+  });
+  if (!collection.continuation) {
+    throw new Error("PATIENT_HISTORY_CONTINUATION_MISSING");
+  }
+  return {
+    schemaVersion: 1,
+    generatedAt,
+    scope: { practiceId: context.user.practiceId, patientId },
+    family,
+    collection: { ...collection, continuation: collection.continuation },
   };
 }

@@ -30,14 +30,6 @@ export interface PatientCoreProjectionExclusionCount {
   count: number;
 }
 
-/**
- * Runtime projection accounting for one declared source scope.
- *
- * This is deliberately non-clinical metadata: it explains why a collection is
- * complete or partial without turning missing data into a medical conclusion.
- * `sourceRowCount` is the number of rows inside `sourceScope`; rows outside that
- * declared scope (for example superseded snapshot revisions) are not counted.
- */
 export interface PatientCoreCollectionDiagnostics {
   sourceScope: string;
   sourceRowCount: number;
@@ -47,6 +39,20 @@ export interface PatientCoreCollectionDiagnostics {
   invalidSkippedCount: number;
   truncatedCount: number;
   exclusions?: PatientCoreProjectionExclusionCount[];
+}
+
+/**
+ * Opaque, scope-bound continuation metadata for one declared read traversal.
+ * `sourceVersion` freezes the membership/revision watermark for later pages.
+ * `remainingCount` is optional because some heterogeneous collections cannot
+ * expose an exact total without turning the summary read into another scan.
+ */
+export interface PatientCoreCollectionContinuation {
+  sourceVersion: string;
+  pageSize: number;
+  hasMore: boolean;
+  nextCursor?: string;
+  remainingCount?: number;
 }
 
 /**
@@ -63,4 +69,5 @@ export interface PatientCoreCollection<T> {
   gapReason?: PatientCoreCollectionGapReason;
   asOf?: string;
   diagnostics?: PatientCoreCollectionDiagnostics;
+  continuation?: PatientCoreCollectionContinuation;
 }

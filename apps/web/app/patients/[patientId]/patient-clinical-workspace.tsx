@@ -1,9 +1,16 @@
 "use client";
 
-import type { PatientLongitudinalReadModel } from "@glymize/contracts/patient-core";
+import type {
+  PatientLongitudinalHistoryFamily,
+  PatientLongitudinalReadModel,
+} from "@glymize/contracts/patient-core";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getPatientLongitudinalReadModel } from "../../../lib/patient-clinical-core-client";
+import {
+  getPatientLongitudinalHistoryPage,
+  getPatientLongitudinalReadModel,
+} from "../../../lib/patient-clinical-core-client";
+import { mergePatientLongitudinalHistoryPage } from "../../../lib/patient-longitudinal-history-merge";
 import {
   createLatestPatientLongitudinalReader,
   isPatientWorkspaceReadScopeActive,
@@ -15,6 +22,16 @@ import {
 import { useGlymizeLocale } from "../../components/use-glymize-locale";
 import styles from "./patient-clinical-workspace.module.css";
 import { PatientClinicalWorkspaceView } from "./patient-clinical-workspace-view";
+import { PatientHistoryContinuation } from "./patient-history-continuation";
+
+function continuationFor(
+  model: PatientLongitudinalReadModel,
+  family: PatientLongitudinalHistoryFamily,
+) {
+  return family === "observations"
+    ? model.context.observations.continuation
+    : model.timeline.continuation;
+}
 
 export default function PatientClinicalWorkspace({ patientId }: { patientId: string }) {
   const { locale, isRtl } = useGlymizeLocale();
@@ -22,6 +39,9 @@ export default function PatientClinicalWorkspace({ patientId }: { patientId: str
   const [model, setModel] = useState<PatientLongitudinalReadModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [historyLoadingFamily, setHistoryLoadingFamily] =
+    useState<PatientLongitudinalHistoryFamily | null>(null);
+  const [historyError, setHistoryError] = useState("");
   const reader = useMemo(
     () => createLatestPatientLongitudinalReader((scope, signal) =>
       getPatientLongitudinalReadModel(scope.patientId, {
@@ -33,6 +53,8 @@ export default function PatientClinicalWorkspace({ patientId }: { patientId: str
 
   const load = useCallback(async () => {
     const user = getCachedRuntimeUser();
+    setHistoryLoadingFamily(null);
+    setHistoryError("");
     if (!user || user.status !== "active") {
       reader.invalidate();
       setModel(null);
@@ -71,11 +93,67 @@ export default function PatientClinicalWorkspace({ patientId }: { patientId: str
     }
   }, [patientId, reader]);
 
+  const loadHistory = useCallback(async (family: PatientLongitudinalHistoryFamily) => {
+    const user = getCachedRuntimeUser();
+    if (!model || !user || user.status !== "active") {
+      setHistoryError("AUTH_REQUIRED");
+      return;
+    }
+    const continuation = continuationFor(model, family);
+    const cursor = continuation?.nextCursor;
+    if (!continuation?.hasMore || !cursor) return;
+
+    const requestScope = {
+      actorId: user.id,
+      practiceId: user.practiceId,
+      patientId,
+    };
+    if (!isPatientWorkspaceReadScopeActive(requestScope, user)) {
+      setModel(null);
+      setHistoryError("PATIENT_CONTEXT_CHANGED");
+      return;
+    }
+
+    setHistoryLoadingFamily(family);
+    setHistoryError("");
+    try {
+      const page = await getPatientLongitudinalHistoryPage(patientId, {
+        expectedPracticeId: user.practiceId,
+        family,
+        cursor,
+      });
+      const currentUser = getCachedRuntimeUser();
+      if (!isPatientWorkspaceReadScopeActive(requestScope, currentUser)) {
+        reader.invalidate();
+        setModel(null);
+        setHistoryError("PATIENT_CONTEXT_CHANGED");
+        return;
+      }
+
+      setModel((current) => {
+        if (!current) return current;
+        const currentContinuation = continuationFor(current, family);
+        if (currentContinuation?.nextCursor !== cursor) return current;
+        return mergePatientLongitudinalHistoryPage(current, page);
+      });
+    } catch (cause) {
+      setHistoryError(
+        cause instanceof Error
+          ? cause.message
+          : "PATIENT_LONGITUDINAL_HISTORY_READ_FAILED",
+      );
+    } finally {
+      setHistoryLoadingFamily(null);
+    }
+  }, [model, patientId, reader]);
+
   useEffect(() => {
     void load();
     const onAuthChange = () => {
       reader.invalidate();
       setModel(null);
+      setHistoryLoadingFamily(null);
+      setHistoryError("");
       if (getCachedRuntimeUser()?.status === "active") {
         void load();
       } else {
@@ -107,7 +185,7 @@ export default function PatientClinicalWorkspace({ patientId }: { patientId: str
         <div className={styles.stateCard}>
           <span>PATIENT WORKSPACE</span>
           <strong>{fa ? "پرونده قابل نمایش نیست" : "Patient workspace is unavailable"}</strong>
-          <small>{error}</small>
+          <small>{error || historyError}</small>
           <div className={styles.stateActions}>
             <button type="button" onClick={() => void load()}>{fa ? "تلاش دوباره" : "Retry"}</button>
             <Link href="/records">{fa ? "بازگشت به بیماران" : "Back to patients"}</Link>
@@ -118,11 +196,20 @@ export default function PatientClinicalWorkspace({ patientId }: { patientId: str
   }
 
   return (
-    <PatientClinicalWorkspaceView
-      model={model}
-      patientId={patientId}
-      locale={locale}
-      onRefresh={() => void load()}
-    />
+    <>
+      <PatientClinicalWorkspaceView
+        model={model}
+        patientId={patientId}
+        locale={locale}
+        onRefresh={() => void load()}
+      />
+      <PatientHistoryContinuation
+        model={model}
+        locale={locale}
+        loadingFamily={historyLoadingFamily}
+        error={historyError}
+        onLoad={(family) => void loadHistory(family)}
+      />
+    </>
   );
 }
