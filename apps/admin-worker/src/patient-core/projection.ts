@@ -1,5 +1,6 @@
 import type {
   PatientEncounterClinicalSnapshot,
+  PatientEncounterSnapshotKind,
   PatientHandoffLab,
   PatientHandoffMedication,
   PatientLongitudinalSummary,
@@ -11,6 +12,7 @@ import type {
   PatientCoreCollection,
   PatientCoreFactMeta,
   PatientCoreVerification,
+  PatientMedicationReconciliationStage,
   PatientMedicationStateView,
   PatientObservationView,
 } from "@glymize/contracts/patient-core";
@@ -53,6 +55,16 @@ function sourceMeta(
     revision: source.revision,
   };
 }
+
+const MEDICATION_RECONCILIATION_STAGE_BY_SNAPSHOT_KIND: Record<
+  PatientEncounterSnapshotKind,
+  PatientMedicationReconciliationStage
+> = {
+  clinical: "clinical_snapshot",
+  care_team: "care_team_snapshot",
+  physician_review: "physician_review_snapshot",
+  final: "final_snapshot",
+};
 
 function medicationDose(item: PatientHandoffMedication) {
   if (typeof item.doseAmount !== "number" || !Number.isFinite(item.doseAmount)) {
@@ -113,6 +125,8 @@ export function projectSnapshotMedications(
       status: medication.status ?? "uncertain",
       sourceState: "reconciled",
       adherence: "unknown",
+      reconciliationStage:
+        MEDICATION_RECONCILIATION_STAGE_BY_SNAPSHOT_KIND[source.snapshotKind],
       ...(dose ? { dose } : {}),
       ...(frequency ? { frequency } : {}),
       meta: sourceMeta(
