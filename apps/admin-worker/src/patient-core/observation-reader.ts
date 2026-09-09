@@ -1,11 +1,14 @@
 import type {
   PatientCoreCollection,
+  PatientCoreCollectionDiagnostics,
+  PatientCoreProjectionExclusionCount,
   PatientCoreVerification,
   PatientObservationView,
 } from "@glymize/contracts/patient-core";
 import { decryptClinicalPayload } from "../runtime-security";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
 import { patientObservationAad } from "./aad";
+import { completenessFromPatientCoreDiagnostics } from "./projection-coverage";
 
 type ObservationRow = {
   id: string;
@@ -18,6 +21,8 @@ type ObservationRow = {
   payload_auth_tag: string;
   created_at: string;
 };
+
+const OBSERVATION_SOURCE_SCOPE = "latest_snapshot_revision_per_encounter";
 
 function verification(value: ObservationRow["verification"]): PatientCoreVerification {
   if (value === "confirmed") return "verified";
@@ -37,6 +42,13 @@ function observationValue(value: unknown) {
   return undefined;
 }
 
+function incrementExclusion(
+  counts: Map<PatientCoreProjectionExclusionCount["reason"], number>,
+  reason: PatientCoreProjectionExclusionCount["reason"],
+) {
+  counts.set(reason, (counts.get(reason) ?? 0) + 1);
+}
+
 export async function readPatientCoreObservations(
   context: PatientRecordV2RouteContext,
   patientId: string,
@@ -46,8 +58,6 @@ export async function readPatientCoreObservations(
             o.payload_ciphertext,o.payload_iv,o.payload_auth_tag,o.created_at
      FROM patient_observations o
      WHERE o.practice_id=? AND o.patient_id=?
-       AND o.verification<>'rejected'
-       AND o.canonical_key NOT LIKE 'raw:%'
        AND o.snapshot_revision=(
          SELECT MAX(s.revision)
          FROM patient_encounter_snapshots s
@@ -59,7 +69,24 @@ export async function readPatientCoreObservations(
   ).bind(context.user.practiceId, patientId).all<ObservationRow>();
 
   const items: PatientObservationView[] = [];
+  const exclusions = new Map<PatientCoreProjectionExclusionCount["reason"], number>();
+  let eligibleCount = 0;
+  let invalidSkippedCount = 0;
+
   for (const row of rows.results) {
+    // Rejected observations and the raw namespace are intentionally outside the
+    // canonical longitudinal observation universe. They remain auditable in the
+    // source store but do not make this projection partial.
+    if (row.verification === "rejected") {
+      incrementExclusion(exclusions, "rejected");
+      continue;
+    }
+    if (row.canonical_key.startsWith("raw:")) {
+      incrementExclusion(exclusions, "raw_namespace");
+      continue;
+    }
+
+    eligibleCount += 1;
     const payload = await decryptClinicalPayload<Record<string, unknown>>(
       {
         ciphertext: row.payload_ciphertext,
@@ -72,9 +99,11 @@ export async function readPatientCoreObservations(
     if (!payload) throw new Error("PATIENT_OBSERVATION_DECRYPTION_FAILED");
 
     const value = observationValue(payload.value ?? payload.valueText);
-    if (value === undefined) continue;
     const canonicalKey = row.canonical_key.trim();
-    if (!canonicalKey) continue;
+    if (value === undefined || !canonicalKey) {
+      invalidSkippedCount += 1;
+      continue;
+    }
     const unit = optionalText(payload.unit);
     const specimen = optionalText(payload.specimen);
     const abnormalFlag = optionalText(payload.interpretation ?? payload.abnormalFlag);
@@ -106,9 +135,33 @@ export async function readPatientCoreObservations(
     });
   }
 
+  const intentionallyExcludedCount = [...exclusions.values()].reduce(
+    (total, count) => total + count,
+    0,
+  );
+  const diagnostics: PatientCoreCollectionDiagnostics = {
+    sourceScope: OBSERVATION_SOURCE_SCOPE,
+    sourceRowCount: rows.results.length,
+    eligibleCount,
+    includedCount: items.length,
+    intentionallyExcludedCount,
+    invalidSkippedCount,
+    truncatedCount: 0,
+    ...(exclusions.size
+      ? {
+          exclusions: [...exclusions.entries()]
+            .map(([reason, count]) => ({ reason, count }))
+            .sort((left, right) => left.reason.localeCompare(right.reason)),
+        }
+      : {}),
+  };
+  const completeness = completenessFromPatientCoreDiagnostics(diagnostics);
+
   return {
-    completeness: "complete",
+    completeness,
+    ...(completeness === "partial" ? { gapReason: "other" as const } : {}),
     items,
-    ...(rows.results[0]?.observed_at ? { asOf: rows.results[0].observed_at } : {}),
+    ...(items[0]?.observedAt ? { asOf: items[0].observedAt } : {}),
+    diagnostics,
   };
 }

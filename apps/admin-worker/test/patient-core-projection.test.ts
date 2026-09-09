@@ -139,6 +139,37 @@ describe("Patient Clinical Core snapshot projection", () => {
     });
   });
 
+  it("marks a snapshot observation family partial when an eligible lab is unusable", () => {
+    const result = projectSnapshotObservations(
+      source({
+        snapshot: {
+          labs: [
+            {
+              id: "lab-valid",
+              canonicalKey: "hba1c",
+              rawName: "HbA1c",
+              value: 7.2,
+              unit: "%",
+              verification: "confirmed",
+            },
+            {
+              id: "lab-missing-value",
+              canonicalKey: "creatinine",
+              rawName: "Creatinine",
+              verification: "confirmed",
+            },
+          ],
+        },
+      }),
+      "practice-1",
+      patient.patientId,
+    );
+
+    expect(result.completeness).toBe("partial");
+    expect(result.gapReason).toBe("other");
+    expect(result.items).toHaveLength(1);
+  });
+
   it("keeps bounded legacy clinical flags explicitly partial", () => {
     const result = projectSnapshotClinicalContexts(
       source({

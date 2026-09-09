@@ -22,6 +22,10 @@ const observationReader = fs.readFileSync(
   new URL("../src/patient-core/observation-reader.ts", import.meta.url),
   "utf8",
 );
+const projectionCoverage = fs.readFileSync(
+  new URL("../src/patient-core/projection-coverage.ts", import.meta.url),
+  "utf8",
+);
 const historicalCore = fs.readFileSync(
   new URL("../src/platform-patient-record-v2-core.ts", import.meta.url),
   "utf8",
@@ -44,11 +48,16 @@ describe("Patient Clinical Core B3 read-model boundary", () => {
     expect(snapshotReader).toContain("e.practice_id=? AND e.patient_id=?");
   });
 
-  it("keeps longitudinal observations on the latest snapshot revision and ignores rejected/raw facts", () => {
-    expect(observationReader).toContain("o.verification<>'rejected'");
-    expect(observationReader).toContain("o.canonical_key NOT LIKE 'raw:%'");
+  it("declares and accounts for the longitudinal observation universe explicitly", () => {
+    expect(observationReader).toContain('"latest_snapshot_revision_per_encounter"');
+    expect(observationReader).toContain('row.verification === "rejected"');
+    expect(observationReader).toContain('row.canonical_key.startsWith("raw:")');
     expect(observationReader).toContain("o.snapshot_revision=(");
     expect(observationReader).toContain("MAX(s.revision)");
+    expect(observationReader).toContain("completenessFromPatientCoreDiagnostics");
+    expect(projectionCoverage).toContain("PATIENT_CORE_COVERAGE_ACCOUNTING_INVALID");
+    expect(projectionCoverage).toContain("diagnostics.invalidSkippedCount > 0");
+    expect(projectionCoverage).toContain("diagnostics.truncatedCount > 0");
   });
 
   it("keeps B3 decryption AADs equivalent to the established Patient Record v2 authority", () => {
