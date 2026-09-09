@@ -6,13 +6,21 @@ import type {
   PatientLongitudinalReadModel,
 } from "@glymize/contracts/patient-core";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getPatientLongitudinalReadModel } from "../../../lib/patient-clinical-core-client";
+import {
+  createLatestPatientLongitudinalReader,
+  isPatientWorkspaceReadScopeActive,
+} from "../../../lib/patient-longitudinal-read-guard";
 import {
   buildPatientTenSecondBrief,
   isSourceFlaggedObservation,
   type PatientReviewPosture,
 } from "../../../lib/patient-clinical-brief";
+import {
+  getCachedRuntimeUser,
+  runtimeAuthEventName,
+} from "../../../lib/runtime-client";
 import { useGlymizeLocale } from "../../components/use-glymize-locale";
 import styles from "./patient-clinical-workspace.module.css";
 import { PatientWorkspaceC1Completion } from "./patient-workspace-c1-completion";
@@ -144,25 +152,72 @@ export default function PatientClinicalWorkspace({ patientId }: { patientId: str
   const [model, setModel] = useState<PatientLongitudinalReadModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const reader = useMemo(
+    () => createLatestPatientLongitudinalReader((scope, signal) =>
+      getPatientLongitudinalReadModel(scope.patientId, {
+        expectedPracticeId: scope.practiceId,
+        signal,
+      })),
+    [],
+  );
 
-  async function load() {
+  const load = useCallback(async () => {
+    const user = getCachedRuntimeUser();
+    if (!user || user.status !== "active") {
+      reader.invalidate();
+      setModel(null);
+      setLoading(false);
+      setError("AUTH_REQUIRED");
+      return;
+    }
+
+    const requestScope = {
+      actorId: user.id,
+      practiceId: user.practiceId,
+      patientId,
+    };
     setLoading(true);
+    setModel(null);
     setError("");
     try {
-      setModel(await getPatientLongitudinalReadModel(patientId));
+      const result = await reader.read(requestScope);
+      if (result.status === "obsolete") return;
+
+      const currentUser = getCachedRuntimeUser();
+      if (!isPatientWorkspaceReadScopeActive(result.scope, currentUser)) {
+        reader.invalidate();
+        setModel(null);
+        setError("PATIENT_CONTEXT_CHANGED");
+        setLoading(false);
+        return;
+      }
+
+      setModel(result.model);
+      setLoading(false);
     } catch (cause) {
       setModel(null);
       setError(cause instanceof Error ? cause.message : "PATIENT_LONGITUDINAL_READ_FAILED");
-    } finally {
       setLoading(false);
     }
-  }
+  }, [patientId, reader]);
 
   useEffect(() => {
     void load();
-    // patientId is the route identity for this workspace.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId]);
+    const onAuthChange = () => {
+      reader.invalidate();
+      setModel(null);
+      if (getCachedRuntimeUser()?.status === "active") void load();
+      else {
+        setLoading(false);
+        setError("AUTH_REQUIRED");
+      }
+    };
+    window.addEventListener(runtimeAuthEventName(), onAuthChange);
+    return () => {
+      window.removeEventListener(runtimeAuthEventName(), onAuthChange);
+      reader.invalidate();
+    };
+  }, [load, reader]);
 
   const brief = useMemo(() => model ? buildPatientTenSecondBrief(model) : null, [model]);
 
