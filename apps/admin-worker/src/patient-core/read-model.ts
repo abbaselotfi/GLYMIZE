@@ -69,6 +69,10 @@ export async function readPatientLongitudinalModel(
       }
     : undefined;
 
+  // The dedicated Allergy/Problem authorities are longitudinal and not tied to an
+  // encounter-snapshot revision. Until a revision-time change reader is reviewed,
+  // keep encounter-to-encounter comparison on its existing snapshot projection so
+  // pre-existing authoritative facts cannot be mislabeled as newly added.
   const changesSincePreviousEncounter =
     currentSnapshot && baselineSnapshot
       ? comparePatientContexts(
@@ -77,15 +81,11 @@ export async function readPatientLongitudinalModel(
             context.user.practiceId,
             baselineSnapshot,
           ),
-          {
-            ...projectSnapshotContext(
-              patient,
-              context.user.practiceId,
-              currentSnapshot,
-            ),
-            allergies,
-            problems,
-          },
+          projectSnapshotContext(
+            patient,
+            context.user.practiceId,
+            currentSnapshot,
+          ),
           {
             encounterId: baselineSnapshot.encounterId,
             effectiveAt: baselineSnapshot.encounterAt,
