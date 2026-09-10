@@ -359,6 +359,7 @@ function collectionEnvelope<T>(
   items: T[],
   reconciliation: ReconciliationRow | null,
   truncated: boolean,
+  changedAfterReconciliation: boolean,
   fallbackAsOf?: string,
 ): PatientCoreCollection<T> {
   if (!reconciliation) {
@@ -376,10 +377,14 @@ function collectionEnvelope<T>(
           ...(fallbackAsOf ? { asOf: fallbackAsOf } : {}),
         };
   }
-  if (reconciliation.completeness === "partial" || truncated) {
+  if (
+    reconciliation.completeness === "partial" ||
+    truncated ||
+    changedAfterReconciliation
+  ) {
     return {
       completeness: "partial",
-      gapReason: truncated ? "other" : "not_collected",
+      gapReason: truncated || changedAfterReconciliation ? "other" : "not_collected",
       items,
       asOf: reconciliation.reconciled_at,
     };
@@ -401,6 +406,9 @@ export async function readPatientCoreAllergies(
   ]);
   const truncated = rows.length > MAX_CURRENT_AUTHORITY_FACTS;
   const visibleRows = rows.slice(0, MAX_CURRENT_AUTHORITY_FACTS);
+  const changedAfterReconciliation = Boolean(
+    reconciliation && visibleRows.some((row) => row.created_at > reconciliation.created_at),
+  );
   const items = await Promise.all(
     visibleRows.map(async (row) => {
       const payload = await decryptFactPayload<StoredAllergyPayload>(
@@ -429,6 +437,7 @@ export async function readPatientCoreAllergies(
     items,
     reconciliation,
     truncated,
+    changedAfterReconciliation,
     visibleRows[0]?.created_at,
   );
 }
@@ -443,6 +452,9 @@ export async function readPatientCoreProblems(
   ]);
   const truncated = rows.length > MAX_CURRENT_AUTHORITY_FACTS;
   const visibleRows = rows.slice(0, MAX_CURRENT_AUTHORITY_FACTS);
+  const changedAfterReconciliation = Boolean(
+    reconciliation && visibleRows.some((row) => row.created_at > reconciliation.created_at),
+  );
   const items = await Promise.all(
     visibleRows.map(async (row) => {
       const payload = await decryptFactPayload<StoredProblemPayload>(
@@ -470,6 +482,7 @@ export async function readPatientCoreProblems(
     items,
     reconciliation,
     truncated,
+    changedAfterReconciliation,
     visibleRows[0]?.created_at,
   );
 }
