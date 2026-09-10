@@ -1,7 +1,7 @@
 # GLYMIZE Current State
 
 Snapshot date: 2026-09-09
-Repository baseline: R28-05 implementation is validated at `main@a3076171690f5cd80d3c89ba55ded5fba4b67faf`; closure evidence begins at `229d6215db0ba706b77ed9e4df12981d81cad2db`.
+Repository baseline: R28-06 non-authority implementation is validated at `main@964d94fff808679a61d3845f2ac527185326f2df`; decision-ready authority governance is merged through `main@ebb0ed5a5d6e2e000bc6e78648c34fd6c7219186`. R28-06 remains authority-gated rather than fully complete.
 
 This document is a factual repository snapshot, not a product promise or replacement for the ordered [Project Overview and Roadmap](PROJECT_OVERVIEW_AND_ROADMAP.md). The remaining open roadmap families are status-classified in [Remaining Roadmap Re-baseline](REMAINING_ROADMAP_REBASELINE_2026-09-08.md); that audit does not convert implemented code into V1 scope or deployment claims. It describes code, routes, tests, migrations, workflow configuration, and checked-in default feature state present in the repository. It does not assert that an uninspected remote environment has been deployed or activated.
 
@@ -17,7 +17,7 @@ Run `node scripts/generate-current-state.mjs` from the repository root to reprod
 | Repository fact | Count |
 | --- | ---: |
 | Web App Router entries | 29 (29 pages, 0 route handlers) |
-| Automated test files | 168 (162 JS/TS, 6 Python) |
+| Automated test files | 170 (164 JS/TS, 6 Python) |
 | SQL migration files | 23 (18 Worker/D1, 5 PostgreSQL foundation) |
 <!-- current-state:generated:end -->
 
@@ -32,7 +32,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 - A canonical patient entry at `/patient` with a patient-specific Care Hub shell separated from the physician/assistant application shell. The older `/portal` surface remains part of the repository for portal compatibility and patient-record access flows.
 - Physician Patient Workspace surfaces for patient context/header, medication reconciliation, investigations/orders, lab trends, encounter timeline, and change summaries, backed by the existing patient-record runtime contracts rather than a second patient store. Longitudinal reads are bound to the active actor/practice/patient context: obsolete overlapping reads are cancelled/ignored, auth or practice changes invalidate visible patient state, and response version/scope plus nested workspace-consumed values are validated fail-closed before rendering.
 - The physician 10-second Brief, Attention Now and current-finding previews consume one structural selection contract. Current observation means newest fact in the same exact Patient Core `factKey` series; historical source flags stay separately reviewable, current unverified findings are explicit, incompatible unit/specimen series are not collapsed, and preview overflow is expandable rather than silently omitted. Consequential facts expose source/provenance detail without inventing a clinical severity or resolution state.
-- Longitudinal observation and timeline history now load in bounded pages with explicit continuation. The initial page cannot masquerade as complete history, and the physician can request older history without replacing the current Patient Workspace context.
+- Longitudinal observation and timeline history load in bounded pages with explicit continuation. The initial page cannot masquerade as complete history, and the physician can request older history without replacing the current Patient Workspace context.
 - Patient-facing provider discovery, referral redemption, care-relationship, and scheduling UI foundations that consume capability-gated runtime contracts.
 - App-shell session restoration and permission-aware navigation for physician and assistant users, plus patient-specific authentication/session boundaries.
 - GitHub OAuth owner authentication for central catalogue publication and runtime-account authorization for permitted admin surfaces.
@@ -43,6 +43,8 @@ The counts are file inventory, not a claim that every route or migration is acti
 - The physician-facing `/type-2` route uses `decision-graph-v2` as its configured live medication selection/ranking authority. The older score-based builder is retained only as an explicit unconfigured compatibility fallback, with integration guards against a second live scoring authority.
 - Versioned rule-pack parameters are the authority for consolidated shared Type 2 thresholds covered by Phase 3 Task 3, and hard contraindications are structurally removed from legacy compatibility results rather than relying on score penalties.
 - The Evidence Assistant indexes product- and dose-specific Decision Graph evidence while remaining isolated from clinical-engine decision authority (`engineInfluence: "none"`).
+- R28-06 adds the isolated `patient-core-safety-readiness` Clinical Engine subpath. It consumes `PatientContextView`, declares `decisionAuthority: "none"`, and preserves collection/readiness state (`not_collected`, `not_available`, `partial`, `known_absent`, `present`; plus `unverified`, `freshness_unknown`, `stale`, `current`) without adding eligibility, contraindication, ranking, dose, treatment or clearance rules. Existing reviewed medication/product safety registries remain the clinical-rule authority.
+- Patient Core medication reconciliation now preserves the immutable snapshot stage (`clinical_snapshot`, `care_team_snapshot`, `physician_review_snapshot`, `final_snapshot`) as source/reconciliation context. That stage is not a signed physician order or clinical-engine decision.
 - The reviewed Iranian multidomain inventory includes the Phase 4 cardiac/renal/hypertension/lipid classes and supports sourced blood-pressure/lipid objectives, reviewed cardiometabolic product-dose rules, regimen-composition guards, and meaningful scenario-diversity checks.
 - The deterministic clinical release gate covers 325,000 large-scale clinical, financial, metamorphic, adversarial-numeric, and multidomain cases/pairs across the established suites.
 - Type 2 structured intake carries represented specialist contexts without promoting UI visibility into a diagnosis. Product-specific safety screening for the reviewed WEGOVY MASH path is version/product bound, collected as explicit Present/Absent/Unknown responses, and remains fail-closed for missing, stale, partial, or unknown data. A complete transport envelope is not global product clearance or a treatment order.
@@ -72,6 +74,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 - R28-03 adds executable projection accounting and controlled reader tests. The tests cover missing/unusable eligible values, rejected/raw intentional exclusions, latest snapshot-revision scoping, practice/patient query binding, decryption failure, snapshot partial semantics, and preservation of the change detector rule that partial-family absence is not a removal.
 - R28-04 adds a shared Patient Workspace current-selection module, separates rendering from the async/auth loader, adds reusable Source/Audit disclosure, propagates immutable observation revision provenance, and tests old-flag/new-normal ordering, repeated exact series, incompatible units/specimens, unverified findings and all preview-overflow paths. Validation run `34335565064` passed lint, typecheck, full regression, Worker build, current web build and Playwright critical flows.
 - R28-05 adds bounded longitudinal readers, a separate pagination/cursor boundary, bounded timeline-order projection, non-PHI runtime read metrics, fail-closed history validators/merge logic and touch-friendly history continuation. PR validation run `34351829348` and direct-main validation run `34352391023` passed. Synthetic CI evidence shows initial medium/large reads remain bounded at 80 observations, 60 timeline rows, 9 measured queries, 144 decryptions and 22,054 response bytes even as source history grows from 400/300 to 4,000/3,000 rows. These runner measurements are not a production SLA.
+- R28-06 non-authority implementation was validated in PR run `34354445235`, reapplied as the exact tested tree on `main@964d94fff808679a61d3845f2ac527185326f2df`, and passed direct-main run `34356760954`. Governance PR #137 added the proposed Allergy/Problem authority ADR, passed validation run `34357808714`, and merged at `ebb0ed5a5d6e2e000bc6e78648c34fd6c7219186`; post-merge direct-main run `34358251203` and Codebase Memory run `34358251246` passed on that SHA.
 - Codebase Memory is pinned at `0.10.8` for the current graph-gate workflow, with PRE/POST graph checks used for graph-relevant tasks.
 - The five previously oversized modules identified in roadmap §8.24 expose compatibility façades over cohesive archive, portal-media, generated-catalogue, Care Team form-model, and browser-catalogue state modules, with equivalence tests.
 - Versioned/hotfix CSS identified by Phase 0 Task 8 was consolidated and superseded styling files were removed after screenshot comparison.
@@ -80,7 +83,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 ## Partial, gated, or disabled by default
 
 - Patient Identity v2, provider directory, referral service, care relationships, multi-practice patient contexts, scheduling availability, slot discovery, slot locking, and booking have schema/contracts/runtime tests and substantial UI/runtime implementation, but repository presence alone does not prove production activation. Their RC checkpoints and feature-capability surfaces must not be described as production availability without environment evidence.
-- Patient Core allergies and problems are still explicitly `not_available/source_not_exposed`; the current Patient Record v2 snapshot contract and D1 schema do not establish a canonical allergy/problem write authority. R28-06 may audit and adapt existing authorities but cannot invent these authorities without its separate gap/ADR review gate.
+- Patient Core allergies and problems remain explicitly `not_available/source_not_exposed`; the current Patient Record v2 snapshot contract and D1 schema do not establish a canonical allergy/problem write authority. [`PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ADR.md`](architecture/PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ADR.md) is decision-ready but remains **Proposed / not accepted**. It recommends dedicated bounded longitudinal Allergy/Problem persistence inside the existing Worker/D1 Patient Record v2 authority, with explicit collection reconciliation/coverage, but no migration or write path is authorized until the owner explicitly accepts or revises that direction.
 - Patient Core medication state is currently derived from immutable encounter-snapshot reconciliation, while cross-cutting contexts are a bounded snapshot flag subset. Shared freshness remains `unknown` unless a reviewed clinical-use-specific policy supplies versioned current/stale semantics; there is no universal cutoff.
 - The checked-in Worker configuration keeps `PATIENT_PORTAL_V1_ENABLED` at `false`.
 - Type 1 and pregnancy pages provide informational/checklist and catalogue surfaces; they are not complete autonomous treatment pathways.
@@ -96,20 +99,26 @@ The counts are file inventory, not a claim that every route or migration is acti
 - Phase 3 Tasks 1–5 are complete. The live Type 2 authority convergence, threshold consolidation, structural hard-exclusion firewall, and product/dose evidence indexing were merged in PRs #37–#41.
 - Phase 4 Tasks 6–10 are complete. The verified multidomain catalogue, reviewed cardiometabolic dose protocols, BP/lipid objective wiring, scenario-diversity acceptance, and expanded multidomain release gate were merged through PRs #42 and #47–#50. Task 6 merged before both clinical-logic tasks; after the first Task 7 attempt exposed an ordering dependency, Task 8 dose protocols were completed before the final Task 7 objective activation.
 - Subsequent Type 2 hardening through PR #116 added structured specialist intake, authority/coverage truth contracts, runtime parity, current-medication interval reconciliation, insurer/claims boundaries, WEGOVY MASH protocol/product-safety convergence, authoritative safety metadata, and active UI collection without changing the completed Phase 3/4 task definitions.
-- Roadmap §28 R28-01 status reconciliation, R28-02 active-context binding, R28-03 executable completeness, R28-04 current/source alignment, and R28-05 bounded longitudinal reads/cost measurement are complete. R28-05 implementation is `a3076171690f5cd80d3c89ba55ded5fba4b67faf`; evidence is recorded in `R28_05_BOUNDED_LONGITUDINAL_READS_2026-09-09.md`.
+- Roadmap §28 R28-01 status reconciliation, R28-02 active-context binding, R28-03 executable completeness, R28-04 current/source alignment, and R28-05 bounded longitudinal reads/cost measurement are complete. R28-06 has completed its non-authority audit/readiness adapter and decision-ready ADR work, but remains **partially complete / authority-gated** until canonical Allergy/Problem write ownership is explicitly accepted or revised. Evidence is recorded in `R28_06_PATIENT_CORE_AUTHORITY_READINESS_2026-09-09.md` and `architecture/PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ADR.md`.
 - Remaining unchecked roadmap phases contain a mix of genuinely planned work, already-partial implementation, and owner/product/clinical decisions. They require the execution ordering in canonical Roadmap §28 and this document's stated continuation boundary rather than treating any unchecked historical item as automatically next.
 
 ## Immediate continuation boundary
 
-R28-01 through R28-05 are complete. **R28-06 is now the active task.** Existing Patient Record/reconciliation and bounded clinical-context sources may be audited and adapted without changing authority. A new allergy/problem/context write authority, new persistence model, or unreviewed freshness policy is outside the automatic execution grant and requires the separate review/ADR specified by Roadmap §28.
+R28-01 through R28-05 are complete. **R28-06 is partially complete and stopped at its explicit owner authority gate.** The non-authority Patient Core safety-readiness adapter, medication reconciliation-stage preservation, authority audit and proposed decision ADR are implemented/validated. Allergy and Problem authority selection is not approved.
 
-R28-07 follows only after the R28-06 dependency is actually satisfied; R28-08 remains dependent on R28-06 plus the existing privacy/evaluation gates; R28-09 binds acceptance evidence to the exact reviewed candidate.
+The decision-ready ADR offers the following explicit continuation choices:
+
+- accept **Option A** — dedicated bounded longitudinal Allergy/Problem persistence inside existing Worker/D1 Patient Record v2, followed by separately reviewed contract/schema/write-path implementation;
+- choose **Option B** — snapshot-derived authority with explicit collection reconciliation semantics;
+- request another option/revision — keep R28-06 gated.
+
+R28-07 must not assume canonical Allergy/Problem authority is satisfied until that decision is recorded. R28-08 likewise remains dependent on R28-06 plus the existing privacy/evaluation gates; R28-09 binds acceptance evidence to the exact reviewed candidate.
 
 During that sequence:
 
 - do not collect NYHA merely to remove the last Type 2 UI gap without a demonstrated downstream consumer;
 - do not implement the catalogue storage migration without the owner confirmation required by its ADR;
-- do not introduce a new Patient Core authority without the separate review/ADR required by R28-06;
+- do not introduce or activate a new Patient Core authority without explicit acceptance of the R28-06 authority decision;
 - do not invent clinical thresholds, contraindications, dose rules, evidence, freshness cutoffs, or product scope to satisfy an unchecked roadmap box.
 
 ## Safety status
