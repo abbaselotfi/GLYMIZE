@@ -8,6 +8,19 @@ import type {
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  CLINICAL_MODULE_REGISTRY,
+  clinicalModuleMaturityLabel,
+} from "../../../lib/clinical-module-registry";
+import {
+  clearPatientModuleHandoffIntent,
+  createPatientModuleHandoffIntent,
+  writePatientModuleHandoffIntent,
+} from "../../../lib/patient-module-handoff";
+import {
+  buildType2PatientCoreHandoffCandidate,
+  TYPE2_PATIENT_CORE_MODULE_ID,
+} from "../../../lib/type2-patient-core-handoff";
+import {
   buildPatientObservationTrends,
   type PatientObservationTrend,
 } from "../../../lib/patient-observation-trends";
@@ -63,63 +76,6 @@ function TrendSparkline({ trend }: { trend: PatientObservationTrend }) {
   );
 }
 
-type ModuleMaturity = "reviewed_cds" | "reviewed_tool" | "reference_only";
-
-type ClinicalModuleLink = {
-  id: string;
-  href: string;
-  maturity: ModuleMaturity;
-  faTitle: string;
-  enTitle: string;
-  faDescription: string;
-  enDescription: string;
-};
-
-const CLINICAL_MODULES: ClinicalModuleLink[] = [
-  {
-    id: "diabetes-type-2",
-    href: "/type-2",
-    maturity: "reviewed_cds",
-    faTitle: "دیابت نوع ۲",
-    enTitle: "Type 2 Diabetes",
-    faDescription: "Decision Graph v2 فعال و تست‌شده؛ ورود بیمار از این launcher هنوز خودکار نیست.",
-    enDescription: "Decision Graph v2 is the active tested authority; patient handoff from this launcher is not automatic yet.",
-  },
-  {
-    id: "insulin-conversion",
-    href: "/insulin-tools",
-    maturity: "reviewed_tool",
-    faTitle: "ابزار تبدیل انسولین",
-    enTitle: "Insulin Conversion",
-    faDescription: "مسیرهای تبدیل پشتیبانی‌شده با محاسبات و هشدارهای تست‌شده.",
-    enDescription: "Supported conversion paths with tested arithmetic and warnings.",
-  },
-  {
-    id: "type-1",
-    href: "/type-1",
-    maturity: "reference_only",
-    faTitle: "دیابت نوع ۱",
-    enTitle: "Type 1 Diabetes",
-    faDescription: "فعلاً سطح اطلاعات/چک‌لیست؛ مسیر درمان خودکار کامل نیست.",
-    enDescription: "Currently an informational/checklist surface; not a complete autonomous treatment pathway.",
-  },
-  {
-    id: "pregnancy",
-    href: "/pregnancy",
-    maturity: "reference_only",
-    faTitle: "دیابت و بارداری",
-    enTitle: "Diabetes & Pregnancy",
-    faDescription: "فعلاً سطح اطلاعات/چک‌لیست؛ pregnancy یک context میان‌دامنه‌ای باقی می‌ماند.",
-    enDescription: "Currently an informational/checklist surface; pregnancy remains a cross-domain context.",
-  },
-];
-
-function maturityLabel(value: ModuleMaturity, fa: boolean) {
-  if (value === "reviewed_cds") return fa ? "CDS بازبینی‌شده" : "Reviewed CDS";
-  if (value === "reviewed_tool") return fa ? "ابزار بازبینی‌شده" : "Reviewed tool";
-  return fa ? "مرجع / چک‌لیست" : "Reference / checklist";
-}
-
 export function PatientWorkspaceC1Completion({
   model,
   patientId,
@@ -140,6 +96,26 @@ export function PatientWorkspaceC1Completion({
   const currentMedicationCount = model.context.medications.items.filter(
     (item) => item.status !== "stopped",
   ).length;
+
+  function prepareModuleNavigation(moduleId: string) {
+    clearPatientModuleHandoffIntent();
+    if (moduleId !== TYPE2_PATIENT_CORE_MODULE_ID) return;
+    try {
+      const candidate = buildType2PatientCoreHandoffCandidate(model);
+      const intent = createPatientModuleHandoffIntent({
+        moduleId: candidate.moduleId,
+        practiceId: candidate.scope.practiceId,
+        patientId: candidate.scope.patientId,
+        sourceRevisions: candidate.sourceRevisions,
+      });
+      if (intent.sourceRevisionFingerprint !== candidate.sourceRevisionFingerprint) {
+        return;
+      }
+      writePatientModuleHandoffIntent(intent);
+    } catch {
+      clearPatientModuleHandoffIntent();
+    }
+  }
 
   return (
     <section className={styles.completion} data-patient-workspace="c1-completion-surfaces">
@@ -224,15 +200,23 @@ export function PatientWorkspaceC1Completion({
         <header className={styles.panelHeader}>
           <div>
             <span>CLINICAL MODULES</span>
-            <h2>{fa ? "ورود به ماژول بالینی از داخل context بیمار" : "Enter clinical modules from the patient context"}</h2>
+            <h2>{fa ? "ورود کنترل‌شده از context بیمار" : "Governed entry from patient context"}</h2>
           </div>
-          <small>{fa ? "maturity هر ماژول صریح است" : "Module maturity is explicit"}</small>
+          <small>{fa ? "maturity، authority و release جدا هستند" : "Maturity, authority, and release are separate"}</small>
         </header>
         <div className={styles.moduleGrid}>
-          {CLINICAL_MODULES.map((module) => (
-            <Link className={styles.moduleCard} data-maturity={module.maturity} href={module.href} key={module.id}>
+          {CLINICAL_MODULE_REGISTRY.map((module) => (
+            <Link
+              className={styles.moduleCard}
+              data-maturity={module.maturity}
+              data-release-eligibility={module.releaseEligibility}
+              data-treatment-authority={module.treatmentAuthority}
+              href={module.route}
+              key={module.id}
+              onClick={() => prepareModuleNavigation(module.id)}
+            >
               <div>
-                <span>{maturityLabel(module.maturity, fa)}</span>
+                <span>{clinicalModuleMaturityLabel(module.maturity, fa)}</span>
                 <strong>{fa ? module.faTitle : module.enTitle}</strong>
               </div>
               <p>{fa ? module.faDescription : module.enDescription}</p>
@@ -242,8 +226,8 @@ export function PatientWorkspaceC1Completion({
         </div>
         <p className={styles.safetyNote}>
           {fa
-            ? "C1 هیچ patientId یا fact بالینی را به‌صورت پنهانی وارد یک ماژول بیماری نمی‌کند. انتقال context باید بعداً از قرارداد رسمی Module Registry/Smart Routing انجام شود."
-            : "C1 does not silently inject a patientId or clinical fact into a disease workflow. Context handoff must later use the formal Module Registry/Smart Routing contract."}
+            ? "برای Type 2 فقط descriptor شامل patient/practice و revision metadata در همین tab ساخته می‌شود؛ هیچ مقدار بالینی در URL یا transport ذخیره نمی‌شود. مقصد Patient Core را دوباره می‌خواند، revision را تطبیق می‌دهد و قبل از اعمال هر مقدار تأیید پزشک را می‌خواهد."
+            : "For Type 2, only a same-tab descriptor containing patient/practice scope and revision metadata is created; no clinical value is stored in the URL or transport. The destination re-reads Patient Core, checks revisions, and requires clinician confirmation before applying any value."}
         </p>
       </article>
 
