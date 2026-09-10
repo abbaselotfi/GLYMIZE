@@ -82,12 +82,21 @@ describe("C1 Patient Workspace completion surfaces", () => {
     expect(completionSource).toContain("An empty list here is never proof");
   });
 
-  it("labels module maturity and avoids silent patient-context injection", () => {
-    expect(completionSource).toContain('maturity: "reviewed_cds"');
-    expect(completionSource).toContain('maturity: "reviewed_tool"');
-    expect(completionSource).toContain('maturity: "reference_only"');
-    expect(completionSource).toContain("does not silently inject a patientId or clinical fact");
+  it("uses the governed registry and keeps authority/release state explicit at the launcher", () => {
+    expect(completionSource).toContain("CLINICAL_MODULE_REGISTRY");
+    expect(completionSource).toContain('data-maturity={module.maturity}');
+    expect(completionSource).toContain('data-treatment-authority={module.treatmentAuthority}');
+    expect(completionSource).toContain('data-release-eligibility={module.releaseEligibility}');
+    expect(completionSource).toContain("no clinical value is stored in the URL or transport");
     expect(completionSource).not.toContain("?patientId=");
+  });
+
+  it("creates a revision-only Type2 launch descriptor instead of carrying clinical values", () => {
+    expect(completionSource).toContain("buildType2PatientCoreHandoffCandidate(model)");
+    expect(completionSource).toContain("createPatientModuleHandoffIntent");
+    expect(completionSource).toContain("sourceRevisions: candidate.sourceRevisions");
+    expect(completionSource).toContain("writePatientModuleHandoffIntent(intent)");
+    expect(completionSource).not.toContain("currentHba1c: candidate.prefill.currentHba1c");
   });
 
   it("keeps the contextual AI drawer non-authoritative and does not send patient data", () => {

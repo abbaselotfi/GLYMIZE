@@ -28,10 +28,13 @@ import {
   clinicianCostingProfileForMedication,
   type ClinicianMedicationCostingProfile,
 } from "../../lib/clinician-market-v2";
+import type { Type2PatientCoreHandoffCandidate } from "../../lib/type2-patient-core-handoff";
+import { useType2PatientCoreHandoff } from "../../lib/use-type2-patient-core-handoff";
 import MedicationMarketDetails from "../components/medication-market-details";
 import PatientHandoffLookup from "../components/patient-handoff-lookup";
 import { useGlymizeLocale } from "../components/use-glymize-locale";
 import Type2ParallelSafetyPanel from "./type2-parallel-safety-panel";
+import Type2PatientCoreHandoffReview from "./type2-patient-core-handoff-review";
 import Type2StructuredContextFields from "./type2-structured-context-fields";
 import {
   emptyType2StructuredIntakeDraft,
@@ -256,6 +259,7 @@ export default function Type2ScenariosClient() {
   const [submittedRequest, setSubmittedRequest] = useState<Type2ConsiderationRequest | null>(null);
   const [costPlans, setCostPlans] = useState<Record<string, Type2CostingPlan>>({});
   const [status, setStatus] = useState("");
+  const patientCoreHandoff = useType2PatientCoreHandoff();
 
   useEffect(() => {
     void apiFetch("/v1/catalog/generics")
@@ -336,6 +340,32 @@ export default function Type2ScenariosClient() {
     const normalized = value.trim().toLocaleLowerCase();
     const match = catalog.find((item) => item.canonicalName.toLocaleLowerCase() === normalized || item.persianName.toLocaleLowerCase() === normalized);
     updateMedication(id, { genericName: value, genericMedicationId: match?.id });
+  }
+
+  function applyPatientCoreHandoff(candidate: Type2PatientCoreHandoffCandidate) {
+    const prefill = candidate.prefill;
+    if (prefill.currentHba1c !== undefined) {
+      setCurrentHba1c(String(prefill.currentHba1c));
+    }
+    setContext((current) => ({
+      ...current,
+      eGfr: prefill.eGfr !== undefined ? String(prefill.eGfr) : current.eGfr,
+      creatinineClearanceMlMin: prefill.creatinineClearanceMlMin !== undefined
+        ? String(prefill.creatinineClearanceMlMin)
+        : current.creatinineClearanceMlMin,
+      uacr: prefill.uacr !== undefined ? String(prefill.uacr) : current.uacr,
+      potassiumMmolL: prefill.potassiumMmolL !== undefined
+        ? String(prefill.potassiumMmolL)
+        : current.potassiumMmolL,
+      dialysis: prefill.dialysis ?? current.dialysis,
+    }));
+    setFactors((current) => [...new Set([...current, ...prefill.factors])]);
+    setAssessment(null);
+    setSubmittedRequest(null);
+    setCostPlans({});
+    setStatus(fa
+      ? "candidateهای verified و revision-bound Patient Core پس از تأیید شما روی فرم اعمال شدند. Target و سایر ترجیحات را جداگانه مرور کنید."
+      : "Verified, revision-bound Patient Core candidates were applied after your confirmation. Review target and other preferences separately.");
   }
 
   function applyPatientHandoff(record: PatientHandoffRecord, patient?: PatientLongitudinalSummary) {
@@ -446,6 +476,17 @@ export default function Type2ScenariosClient() {
         </div>
         <div className={styles.heroMetric}><b>1,000</b><span>{fa ? "کیس اعتبارسنجی بالینی تصادفی" : "Randomized Clinical Validation Cases"}</span></div>
       </header>
+
+      <Type2PatientCoreHandoffReview
+        state={patientCoreHandoff.state}
+        candidate={patientCoreHandoff.candidate}
+        errorCode={patientCoreHandoff.error}
+        locale={locale}
+        onConfirm={() => {
+          patientCoreHandoff.confirm(applyPatientCoreHandoff);
+        }}
+        onDiscard={patientCoreHandoff.discard}
+      />
 
       <PatientHandoffLookup onApply={applyPatientHandoff} />
 

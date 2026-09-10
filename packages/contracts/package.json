@@ -12,6 +12,10 @@
     "./patient-core": {
       "types": "./dist/patient-core/index.d.ts",
       "default": "./dist/patient-core/index.js"
+    },
+    "./clinical-modules": {
+      "types": "./dist/clinical-modules.d.ts",
+      "default": "./dist/clinical-modules.js"
     }
   },
   "scripts": {
