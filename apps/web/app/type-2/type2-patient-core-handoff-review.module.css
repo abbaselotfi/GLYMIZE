@@ -1,0 +1,158 @@
+.panel {
+  margin-bottom: 22px;
+  padding: 20px;
+  border: 1px solid rgba(34, 80, 108, 0.14);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 9px 30px rgba(28, 65, 86, 0.045);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.header span {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #2e7480;
+}
+
+.header h2 {
+  margin: 5px 0 4px;
+  font-size: 19px;
+}
+
+.header p,
+.note,
+.issue {
+  margin: 0;
+  color: #667985;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.badge {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid #dce7ea;
+  border-radius: 999px;
+  background: #f7fbfc;
+  color: #48636f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 14px 0;
+}
+
+.fact {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #e3ebee;
+  border-radius: 14px;
+  background: #fbfdfe;
+}
+
+.fact > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fact strong {
+  font-size: 13px;
+}
+
+.fact b {
+  font-size: 13px;
+  color: #245f69;
+}
+
+.fact small {
+  color: #73838d;
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.ready {
+  border-color: #cfe4df;
+  background: #f7fcfa;
+}
+
+.unverified,
+.stale,
+.source_revision_missing,
+.invalid_value {
+  border-color: #eadfc9;
+  background: #fffaf2;
+}
+
+.issue {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #ecdcc0;
+  border-radius: 12px;
+  background: #fff8ed;
+  color: #735d36;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.actions button,
+.actions a {
+  border-radius: 11px;
+  padding: 9px 13px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.confirm {
+  border: 0;
+  background: #1c7180;
+  color: #fff;
+}
+
+.discard,
+.actions a {
+  border: 1px solid #d9e4e8;
+  background: #fff;
+  color: #405d68;
+}
+
+@media (max-width: 760px) {
+  .header {
+    flex-direction: column;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions button,
+  .actions a {
+    text-align: center;
+  }
+}
