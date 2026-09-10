@@ -5,6 +5,10 @@ import type {
 } from "@glymize/contracts/patient-core";
 import type { RuntimeReadMetricsCollector } from "../runtime-read-metrics";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
+import {
+  readPatientCoreAllergies,
+  readPatientCoreProblems,
+} from "./authority-repository";
 import { comparePatientContexts, unavailablePatientChangeSet } from "./change-detection";
 import { readPatientCoreObservations } from "./observation-reader";
 import { emptyPatientContext, projectSnapshotContext } from "./projection";
@@ -14,6 +18,7 @@ import { readPatientCoreTimeline } from "./timeline-reader";
 
 export interface PatientLongitudinalReadOptions {
   metrics?: RuntimeReadMetricsCollector;
+  allergyProblemAuthorityEnabled?: boolean;
 }
 
 export async function readPatientLongitudinalModel(
@@ -27,19 +32,32 @@ export async function readPatientLongitudinalModel(
   });
   if (!patient) return null;
 
-  const [snapshots, observations, timeline] = await Promise.all([
-    readRecentPatientCoreSnapshots(context, patientId, 2, {
-      metrics: options.metrics,
-    }),
-    readPatientCoreObservations(context, patientId, {
-      sourceVersion: generatedAt,
-      metrics: options.metrics,
-    }),
-    readPatientCoreTimeline(context, patientId, {
-      sourceVersion: generatedAt,
-      metrics: options.metrics,
-    }),
-  ]);
+  const authorityReads = options.allergyProblemAuthorityEnabled === true
+    ? Promise.all([
+        readPatientCoreAllergies(context, patientId, {
+          metrics: options.metrics,
+        }),
+        readPatientCoreProblems(context, patientId, {
+          metrics: options.metrics,
+        }),
+      ])
+    : Promise.resolve(null);
+
+  const [snapshots, observations, timeline, authorityCollections] =
+    await Promise.all([
+      readRecentPatientCoreSnapshots(context, patientId, 2, {
+        metrics: options.metrics,
+      }),
+      readPatientCoreObservations(context, patientId, {
+        sourceVersion: generatedAt,
+        metrics: options.metrics,
+      }),
+      readPatientCoreTimeline(context, patientId, {
+        sourceVersion: generatedAt,
+        metrics: options.metrics,
+      }),
+      authorityReads,
+    ]);
 
   const currentSnapshot = snapshots[0];
   const baselineSnapshot = snapshots[1];
@@ -50,6 +68,12 @@ export async function readPatientLongitudinalModel(
   const currentContext = {
     ...projectedCurrent,
     generatedAt,
+    ...(authorityCollections
+      ? {
+          allergies: authorityCollections[0],
+          problems: authorityCollections[1],
+        }
+      : {}),
     observations,
   };
 
@@ -61,6 +85,10 @@ export async function readPatientLongitudinalModel(
       }
     : undefined;
 
+  // The dedicated Allergy/Problem authorities are longitudinal and not tied to an
+  // encounter-snapshot revision. Until a revision-time change reader is reviewed,
+  // keep encounter-to-encounter comparison on its existing snapshot projection so
+  // pre-existing authoritative facts cannot be mislabeled as newly added.
   const changesSincePreviousEncounter =
     currentSnapshot && baselineSnapshot
       ? comparePatientContexts(

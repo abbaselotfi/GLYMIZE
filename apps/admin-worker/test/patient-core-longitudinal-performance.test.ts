@@ -66,9 +66,13 @@ describe("R28-05 bounded longitudinal synthetic budgets", () => {
         PATIENT_CORE_DEFAULT_TIMELINE_PAGE_SIZE + 1,
       );
 
-      // Structural initial-read budget: registry + identifiers + demographics +
-      // latest encounter + snapshots + observation count/page + encounter/order
-      // timeline candidates = nine D1 operations regardless of source history.
+      // Structural initial-read budget after R28-06 Option A when rollout is enabled:
+      // registry + identifiers + demographics + latest encounter + snapshots +
+      // observation count/page + encounter/order timeline candidates + bounded
+      // allergy facts/reconciliation + bounded problem facts/reconciliation =
+      // thirteen D1 operations regardless of observation/timeline source history.
+      // These synthetic cohorts model empty Allergy/Problem authorities; their
+      // independent item bounds are locked by R28-06 authority tests.
       const syntheticReturnedRows = [
         1,
         2,
@@ -79,6 +83,10 @@ describe("R28-05 bounded longitudinal synthetic budgets", () => {
         returnedObservationRows,
         timelineCandidateRows,
         timelineCandidateRows,
+        0,
+        0,
+        0,
+        0,
       ];
       for (const rowCount of syntheticReturnedRows) {
         await measureRuntimeReadQuery(
@@ -117,12 +125,12 @@ describe("R28-05 bounded longitudinal synthetic budgets", () => {
       };
       console.info("R28_05_SYNTHETIC_BUDGET", JSON.stringify(evidence));
 
-      expect(snapshot.queryCount).toBe(9);
+      expect(snapshot.queryCount).toBe(13);
       expect(snapshot.decryptionCount).toBeLessThanOrEqual(150);
       expect(snapshot.rowCount).toBeLessThanOrEqual(210);
       expect(snapshot.responseBytes).toBeLessThanOrEqual(512 * 1024);
       expect(snapshot.decryptionMs).toBeLessThan(5_000);
       expect(snapshot.totalMs).toBeLessThan(5_000);
     }
-  });
+  }, 30_000);
 });

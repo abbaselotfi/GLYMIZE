@@ -8,6 +8,9 @@ import {
 
 import { patientRecordV2Route } from "./platform-patient-record-v2";
 import {
+  patientCoreAllergyProblemAuthorityEnabledFromEnv,
+} from "./patient-core-rollout";
+import {
   authorizePatientRoute,
   type PatientRouteId,
 } from "./patient-access-rbac";
@@ -61,6 +64,7 @@ interface Env {
   AI_CONFIG_KV: KVNamespace;
   AI_CONFIG_MASTER_KEY: string;
   AI_RUNTIME_SHARED_SECRET: string;
+  PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ENABLED?: string;
 
   GLYMIZE_DB?: D1Database;
   CLINICAL_DATA_MASTER_KEY?: string;
@@ -1546,6 +1550,11 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
       respond:(body,status=200)=>json(request,env,body,status),
       audit:(action,targetType,targetId,meta)=>
         audit(env,auth.user.id,auth.user.practiceId,action,targetType,targetId,meta),
+    }, {
+      patientCoreAllergyProblemAuthorityEnabled:
+        patientCoreAllergyProblemAuthorityEnabledFromEnv(
+          env.PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ENABLED,
+        ),
     });
     if (patientRecord) return patientRecord;
   }

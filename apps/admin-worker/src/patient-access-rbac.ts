@@ -14,6 +14,9 @@ export type PatientRouteId =
   | "patient_record.encounter.revise"
   | "patient_record.encounter.approve"
   | "patient_record.workspace.read"
+  | "patient_record.clinical_fact.write"
+  | "patient_record.clinical_fact.verify"
+  | "patient_record.clinical_fact.reconcile"
   | "patient_handoff.legacy.read"
   | "patient_identity.legacy_link.read"
   | "patient_identity.legacy_link.request"
@@ -40,6 +43,9 @@ export const PATIENT_ROUTE_REQUIREMENTS = {
   "patient_record.encounter.revise": "editor",
   "patient_record.encounter.approve": "approver",
   "patient_record.workspace.read": "editor",
+  "patient_record.clinical_fact.write": "editor",
+  "patient_record.clinical_fact.verify": "approver",
+  "patient_record.clinical_fact.reconcile": "approver",
   "patient_handoff.legacy.read": "editor",
   "patient_identity.legacy_link.read": "editor",
   "patient_identity.legacy_link.request": "editor",
