@@ -12,7 +12,6 @@ export type PatientRecordUser = {
 export type PatientRecordV2RouteContext = {
   database: D1Database;
   clinicalSecret: string;
-  patientCoreAllergyProblemAuthorityEnabled: boolean;
   user: PatientRecordUser;
   authorize: (route: PatientRouteId) => Promise<boolean>;
   respond: (body: unknown, status?: number) => Response;
