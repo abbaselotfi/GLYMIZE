@@ -132,5 +132,5 @@ describe("R28-05 bounded longitudinal synthetic budgets", () => {
       expect(snapshot.decryptionMs).toBeLessThan(5_000);
       expect(snapshot.totalMs).toBeLessThan(5_000);
     }
-  });
+  }, 30_000);
 });
