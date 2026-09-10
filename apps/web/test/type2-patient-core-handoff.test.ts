@@ -141,6 +141,7 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
           id: "egfr-1",
           key: "observation:egfr:mL/min/1.73m2:serum",
           value: "48",
+          unit: "mL/min/1.73m2",
           observedAt: "2026-09-01T09:00:00.000Z",
           revision: 3,
         }),
@@ -177,6 +178,7 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
           id: "older-verified",
           key: "observation:hba1c:%:blood",
           value: 7.8,
+          unit: "%",
           observedAt: "2026-08-01T09:00:00.000Z",
           revision: 1,
         }),
@@ -184,6 +186,7 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
           id: "newest-unverified",
           key: "observation:hba1c:%:blood",
           value: 9.1,
+          unit: "%",
           observedAt: "2026-09-01T09:00:00.000Z",
           revision: 2,
           verification: "unverified",
@@ -206,6 +209,7 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
           id: "stale-hba1c",
           key: "observation:hba1c:%:blood",
           value: 8.8,
+          unit: "%",
           observedAt: "2025-01-01T09:00:00.000Z",
           revision: 5,
           freshness: "stale",
@@ -216,6 +220,26 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
     expect(candidate.prefill.currentHba1c).toBeUndefined();
     expect(candidate.requiredIssues).toEqual([
       { key: "current_hba1c", reason: "stale" },
+    ]);
+  });
+
+  it("rejects incompatible units instead of converting or guessing", () => {
+    const candidate = buildType2PatientCoreHandoffCandidate(model({
+      observations: [
+        observation({
+          id: "hba1c-ifcc",
+          key: "observation:hba1c:mmol/mol:blood",
+          value: 68,
+          unit: "mmol/mol",
+          observedAt: "2026-09-01T09:00:00.000Z",
+          revision: 5,
+        }),
+      ],
+    }));
+
+    expect(candidate.prefill.currentHba1c).toBeUndefined();
+    expect(candidate.requiredIssues).toEqual([
+      { key: "current_hba1c", reason: "invalid_value" },
     ]);
   });
 
@@ -236,6 +260,7 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
           id: "wrong-patient-hba1c",
           key: "observation:hba1c:%:blood",
           value: 8.1,
+          unit: "%",
           observedAt: "2026-09-01T09:00:00.000Z",
           revision: 2,
           patientId: "patient-2",
@@ -251,6 +276,7 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
           id: "hba1c",
           key: "observation:hba1c:%:blood",
           value: 8.1,
+          unit: "%",
           observedAt: "2026-09-01T09:00:00.000Z",
           revision: 2,
         }),
@@ -262,6 +288,7 @@ describe("R28-07 Type 2 Patient Core handoff adapter", () => {
           id: "hba1c",
           key: "observation:hba1c:%:blood",
           value: 8.1,
+          unit: "%",
           observedAt: "2026-09-01T09:00:00.000Z",
           revision: 3,
         }),
