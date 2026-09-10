@@ -43,8 +43,8 @@ export async function readPatientLongitudinalModel(
       sourceVersion: generatedAt,
       metrics: options.metrics,
     }),
-    readPatientCoreAllergies(context, patientId),
-    readPatientCoreProblems(context, patientId),
+    readPatientCoreAllergies(context, patientId, { metrics: options.metrics }),
+    readPatientCoreProblems(context, patientId, { metrics: options.metrics }),
   ]);
 
   const currentSnapshot = snapshots[0];
