@@ -11,6 +11,8 @@
 
 ## 1. Why this inventory exists
 
+> **Status clarification — 2026-09-10:** this inventory preserves the B1 baseline identified above. Statements such as "not yet implemented", candidate B2 contracts, and the concluding "B2 next" describe that historical baseline. B2/B3 contracts and projections, C1 foundations and R28-02 through R28-07 have since landed. The [current execution crosswalk](../ROADMAP_STATUS_CROSSWALK_2026-09-09.md) supersedes those status statements: R28-08 is next; R28-09 acceptance and separate environment activation remain open. The accepted runtime/architecture boundaries in this inventory still apply.
+
 The canonical GLYMIZE roadmap now places the longitudinal patient record and shared Patient Clinical Core ahead of new specialty expansion.
 
 Before implementing that core, this document establishes:

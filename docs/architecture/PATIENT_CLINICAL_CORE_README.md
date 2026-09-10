@@ -8,6 +8,12 @@ The B1 architecture work is intentionally split into small focused documents:
 
 Canonical product direction remains in [`../ROADMAP.md`](../ROADMAP.md), and all implementation must comply with [`MODULARITY_AND_CHANGEABILITY_POLICY.md`](MODULARITY_AND_CHANGEABILITY_POLICY.md).
 
-## B1 conclusion
+## Current execution status — 2026-09-10
 
-Proceed to **B2 — Canonical Patient Core contracts and read projection** only after this B1 PR validates and the post-merge Codebase Memory snapshot is verified against the resulting `main` SHA.
+B1, B2 and B3 foundations are implemented. C1 workspace implementation and R28-02 through R28-07 hardening are complete in repository history. **R28-08 is the next canonical engineering task**; observed physician workflow and clinic-ready acceptance remain R28-09.
+
+Use the [Roadmap Status Crosswalk](../ROADMAP_STATUS_CROSSWALK_2026-09-09.md) for current gaps and the mapping of historical B4–B8 aliases. Do not restart B2 from the historical inventory below. Migration `0019` and Allergy/Problem rollout remain separate environment work; repository completion is not deployment evidence.
+
+## Historical B1 conclusion
+
+At the B1 baseline, B2 was the next task after B1 validation and the post-merge graph snapshot. The inventory retains that historical sequence; subsequent completion is recorded in the current crosswalk.

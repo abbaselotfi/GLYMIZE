@@ -62,13 +62,13 @@ The B1 inventory used local continuation labels before the canonical phase names
 
 Future commits and documents should use the canonical D1/E1/F1/G names, with the old B4–B8 labels shown only as aliases when linking historical B1 material.
 
-## Documentation drift queued for factual sync
+## Historical documentation status — synchronized 2026-09-10
 
 The following documents are retained as historical baselines and intentionally preserve statements from before merged B2/B3/C1/R28 work:
 
-- `architecture/PATIENT_CLINICAL_CORE_README.md` still says B2 is next;
-- the upper historical sections of `architecture/PATIENT_CLINICAL_CORE_GAP_MATRIX.md` retain pre-implementation B1 gaps, while its appended R28-06 audit records current authority status;
-- `architecture/PATIENT_CLINICAL_CORE_INVENTORY.md` labels candidate B2 contracts as not implemented;
-- `CURRENT_STATE.md` is synchronized through the R28-07 completion state.
+- `architecture/PATIENT_CLINICAL_CORE_README.md` now identifies R28-08 as next and labels the B1 conclusion historical;
+- `architecture/PATIENT_CLINICAL_CORE_GAP_MATRIX.md` explicitly separates its historical B1 table from current execution status and its appended R28-06 audit;
+- `architecture/PATIENT_CLINICAL_CORE_INVENTORY.md` explicitly dates its candidate-contract and "B2 next" statements to the original B1 baseline;
+- `CURRENT_STATE.md` is synchronized through R28-07, including the regenerated 180-test-file and 24-migration inventory.
 
 Update historical descriptions only as factual status sync. Preserve their recorded baselines and accepted runtime boundaries; do not rewrite applied migrations, infer remote deployment, or close R28 acceptance work from file existence.

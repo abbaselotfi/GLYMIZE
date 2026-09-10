@@ -7,6 +7,8 @@
 
 This matrix is intentionally separate from the narrative inventory so B2+ tasks can update individual gaps without turning the core architecture document into a change log.
 
+> **Status clarification — 2026-09-10:** the table and B2 blocking subset below preserve the named B1 baseline, not the current implementation backlog. B2/B3 and C1 foundations plus R28-02 through R28-07 are implemented. Use the [current execution crosswalk](../ROADMAP_STATUS_CROSSWALK_2026-09-09.md) for remaining engineering, physician acceptance and environment activation. The appended R28-06 audit retains its own dated evidence. R28-08 is the next engineering task; broader unexposed families remain partial.
+
 | ID | Capability | Existing asset/state | Gap | Target closure | Dependency / guardrail |
 | --- | --- | --- | --- | --- | --- |
 | PCC-G01 | Longitudinal patient persistence | Worker/D1 Patient Record v2 | no canonical Adult Medicine read/context contract | B2 | preserve Worker/D1 authority; no second store |

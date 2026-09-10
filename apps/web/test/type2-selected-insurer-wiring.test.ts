@@ -14,7 +14,7 @@ const apiSource = fs.readFileSync(
 
 describe("Type 2 selected insurer wiring", () => {
   it("sends the selected insurer with the authoritative consideration request", () => {
-    expect(webSource).toContain("costPreference,\n      routePreference,\n      insuranceProvider,");
+    expect(webSource.replaceAll("\r\n", "\n")).toContain("costPreference,\n      routePreference,\n      insuranceProvider,");
     expect(webSource).toContain('apiFetch("/v1/catalog/type-2/considerations"');
   });
 

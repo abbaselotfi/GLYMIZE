@@ -17,8 +17,8 @@ Run `node scripts/generate-current-state.mjs` from the repository root to reprod
 | Repository fact | Count |
 | --- | ---: |
 | Web App Router entries | 29 (29 pages, 0 route handlers) |
-| Automated test files | 170 (164 JS/TS, 6 Python) |
-| SQL migration files | 23 (18 Worker/D1, 5 PostgreSQL foundation) |
+| Automated test files | 180 (174 JS/TS, 6 Python) |
+| SQL migration files | 24 (19 Worker/D1, 5 PostgreSQL foundation) |
 <!-- current-state:generated:end -->
 
 The counts are file inventory, not a claim that every route or migration is active in production. JS/TS test files include Vitest and Playwright files; Python tests cover the Iran drug-data tooling.
