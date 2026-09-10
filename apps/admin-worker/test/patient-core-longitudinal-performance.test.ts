@@ -66,7 +66,7 @@ describe("R28-05 bounded longitudinal synthetic budgets", () => {
         PATIENT_CORE_DEFAULT_TIMELINE_PAGE_SIZE + 1,
       );
 
-      // Structural initial-read budget after R28-06 Option A:
+      // Structural initial-read budget after R28-06 Option A when rollout is enabled:
       // registry + identifiers + demographics + latest encounter + snapshots +
       // observation count/page + encounter/order timeline candidates + bounded
       // allergy facts/reconciliation + bounded problem facts/reconciliation =

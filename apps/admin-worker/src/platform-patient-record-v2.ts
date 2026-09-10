@@ -8,6 +8,10 @@ import type { PatientRecordV2RouteContext } from "./patient-record-v2/context";
 
 export type { PatientRecordV2RouteContext } from "./patient-record-v2/context";
 
+export interface PatientRecordV2RolloutOptions {
+  patientCoreAllergyProblemAuthorityEnabled?: boolean;
+}
+
 /**
  * Patient Record v2 route facade.
  *
@@ -18,8 +22,16 @@ export type { PatientRecordV2RouteContext } from "./patient-record-v2/context";
 export async function patientRecordV2Route(
   request: Request,
   context: PatientRecordV2RouteContext,
+  rollout: PatientRecordV2RolloutOptions = {},
 ): Promise<Response | null> {
-  const patientCoreResponse = await patientClinicalCoreRoute(request, context);
+  const patientCoreResponse = await patientClinicalCoreRoute(
+    request,
+    context,
+    {
+      allergyProblemAuthorityEnabled:
+        rollout.patientCoreAllergyProblemAuthorityEnabled === true,
+    },
+  );
   if (patientCoreResponse) return patientCoreResponse;
 
   const response = await patientRecordV2CoreRoute(request, context);

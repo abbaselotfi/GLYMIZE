@@ -11,7 +11,8 @@
 		"GITHUB_REPOSITORY": "abbaselotfi/GLYMIZE",
 		"GITHUB_BRANCH": "main",
 		"CATALOG_PATH": "apps/web/public/data/admin-catalog.json",
-		"PATIENT_PORTAL_V1_ENABLED": "false"
+		"PATIENT_PORTAL_V1_ENABLED": "false",
+"PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ENABLED": "false"
 	},
 	"secrets": {
 		"required": [

@@ -97,6 +97,26 @@ beforeEach(() => {
 });
 
 describe("R28-06 Option A authority HTTP boundary", () => {
+  it("keeps authority writes unavailable by default", async () => {
+    const fixture = context();
+    const response = await patientCoreAuthorityRoute(
+      new Request(
+        "https://worker.example/v1/patients/patient-1/patient-core/allergies",
+        {
+          method: "POST",
+          body: JSON.stringify(patientReportedAllergy),
+        },
+      ),
+      fixture.value,
+    );
+
+    expect(response).toBeNull();
+    expect(writeAllergy).not.toHaveBeenCalled();
+    expect(writeProblem).not.toHaveBeenCalled();
+    expect(reconcile).not.toHaveBeenCalled();
+    expect(fixture.audits).toHaveLength(0);
+  });
+
   it("allows an editor to persist an unverified candidate and audits without clinical display text", async () => {
     const fixture = context({
       authorize: (route) => route === "patient_record.clinical_fact.write",
@@ -107,6 +127,7 @@ describe("R28-06 Option A authority HTTP boundary", () => {
         body: JSON.stringify(patientReportedAllergy),
       }),
       fixture.value,
+      true,
     );
 
     expect(response?.status).toBe(201);
@@ -136,6 +157,7 @@ describe("R28-06 Option A authority HTTP boundary", () => {
         }),
       }),
       fixture.value,
+      true,
     );
 
     expect(response?.status).toBe(403);
@@ -162,6 +184,7 @@ describe("R28-06 Option A authority HTTP boundary", () => {
         }),
       }),
       fixture.value,
+      true,
     );
 
     expect(response?.status).toBe(403);
@@ -182,6 +205,7 @@ describe("R28-06 Option A authority HTTP boundary", () => {
         }),
       }),
       fixture.value,
+      true,
     );
 
     expect(response?.status).toBe(422);
@@ -206,6 +230,7 @@ describe("R28-06 Option A authority HTTP boundary", () => {
         }),
       }),
       fixture.value,
+      true,
     );
 
     expect(response?.status).toBe(422);

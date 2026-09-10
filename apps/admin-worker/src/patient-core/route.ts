@@ -50,11 +50,21 @@ function logMetrics(
   );
 }
 
+export interface PatientClinicalCoreRouteOptions {
+  allergyProblemAuthorityEnabled?: boolean;
+}
+
 export async function patientClinicalCoreRoute(
   request: Request,
   context: PatientRecordV2RouteContext,
+  options: PatientClinicalCoreRouteOptions = {},
 ): Promise<Response | null> {
-  const authorityResponse = await patientCoreAuthorityRoute(request, context);
+  const authorityEnabled = options.allergyProblemAuthorityEnabled === true;
+  const authorityResponse = await patientCoreAuthorityRoute(
+    request,
+    context,
+    authorityEnabled,
+  );
   if (authorityResponse) return authorityResponse;
 
   if (request.method !== "GET") return null;
@@ -108,7 +118,10 @@ export async function patientClinicalCoreRoute(
 
   const metrics = new RuntimeReadMetricsCollector();
   try {
-    const model = await readPatientLongitudinalModel(context, patientId, { metrics });
+    const model = await readPatientLongitudinalModel(context, patientId, {
+      metrics,
+      allergyProblemAuthorityEnabled: authorityEnabled,
+    });
     if (!model) return context.respond({ error: "patient_not_found" }, 404);
     logMetrics("summary", metrics, model);
     return context.respond(model);

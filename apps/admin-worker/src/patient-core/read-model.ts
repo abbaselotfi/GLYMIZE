@@ -18,6 +18,7 @@ import { readPatientCoreTimeline } from "./timeline-reader";
 
 export interface PatientLongitudinalReadOptions {
   metrics?: RuntimeReadMetricsCollector;
+  allergyProblemAuthorityEnabled?: boolean;
 }
 
 export async function readPatientLongitudinalModel(
@@ -31,21 +32,32 @@ export async function readPatientLongitudinalModel(
   });
   if (!patient) return null;
 
-  const [snapshots, observations, timeline, allergies, problems] = await Promise.all([
-    readRecentPatientCoreSnapshots(context, patientId, 2, {
-      metrics: options.metrics,
-    }),
-    readPatientCoreObservations(context, patientId, {
-      sourceVersion: generatedAt,
-      metrics: options.metrics,
-    }),
-    readPatientCoreTimeline(context, patientId, {
-      sourceVersion: generatedAt,
-      metrics: options.metrics,
-    }),
-    readPatientCoreAllergies(context, patientId, { metrics: options.metrics }),
-    readPatientCoreProblems(context, patientId, { metrics: options.metrics }),
-  ]);
+  const authorityReads = options.allergyProblemAuthorityEnabled === true
+    ? Promise.all([
+        readPatientCoreAllergies(context, patientId, {
+          metrics: options.metrics,
+        }),
+        readPatientCoreProblems(context, patientId, {
+          metrics: options.metrics,
+        }),
+      ])
+    : Promise.resolve(null);
+
+  const [snapshots, observations, timeline, authorityCollections] =
+    await Promise.all([
+      readRecentPatientCoreSnapshots(context, patientId, 2, {
+        metrics: options.metrics,
+      }),
+      readPatientCoreObservations(context, patientId, {
+        sourceVersion: generatedAt,
+        metrics: options.metrics,
+      }),
+      readPatientCoreTimeline(context, patientId, {
+        sourceVersion: generatedAt,
+        metrics: options.metrics,
+      }),
+      authorityReads,
+    ]);
 
   const currentSnapshot = snapshots[0];
   const baselineSnapshot = snapshots[1];
@@ -56,8 +68,12 @@ export async function readPatientLongitudinalModel(
   const currentContext = {
     ...projectedCurrent,
     generatedAt,
-    allergies,
-    problems,
+    ...(authorityCollections
+      ? {
+          allergies: authorityCollections[0],
+          problems: authorityCollections[1],
+        }
+      : {}),
     observations,
   };
 

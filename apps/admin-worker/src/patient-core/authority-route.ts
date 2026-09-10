@@ -114,12 +114,14 @@ function authorityError(context: PatientRecordV2RouteContext, error: unknown) {
 export async function patientCoreAuthorityRoute(
   request: Request,
   context: PatientRecordV2RouteContext,
+  enabled = false,
 ): Promise<Response | null> {
   if (request.method !== "POST") return null;
   const url = new URL(request.url);
   const factMatch = url.pathname.match(FACT_PATH);
   const reconciliationMatch = url.pathname.match(RECONCILIATION_PATH);
   if (!factMatch && !reconciliationMatch) return null;
+  if (!enabled) return null;
 
   const rawPatientId = (factMatch ?? reconciliationMatch)![1]!;
   const patientId = decodePatientId(rawPatientId);

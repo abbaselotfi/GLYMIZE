@@ -46,7 +46,8 @@ const historicalCore = fs.readFileSync(
 describe("Patient Clinical Core bounded read-model boundary", () => {
   it("routes summary and continuation through the Patient Core facade with the existing read authorization", () => {
     expect(facade).toContain('from "./patient-core/route"');
-    expect(facade).toContain("patientClinicalCoreRoute(request, context)");
+    expect(facade).toContain("patientClinicalCoreRoute(");
+    expect(facade).toContain("allergyProblemAuthorityEnabled:");
     expect(route).toContain("/longitudinal");
     expect(route).toContain("/longitudinal\\/history");
     expect(route).toContain('context.authorize("patient_record.workspace.read")');
