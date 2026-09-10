@@ -483,7 +483,7 @@ export default function Type2ScenariosClient() {
         errorCode={patientCoreHandoff.error}
         locale={locale}
         onConfirm={() => {
-          patientCoreHandoff.confirm(applyPatientCoreHandoff);
+          void patientCoreHandoff.confirm(applyPatientCoreHandoff);
         }}
         onDiscard={patientCoreHandoff.discard}
       />

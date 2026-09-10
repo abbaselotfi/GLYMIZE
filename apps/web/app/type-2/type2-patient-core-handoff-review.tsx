@@ -12,6 +12,7 @@ export type Type2PatientCoreHandoffUiState =
   | "idle"
   | "loading"
   | "ready"
+  | "confirming"
   | "confirmed"
   | "invalid";
 
@@ -79,7 +80,7 @@ export default function Type2PatientCoreHandoffReview({
     ? `/patients/${encodeURIComponent(candidate.scope.patientId)}`
     : "/records";
 
-  if (state === "loading") {
+  if (state === "loading" || state === "confirming") {
     return (
       <section className={styles.panel} data-patient-core-handoff="loading">
         <div className={styles.header}>

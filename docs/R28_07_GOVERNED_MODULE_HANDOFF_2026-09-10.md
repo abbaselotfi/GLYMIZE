@@ -41,3 +41,11 @@ The local exact-head POST Roadmap + Graph Gate passed and preserved the clean wo
 After merge, direct-main validation #136 passed lint, typecheck, clinical/security regression, Worker build, current web build and Playwright critical flows.
 
 Codebase Memory snapshot #63 successfully built and published the canonical exact-main graph snapshot.
+
+## Confirmation lifecycle hardening — 2026-09-10
+
+Follow-up source review found that the original hook validated at initial load but could retain a candidate until a later confirmation without a second authenticated read. The review lifecycle now lives in `apps/web/lib/type2-handoff-review-controller.ts`; the React hook only connects that controller to the runtime client and auth events.
+
+Confirmation re-reads the existing authorized Patient Core endpoint and checks actor/practice identity, the active same-tab patient descriptor and source revisions before applying eligible values. Real actor/practice/active-status changes, discard and unmount invalidate in-flight work, including transports that ignore cancellation; same-actor token or profile refresh events do not discard an otherwise valid review. Concurrent confirmation cannot apply twice. No clinical mapping, rule or persistence authority changes.
+
+Focused behavioral tests in `type2-handoff-review-controller.test.ts` cover these races and server-side permission revocation. Candidate-wide CI and graph evidence remain required for this follow-up; the historical runs above refer to the original R28-07 candidate.

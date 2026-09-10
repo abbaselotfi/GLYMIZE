@@ -69,6 +69,6 @@ The following documents are retained as historical baselines and intentionally p
 - `architecture/PATIENT_CLINICAL_CORE_README.md` now identifies R28-08 as next and labels the B1 conclusion historical;
 - `architecture/PATIENT_CLINICAL_CORE_GAP_MATRIX.md` explicitly separates its historical B1 table from current execution status and its appended R28-06 audit;
 - `architecture/PATIENT_CLINICAL_CORE_INVENTORY.md` explicitly dates its candidate-contract and "B2 next" statements to the original B1 baseline;
-- `CURRENT_STATE.md` is synchronized through R28-07, including the regenerated 180-test-file and 24-migration inventory.
+- `CURRENT_STATE.md` is synchronized through R28-07, including its regenerated repository inventory.
 
 Update historical descriptions only as factual status sync. Preserve their recorded baselines and accepted runtime boundaries; do not rewrite applied migrations, infer remote deployment, or close R28 acceptance work from file existence.

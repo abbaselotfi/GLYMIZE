@@ -28,3 +28,6 @@ GLYMIZE keeps reviewed Type 2 claim-timing policy as a separate authority bounda
 - Adding real payer rules is a later reviewed data task, not part of this boundary implementation.
 - No real insurer API, e-prescription integration, patient-data migration, or production deployment is authorized by this decision.
 - `.codebase-memory/adr.md` is kept as small version-controlled text so Codebase Memory ADR decisions survive fresh canonical snapshot builds; graph binaries remain excluded from normal Git history and are distributed through the private `codebase-memory-latest` Release snapshot.
+# 2026-09-10 — Patient module confirmation lifecycle
+
+Decision: isolate the Type 2 handoff review state machine from React wiring and clinical field mapping. Revalidate actor/practice/patient descriptor and source revisions through the existing authorized read endpoint at confirmation. Cancellation/generation guards suppress obsolete responses and duplicate confirmation. Runtime auth events invalidate active work only when actor identity, practice, or active status changes; same-actor token/profile refreshes retain the review. Worker/D1 and Decision Graph v2 authorities remain unchanged. See `docs/ARCHITECTURE.md` and the R28-07 completion record.

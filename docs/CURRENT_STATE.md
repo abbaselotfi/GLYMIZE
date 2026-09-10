@@ -17,7 +17,7 @@ Run `node scripts/generate-current-state.mjs` from the repository root to reprod
 | Repository fact | Count |
 | --- | ---: |
 | Web App Router entries | 29 (29 pages, 0 route handlers) |
-| Automated test files | 180 (174 JS/TS, 6 Python) |
+| Automated test files | 181 (175 JS/TS, 6 Python) |
 | SQL migration files | 24 (19 Worker/D1, 5 PostgreSQL foundation) |
 <!-- current-state:generated:end -->
 

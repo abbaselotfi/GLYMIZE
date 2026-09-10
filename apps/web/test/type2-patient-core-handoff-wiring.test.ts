@@ -13,15 +13,18 @@ const reviewSource = fs.readFileSync(
   new URL("../app/type-2/type2-patient-core-handoff-review.tsx", import.meta.url),
   "utf8",
 );
+const controllerSource = fs.readFileSync(
+  new URL("../lib/type2-handoff-review-controller.ts", import.meta.url), "utf8",
+);
 
 describe("R28-07 Type 2 Patient Core handoff wiring", () => {
   it("re-reads Patient Core and checks runtime practice plus source revisions before review", () => {
-    expect(hookSource).toContain("getCachedRuntimeUser() ?? await initializeRuntimeSession()");
-    expect(hookSource).toContain("user.practiceId !== intent.scope.practiceId");
+    expect(hookSource).toContain("await initializeRuntimeSession()");
+    expect(controllerSource).toContain("current.practiceId !== intent.scope.practiceId");
     expect(hookSource).toContain("getPatientLongitudinalReadModel(");
     expect(hookSource).toContain("expectedPracticeId: intent.scope.practiceId");
-    expect(hookSource).toContain("type2PatientCoreHandoffMatchesIntent(nextCandidate, intent)");
-    expect(hookSource).toContain("PATIENT_MODULE_HANDOFF_SOURCE_CHANGED");
+    expect(controllerSource).toContain("type2PatientCoreHandoffMatchesIntent(nextCandidate, intent!)");
+    expect(controllerSource).toContain("PATIENT_MODULE_HANDOFF_SOURCE_CHANGED");
   });
 
   it("requires explicit clinician confirmation before eligible Patient Core values touch the Type2 form", () => {
@@ -46,8 +49,8 @@ describe("R28-07 Type 2 Patient Core handoff wiring", () => {
   });
 
   it("clears a failed or discarded descriptor instead of silently applying stale context", () => {
-    expect(hookSource).toContain("clearPatientModuleHandoffIntent()");
-    expect(hookSource).toContain('setState("invalid")');
+    expect(hookSource).toContain("clearIntent: clearPatientModuleHandoffIntent");
+    expect(controllerSource).toContain('state: "invalid"');
     expect(reviewSource).toContain("No clinical value was applied");
     expect(reviewSource).toContain("FAIL CLOSED");
   });

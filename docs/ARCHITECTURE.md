@@ -1,5 +1,9 @@
 # معماری سامانه
 
+## Patient module review lifecycle — 2026-09-10
+
+`apps/web/lib/type2-handoff-review-controller.ts` owns cancellation, active actor/practice/patient binding and confirmation concurrency. `use-type2-patient-core-handoff.ts` connects it to React and runtime auth events. Auth events invalidate an active review only when the actor, practice, or active status changed; a same-actor token/profile refresh preserves the review and still requires the confirmation-time authorized read. Clinical candidate mapping stays in `type2-patient-core-handoff.ts`; authorized reads stay in the existing Patient Core HTTP client. Confirmation performs a second authorized read and source-revision comparison before form application. This adds no patient store, treatment authority or clinical rule.
+
 ## ۱. اهداف و قیود
 
 معماری باید محتوای بالینی را از کد اجرایی جدا کند تا به‌روزرسانی سالانهٔ ADA و EASD، اصلاح فوری یک قانون، و تغییر اطلاعات بازار ایران بدون انتشار مجدد کل نرم‌افزار ممکن باشد. تصمیم‌ها باید قطعی، توضیح‌پذیر، قابل ممیزی و قابل بازسازی باشند. زبان رابط (`fa-IR` راست‌به‌چپ و `en` چپ‌به‌راست) نباید منطق بالینی را تغییر دهد.
