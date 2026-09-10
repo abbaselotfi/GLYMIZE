@@ -70,7 +70,8 @@ type ObservationDefinition = {
     | "masld_mash"
     | "hypoglycemia_risk"
   >;
-  prefixes: string[];
+  canonicalKey: string;
+  acceptedUnits: string[];
   label: string;
   required: boolean;
 };
@@ -78,34 +79,36 @@ type ObservationDefinition = {
 const observationDefinitions: ObservationDefinition[] = [
   {
     key: "current_hba1c",
-    prefixes: ["observation:hba1c:"],
+    canonicalKey: "hba1c",
+    acceptedUnits: ["%"],
     label: "HbA1c",
     required: true,
   },
   {
     key: "egfr",
-    prefixes: ["observation:egfr:"],
+    canonicalKey: "egfr",
+    acceptedUnits: ["ml/min/1.73m2"],
     label: "eGFR",
     required: false,
   },
   {
     key: "creatinine_clearance",
-    prefixes: [
-      "observation:creatinine_clearance:",
-      "observation:crcl:",
-    ],
+    canonicalKey: "creatinine_clearance",
+    acceptedUnits: ["ml/min"],
     label: "Creatinine clearance",
     required: false,
   },
   {
     key: "uacr",
-    prefixes: ["observation:uacr:"],
+    canonicalKey: "uacr",
+    acceptedUnits: ["mg/g"],
     label: "UACR",
     required: false,
   },
   {
     key: "potassium",
-    prefixes: ["observation:potassium:"],
+    canonicalKey: "potassium",
+    acceptedUnits: ["mmol/l"],
     label: "Potassium",
     required: false,
   },
@@ -200,12 +203,25 @@ function numericValue(value: unknown) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function normalizedUnit(unit: string | undefined) {
+  return (unit ?? "")
+    .trim()
+    .toLocaleLowerCase()
+    .replaceAll("²", "2")
+    .replaceAll(" ", "");
+}
+
+function observationCanonicalKey(observation: PatientObservationView) {
+  const match = /^observation:([^:]+):/.exec(observation.factKey);
+  return match?.[1]?.trim().toLocaleLowerCase();
+}
+
 function newestObservation(
   observations: readonly PatientObservationView[],
-  prefixes: readonly string[],
+  canonicalKey: string,
 ) {
   return observations
-    .filter((item) => prefixes.some((prefix) => item.factKey.startsWith(prefix)))
+    .filter((item) => observationCanonicalKey(item) === canonicalKey)
     .sort((left, right) => {
       const observed = right.observedAt.localeCompare(left.observedAt);
       if (observed !== 0) return observed;
@@ -220,8 +236,9 @@ function newestObservation(
 function candidateStatus(
   fact: PatientCoreFactBase,
   numeric: number | undefined,
+  unitAccepted: boolean,
 ): Type2PatientCoreCandidateStatus {
-  if (numeric === undefined) return "invalid_value";
+  if (numeric === undefined || !unitAccepted) return "invalid_value";
   if (fact.meta.verification !== "verified") return "unverified";
   if (fact.meta.freshness === "stale") return "stale";
   if (!sourceRevision(fact)) return "source_revision_missing";
@@ -259,14 +276,17 @@ export function buildType2PatientCoreHandoffCandidate(
   for (const definition of observationDefinitions) {
     const observation = newestObservation(
       model.context.observations.items,
-      definition.prefixes,
+      definition.canonicalKey,
     );
     if (!observation) continue;
     assertScope(observation, scope);
     collectRevision(revisions, observation);
     const numeric = numericValue(observation.value);
     const source = sourceRevision(observation);
-    const status = candidateStatus(observation, numeric);
+    const unitAccepted = definition.acceptedUnits.includes(
+      normalizedUnit(observation.unit),
+    );
+    const status = candidateStatus(observation, numeric, unitAccepted);
     const field: Type2PatientCoreCandidateField = {
       key: definition.key,
       label: definition.label,
