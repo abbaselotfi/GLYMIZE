@@ -1,5 +1,6 @@
 import { RuntimeReadMetricsCollector } from "../runtime-read-metrics";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
+import { patientCoreAuthorityRoute } from "./authority-route";
 import {
   readPatientLongitudinalHistoryPage,
   readPatientLongitudinalModel,
@@ -53,6 +54,9 @@ export async function patientClinicalCoreRoute(
   request: Request,
   context: PatientRecordV2RouteContext,
 ): Promise<Response | null> {
+  const authorityResponse = await patientCoreAuthorityRoute(request, context);
+  if (authorityResponse) return authorityResponse;
+
   if (request.method !== "GET") return null;
   const url = new URL(request.url);
   const summaryMatch = url.pathname.match(LONGITUDINAL_PATH);
