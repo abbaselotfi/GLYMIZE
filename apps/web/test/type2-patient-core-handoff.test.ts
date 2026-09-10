@@ -118,7 +118,7 @@ function model(input: {
       schemaVersion: 1,
       scope,
       generatedAt: "2026-09-10T04:00:00.000Z",
-      comparisonStatus: "no_baseline",
+      comparisonStatus: "unavailable",
       coverage: [],
       changes: [],
     },
