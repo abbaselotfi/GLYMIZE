@@ -70,7 +70,7 @@ type ObservationDefinition = {
     | "masld_mash"
     | "hypoglycemia_risk"
   >;
-  canonicalKey: string;
+  canonicalKeys: string[];
   acceptedUnits: string[];
   label: string;
   required: boolean;
@@ -79,35 +79,35 @@ type ObservationDefinition = {
 const observationDefinitions: ObservationDefinition[] = [
   {
     key: "current_hba1c",
-    canonicalKey: "hba1c",
+    canonicalKeys: ["hba1c"],
     acceptedUnits: ["%"],
     label: "HbA1c",
     required: true,
   },
   {
     key: "egfr",
-    canonicalKey: "egfr",
+    canonicalKeys: ["egfr"],
     acceptedUnits: ["ml/min/1.73m2"],
     label: "eGFR",
     required: false,
   },
   {
     key: "creatinine_clearance",
-    canonicalKey: "creatinine_clearance",
+    canonicalKeys: ["creatinine_clearance", "crcl"],
     acceptedUnits: ["ml/min"],
     label: "Creatinine clearance",
     required: false,
   },
   {
     key: "uacr",
-    canonicalKey: "uacr",
+    canonicalKeys: ["uacr"],
     acceptedUnits: ["mg/g"],
     label: "UACR",
     required: false,
   },
   {
     key: "potassium",
-    canonicalKey: "potassium",
+    canonicalKeys: ["potassium"],
     acceptedUnits: ["mmol/l"],
     label: "Potassium",
     required: false,
@@ -218,10 +218,13 @@ function observationCanonicalKey(observation: PatientObservationView) {
 
 function newestObservation(
   observations: readonly PatientObservationView[],
-  canonicalKey: string,
+  canonicalKeys: readonly string[],
 ) {
   return observations
-    .filter((item) => observationCanonicalKey(item) === canonicalKey)
+    .filter((item) => {
+      const key = observationCanonicalKey(item);
+      return key !== undefined && canonicalKeys.includes(key);
+    })
     .sort((left, right) => {
       const observed = right.observedAt.localeCompare(left.observedAt);
       if (observed !== 0) return observed;
@@ -276,7 +279,7 @@ export function buildType2PatientCoreHandoffCandidate(
   for (const definition of observationDefinitions) {
     const observation = newestObservation(
       model.context.observations.items,
-      definition.canonicalKey,
+      definition.canonicalKeys,
     );
     if (!observation) continue;
     assertScope(observation, scope);
