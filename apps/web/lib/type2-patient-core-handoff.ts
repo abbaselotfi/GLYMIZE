@@ -3,7 +3,6 @@ import type {
   PatientModuleSourceRevision,
 } from "@glymize/contracts/clinical-modules";
 import type {
-  PatientClinicalContextView,
   PatientCoreFactBase,
   PatientCoreFreshness,
   PatientLongitudinalReadModel,
@@ -183,10 +182,12 @@ function sourceRevision(
   fact: PatientCoreFactBase,
 ): PatientModuleSourceRevision | undefined {
   const revision = fact.meta.revision;
-  if (!Number.isInteger(revision) || (revision ?? -1) < 0) return undefined;
+  if (typeof revision !== "number" || !Number.isInteger(revision) || revision < 0) {
+    return undefined;
+  }
   return {
     factId: fact.factId,
-    revision: revision!,
+    revision,
     verification: fact.meta.verification,
     freshness: fact.meta.freshness,
   };
