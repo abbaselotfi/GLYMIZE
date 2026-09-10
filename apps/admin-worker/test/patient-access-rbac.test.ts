@@ -21,6 +21,10 @@ const records = fs.readFileSync(
   new URL("../src/platform-patient-record-v2-core.ts", import.meta.url),
   "utf8",
 );
+const patientCoreAuthority = fs.readFileSync(
+  new URL("../src/patient-core/authority-route.ts", import.meta.url),
+  "utf8",
+);
 const portal = fs.readFileSync(
   new URL("../src/platform-patient-portal.ts", import.meta.url),
   "utf8",
@@ -106,6 +110,9 @@ describe("patient-adjacent Worker RBAC", () => {
       "patient_record.encounter.read": "editor",
       "patient_record.encounter.revise": "editor",
       "patient_record.encounter.approve": "approver",
+      "patient_record.clinical_fact.write": "editor",
+      "patient_record.clinical_fact.verify": "approver",
+      "patient_record.clinical_fact.reconcile": "approver",
       "portal_clinician.submission.read": "editor",
       "portal_clinician.submission.manage": "editor",
       "portal_clinician.submission.approve": "approver",
@@ -117,8 +124,9 @@ describe("patient-adjacent Worker RBAC", () => {
       "patient_identity.legacy_link.approve": "approver",
     });
 
+    const routeSources = `${platform}\n${records}\n${patientCoreAuthority}\n${portal}\n${identity}`;
     for (const route of Object.keys(PATIENT_ROUTE_REQUIREMENTS)) {
-      expect(`${platform}\n${records}\n${portal}\n${identity}`).toContain(route);
+      expect(routeSources).toContain(route);
     }
   });
 
@@ -200,6 +208,7 @@ describe("patient-adjacent Worker RBAC", () => {
     expect(admin).toContain('url.pathname === "/catalog/publish"');
     expect(admin).toContain('session.source !== "github"');
     expect(records).not.toContain("ALLOWED_GITHUB_LOGIN");
+    expect(patientCoreAuthority).not.toContain("ALLOWED_GITHUB_LOGIN");
     expect(portal).not.toContain("ALLOWED_GITHUB_LOGIN");
     expect(identity).not.toContain("ALLOWED_GITHUB_LOGIN");
   });
