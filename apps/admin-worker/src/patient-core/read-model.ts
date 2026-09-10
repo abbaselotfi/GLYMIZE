@@ -5,6 +5,10 @@ import type {
 } from "@glymize/contracts/patient-core";
 import type { RuntimeReadMetricsCollector } from "../runtime-read-metrics";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
+import {
+  readPatientCoreAllergies,
+  readPatientCoreProblems,
+} from "./authority-repository";
 import { comparePatientContexts, unavailablePatientChangeSet } from "./change-detection";
 import { readPatientCoreObservations } from "./observation-reader";
 import { emptyPatientContext, projectSnapshotContext } from "./projection";
@@ -27,7 +31,7 @@ export async function readPatientLongitudinalModel(
   });
   if (!patient) return null;
 
-  const [snapshots, observations, timeline] = await Promise.all([
+  const [snapshots, observations, timeline, allergies, problems] = await Promise.all([
     readRecentPatientCoreSnapshots(context, patientId, 2, {
       metrics: options.metrics,
     }),
@@ -39,6 +43,8 @@ export async function readPatientLongitudinalModel(
       sourceVersion: generatedAt,
       metrics: options.metrics,
     }),
+    readPatientCoreAllergies(context, patientId),
+    readPatientCoreProblems(context, patientId),
   ]);
 
   const currentSnapshot = snapshots[0];
@@ -50,6 +56,8 @@ export async function readPatientLongitudinalModel(
   const currentContext = {
     ...projectedCurrent,
     generatedAt,
+    allergies,
+    problems,
     observations,
   };
 
@@ -69,11 +77,15 @@ export async function readPatientLongitudinalModel(
             context.user.practiceId,
             baselineSnapshot,
           ),
-          projectSnapshotContext(
-            patient,
-            context.user.practiceId,
-            currentSnapshot,
-          ),
+          {
+            ...projectSnapshotContext(
+              patient,
+              context.user.practiceId,
+              currentSnapshot,
+            ),
+            allergies,
+            problems,
+          },
           {
             encounterId: baselineSnapshot.encounterId,
             effectiveAt: baselineSnapshot.encounterAt,
