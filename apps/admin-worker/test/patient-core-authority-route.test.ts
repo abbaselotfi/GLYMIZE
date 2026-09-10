@@ -191,6 +191,31 @@ describe("R28-06 Option A authority HTTP boundary", () => {
     expect(reconcile).not.toHaveBeenCalled();
   });
 
+  it("treats generic recordId as opaque provenance, not an internal encounter reference", async () => {
+    const fixture = context({ encounterMatches: false });
+
+    const response = await patientCoreAuthorityRoute(
+      new Request(
+        "https://worker.example/v1/patients/patient-1/patient-core/allergies",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            ...patientReportedAllergy,
+            source: {
+              ...patientReportedAllergy.source,
+              recordId: "encounter-other-patient",
+            },
+          }),
+        },
+      ),
+      fixture.value,
+      true,
+    );
+
+    expect(response?.status).toBe(201);
+    expect(writeAllergy).toHaveBeenCalledOnce();
+  });
+
   it("rejects an encounter provenance reference outside the patient scope", async () => {
     const fixture = context({ encounterMatches: false });
     const response = await patientCoreAuthorityRoute(

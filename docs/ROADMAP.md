@@ -1391,6 +1391,7 @@ Priorities here are review priorities: **P0** = resolve before extending the aff
 - **Proposal:** extend the existing gap matrix with one authoritative source/write owner per allergy, problem, medication-reconciliation and cross-cutting-context family. Add adapters to existing sources where possible; introduce a new authority only through a separately reviewed gap/ADR. Carry source time, verification and reconciliation state into eligibility consumers.
 - **Acceptance:** “not collected,” “known absent,” “unverified,” “stale” and “current” remain distinct. Freshness policies are reviewed and versioned per clinical use; no universal invented cutoff. Pre-visit medication state, physician decision and signed order remain separate. Missing safety facts never become implicit clearance.
 - **Dependency:** R28-03; the existing D1 audit. Reuse current safety registries instead of creating a parallel medication engine.
+- **Owner decision — 2026-09-10:** Option A is accepted: dedicated bounded longitudinal Allergy/Problem authority remains inside the existing Worker/D1 Patient Record v2 runtime of record. Owner acceptance does not authorize migration `0019` application, rollout-flag activation or external deployment. R28-06 closure requires exact-head engineering/Graph/CI gates and merge of the accepted implementation.
 
 #### R28-07 — Turn the module launcher into a governed context handoff
 

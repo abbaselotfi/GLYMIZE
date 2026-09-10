@@ -101,6 +101,58 @@ describe("R28-06 Option A authority input validation", () => {
     })).toThrow("PATIENT_CORE_AUTHORITY_INPUT_INVALID");
   });
 
+  it("accepts ISO clinical dates and RFC3339 instants", () => {
+    expect(parsePatientCoreAllergyMutation(allergy({
+      onsetAt: "2026-09-10",
+      effectiveAt: "2026-09-10T08:00:00.000Z",
+    }))).toMatchObject({
+      onsetAt: "2026-09-10",
+      effectiveAt: "2026-09-10T08:00:00.000Z",
+    });
+
+    expect(parsePatientCoreProblemMutation(problem({
+      status: "resolved",
+      resolvedAt: "2026-09-10T11:30:00+03:30",
+    })).resolvedAt).toBe("2026-09-10T11:30:00+03:30");
+
+    expect(parsePatientCoreCollectionReconciliation({
+      schemaVersion: 1,
+      family: "allergy",
+      completeness: "complete",
+      source,
+      reconciledAt: "2026-09-10T11:30:00+03:30",
+    }).reconciledAt).toBe("2026-09-10T11:30:00+03:30");
+  });
+
+  it("rejects malformed or impossible clinical times", () => {
+    for (const invalid of [
+      "2026-02-30",
+      "09/10/2026",
+      "2026-09-10T08:00:00",
+      "2026-09-10T24:00:00Z",
+    ]) {
+      expect(() =>
+        parsePatientCoreAllergyMutation(allergy({ onsetAt: invalid })),
+      ).toThrow("PATIENT_CORE_AUTHORITY_INPUT_INVALID");
+    }
+
+    for (const invalid of [
+      "2026-09-10",
+      "2026-02-30T08:00:00Z",
+      "2026-09-10T08:00:00+24:00",
+    ]) {
+      expect(() =>
+        parsePatientCoreCollectionReconciliation({
+          schemaVersion: 1,
+          family: "allergy",
+          completeness: "complete",
+          source,
+          reconciledAt: invalid,
+        }),
+      ).toThrow("PATIENT_CORE_AUTHORITY_INPUT_INVALID");
+    }
+  });
+
   it("bounds reactions and related-problem references", () => {
     expect(() => parsePatientCoreAllergyMutation(allergy({
       reactions: Array.from({ length: 21 }, () => ({ displayName: "rash" })),

@@ -38,7 +38,15 @@ export interface PatientCoreScope {
 export interface PatientCoreSourceReference {
   sourceType: PatientCoreSourceType;
   recordType: string;
+  /**
+   * Opaque source-system identifier used only for provenance correlation.
+   * It does not establish GLYMIZE authorization or patient/practice scope.
+   */
   recordId: string;
+  /**
+   * Optional GLYMIZE Patient Record v2 encounter reference. Authority write
+   * routes validate it against the active practice/patient scope.
+   */
   encounterId?: string;
   documentId?: string;
 }

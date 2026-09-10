@@ -1,19 +1,20 @@
 # ADR — Canonical Allergy and Problem Authority
 
-**Status:** Proposed — owner decision required; **not accepted**  
-**Date:** 2026-09-09  
-**Roadmap:** §28.3 `R28-06 — Close Patient Core authority gaps before shared medication safety consumes them`  
+**Status:** Accepted — Option A; implementation closure and rollout remain separately gated
+**Date:** 2026-09-09
+**Owner decision recorded:** 2026-09-10
+**Roadmap:** §28.3 `R28-06 — Close Patient Core authority gaps before shared medication safety consumes them`
 **Related:** `PATIENT_CLINICAL_CORE_MIGRATION_ADR.md`, `PATIENT_CLINICAL_CORE_GAP_MATRIX.md`, `R28_06_PATIENT_CORE_AUTHORITY_READINESS_2026-09-09.md`
 
 ---
 
-## Decision requested
+## Decision
 
 R28-06 has reached the point where the repository can preserve medication/context/observation readiness without changing authority, but it cannot safely make allergies or problems authoritative because the current Patient Record v2 contract and D1 schema expose no canonical write owner for either family.
 
-This ADR is decision-ready documentation only. It does **not** authorize a migration, write endpoint, backfill, feature activation, clinical rule, freshness cutoff, or production deployment.
+**Owner decision — 2026-09-10: Accept Option A.**
 
-The owner must explicitly accept one authority direction before implementation continues past this gate.
+The accepted direction is dedicated, bounded longitudinal Allergy/Problem authority inside the existing Worker/D1 Patient Record v2 runtime of record. This acceptance authorizes the architecture and its reviewed implementation path; it does **not** authorize applying migration `0019_patient_core_allergy_problem_authority.sql`, enabling the rollout flag, backfilling data, changing clinical rules/freshness policy, or deploying to RC/production.
 
 ---
 
@@ -170,7 +171,7 @@ This would create a second patient source of truth or prematurely move runtime a
 
 **Recommend Option A:** keep one runtime of record and add dedicated, typed longitudinal Allergy and Problem persistence responsibilities inside Worker/D1 Patient Record v2, with explicit collection reconciliation/coverage semantics.
 
-This recommendation is **not accepted merely by being written here**. The owner must explicitly approve it before any migration or write path is implemented.
+The owner explicitly accepted Option A on 2026-09-10. The implementation remains subject to exact-head engineering/graph gates and merge; migration application, runtime activation and external deployment remain separate gates.
 
 If approved, the follow-on implementation should remain modular and staged:
 
@@ -204,12 +205,12 @@ An implementation following Option A must prove at least:
 
 ---
 
-## Owner decision gate
+## Owner decision record
 
-Choose one of the following explicitly before implementation:
-
-- **Accept Option A** — authorize detailed contract/schema design and a separately reviewed migration/write-path implementation under existing Worker/D1 Patient Record v2 authority;
-- **Choose Option B** — authorize snapshot-based authority design instead, with explicit collection reconciliation semantics;
-- **Request another option/revision** — keep R28-06 gated and make no authority change.
-
-Until that decision is recorded, R28-06 remains partially complete and R28-07 must not treat allergy/problem authority as satisfied.
+- **Decision:** Accept Option A.
+- **Recorded:** 2026-09-10.
+- **Selected authority:** dedicated, typed longitudinal Allergy/Problem persistence inside the existing Worker/D1 Patient Record v2 authority, with explicit collection reconciliation and append-only revisions.
+- **Provenance boundary:** generic `recordId` is opaque source metadata and does not establish authorization/scope; an explicit `encounterId` is the internal Patient Record v2 link and is checked against active practice/patient scope before mutation.
+- **Temporal boundary:** clinical effective/onset/resolution values accept validated ISO dates or RFC3339 instants; collection `reconciledAt` is a validated RFC3339 instant. Server `created_at` remains the ordering authority used to detect fact changes after reconciliation.
+- **Not authorized by this decision:** applying migration `0019_patient_core_allergy_problem_authority.sql`, enabling `PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ENABLED`, synthetic backfill, RC/production deployment, or any clinical-rule/freshness-policy change.
+- **Completion gate:** R28-06 becomes complete only after the accepted implementation passes exact-head repository/Graph/CI gates and is merged. R28-07 must not consume the authority dependency before that closure.

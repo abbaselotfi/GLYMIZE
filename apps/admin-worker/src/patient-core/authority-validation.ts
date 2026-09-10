@@ -31,6 +31,95 @@ function optionalText(value: unknown, max = MAX_TEXT) {
   return value === undefined || text(value, max);
 }
 
+const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const RFC3339_INSTANT_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/;
+
+function validCalendarDate(year: number, month: number, day: number) {
+  if (month < 1 || month > 12 || day < 1) return false;
+
+  const leapYear =
+    year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+
+  const days = [
+    31,
+    leapYear ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+
+  return day <= days[month - 1]!;
+}
+
+function validIsoDate(value: unknown) {
+  if (typeof value !== "string" || value.length > 80) return false;
+
+  const match = value.match(ISO_DATE_PATTERN);
+  if (!match) return false;
+
+  return validCalendarDate(
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+  );
+}
+
+function validRfc3339Instant(value: unknown) {
+  if (typeof value !== "string" || value.length > 80) return false;
+
+  const match = value.match(RFC3339_INSTANT_PATTERN);
+  if (!match) return false;
+
+  if (
+    !validCalendarDate(
+      Number(match[1]),
+      Number(match[2]),
+      Number(match[3]),
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    Number(match[4]) > 23 ||
+    Number(match[5]) > 59 ||
+    Number(match[6]) > 59
+  ) {
+    return false;
+  }
+
+  const offset = match[8]!;
+
+  if (offset !== "Z") {
+    const offsetHour = Number(offset.slice(1, 3));
+    const offsetMinute = Number(offset.slice(4, 6));
+
+    if (offsetHour > 23 || offsetMinute > 59) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function optionalClinicalDateTime(value: unknown) {
+  return value === undefined ||
+    validIsoDate(value) ||
+    validRfc3339Instant(value);
+}
+
+function optionalRfc3339Instant(value: unknown) {
+  return value === undefined || validRfc3339Instant(value);
+}
+
 function oneOf<const T extends readonly string[]>(values: T, value: unknown): value is T[number] {
   return typeof value === "string" && (values as readonly string[]).includes(value);
 }
@@ -82,7 +171,7 @@ function validMutationBase(value: Record<string, unknown>) {
     text(value.displayName) &&
     validVerification(value) &&
     validSource(value.source) &&
-    optionalText(value.effectiveAt, 80);
+    optionalClinicalDateTime(value.effectiveAt);
 }
 
 function validReaction(value: unknown) {
@@ -103,8 +192,8 @@ export function parsePatientCoreAllergyMutation(
     !oneOf(patientAllergyCriticalities, value.criticality) ||
     !optionalText(value.substanceKey, MAX_ID) ||
     !optionalText(value.medicationId, MAX_ID) ||
-    !optionalText(value.onsetAt, 80) ||
-    !optionalText(value.resolvedAt, 80) ||
+    !optionalClinicalDateTime(value.onsetAt) ||
+    !optionalClinicalDateTime(value.resolvedAt) ||
     (value.reactions !== undefined &&
       (!Array.isArray(value.reactions) ||
         value.reactions.length > MAX_REACTIONS ||
@@ -131,8 +220,8 @@ export function parsePatientCoreProblemMutation(
   if (
     !oneOf(patientProblemStatuses, value.status) ||
     (value.coding !== undefined && !validCoding(value.coding)) ||
-    !optionalText(value.onsetAt, 80) ||
-    !optionalText(value.resolvedAt, 80) ||
+    !optionalClinicalDateTime(value.onsetAt) ||
+    !optionalClinicalDateTime(value.resolvedAt) ||
     (value.relatedProblemFactIds !== undefined &&
       (!Array.isArray(value.relatedProblemFactIds) ||
         value.relatedProblemFactIds.length > MAX_RELATED_PROBLEMS ||
@@ -154,7 +243,7 @@ export function parsePatientCoreCollectionReconciliation(
     !oneOf(patientCoreAuthorityReconciliationStates, value.completeness) ||
     !validExpectedRevision(value.expectedRevision) ||
     !validSource(value.source) ||
-    !optionalText(value.reconciledAt, 80)
+    !optionalRfc3339Instant(value.reconciledAt)
   ) {
     throw new Error("PATIENT_CORE_AUTHORITY_INPUT_INVALID");
   }
