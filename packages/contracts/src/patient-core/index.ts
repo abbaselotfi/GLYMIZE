@@ -1,4 +1,5 @@
 export * from "./allergies.js";
+export * from "./authority.js";
 export * from "./changes.js";
 export * from "./contexts.js";
 export * from "./coverage.js";
