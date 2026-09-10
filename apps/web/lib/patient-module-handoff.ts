@@ -55,12 +55,13 @@ function parseSourceRevision(value: unknown): PatientModuleSourceRevision | null
 export function patientModuleSourceRevisionFingerprint(
   revisions: readonly PatientModuleSourceRevision[],
 ) {
-  return revisions
+  const fingerprint = revisions
     .map((item) =>
       `${item.factId}@${item.revision}:${item.verification}:${item.freshness}`,
     )
     .sort((left, right) => left.localeCompare(right))
     .join("|");
+  return fingerprint || "none";
 }
 
 export function createPatientModuleHandoffIntent(input: {
