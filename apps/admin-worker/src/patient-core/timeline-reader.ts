@@ -2,7 +2,7 @@ import type {
   PatientCoreCollection,
   PatientCoreEventView,
 } from "@glymize/contracts/patient-core";
-import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
+import type { PatientRecordV2ReadContext } from "../patient-record-v2/context";
 import {
   measureRuntimeReadQuery,
   type RuntimeReadMetricsCollector,
@@ -44,7 +44,7 @@ function encounterCursorSql(position: PatientCoreTimelineCursorPosition | undefi
 }
 
 export async function readPatientCoreTimeline(
-  context: PatientRecordV2RouteContext,
+  context: PatientRecordV2ReadContext,
   patientId: string,
   options: PatientCoreTimelineReadOptions = {},
 ): Promise<PatientCoreCollection<PatientCoreEventView>> {

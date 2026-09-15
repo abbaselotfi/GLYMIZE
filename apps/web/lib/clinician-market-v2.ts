@@ -219,7 +219,8 @@ type PresentationRuntimeData = {
 };
 
 let marketIndex: ClinicianMarketIndex | null = null;
-let marketLoadPromise: Promise<void> | null = null;
+let validatedMarket: ClinicianMarketIndex | null = null;
+let marketLoadPromise: Promise<ClinicianMarketIndex> | null = null;
 let productById = new Map<string, MarketProduct>();
 let summaryByPresentationId = new Map<string, MarketSummary>();
 let insuranceByGenericCode = new Map<string, InsuranceCoverage[]>();
@@ -691,8 +692,9 @@ export function parseClinicianMarketDeploymentMeta(
   };
 }
 
-export async function loadClinicianMarketV2() {
-  if (marketIndex || typeof window === "undefined") return;
+export async function loadValidatedClinicianMarketIndex(): Promise<Readonly<ClinicianMarketIndex>> {
+  if (validatedMarket) return validatedMarket;
+  if (typeof window === "undefined") throw new Error("clinician_market_v2_browser_required");
   if (marketLoadPromise) return marketLoadPromise;
   marketLoadPromise = (async () => {
     let runtimeVersion = "v2";
@@ -763,10 +765,25 @@ export async function loadClinicianMarketV2() {
       throw new Error("clinician_market_v2_insulin_package_gate_failed");
     }
 
-    marketIndex = parsed;
-    buildIndexes();
-  })();
+    validatedMarket = parsed;
+    return parsed;
+  })().finally(() => { marketLoadPromise = null; });
   return marketLoadPromise;
+}
+
+export async function loadClinicianMarketV2() {
+  if (marketIndex || typeof window === "undefined") return;
+  const parsed = await loadValidatedClinicianMarketIndex();
+  // Another waiter may already have built these synchronous projections.
+  if (marketIndex) return;
+  marketIndex = parsed;
+  try {
+    buildIndexes();
+  } catch (error) {
+    marketIndex = null;
+    buildIndexes(); // Clear every partially constructed derived cache.
+    throw error;
+  }
 }
 
 export function clinicianMarketPresentations(): ReferenceMedicationPresentation[] {

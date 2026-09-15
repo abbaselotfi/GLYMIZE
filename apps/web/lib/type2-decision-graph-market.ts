@@ -1,5 +1,5 @@
 import type { InsuranceCoverage, IranMarketDrugProduct } from "@glymize/contracts";
-import { withBasePath } from "./base-path";
+import { loadValidatedClinicianMarketIndex } from "./clinician-market-v2";
 import { initializeTrustedType2ClaimPolicyRuntime } from "./type2-claim-policy-runtime";
 
 type RawProduct = {
@@ -102,11 +102,50 @@ function packagePresentation(product: RawProduct) {
   return undefined;
 }
 
+function object(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function validProductShape(value: unknown): value is RawProduct {
+  if (!object(value) || typeof value.productId !== "string" || !value.productId.trim()
+    || !object(value.generic) || typeof value.generic.canonicalName !== "string" || !value.generic.canonicalName.trim()
+    || !object(value.product) || !object(value.market)) return false;
+  const strings = (record: Record<string, unknown>, keys: string[]) => keys.every(
+    (key) => record[key] == null || typeof record[key] === "string",
+  );
+  if (!strings(value.generic, ["genericRegistryCode"])
+    || !strings(value.product, ["brandName", "brandRegistryCode", "ircCode", "gtin", "atcCode", "dosageFormNormalized", "route", "strengthRaw", "packageRaw", "unitType", "manufacturerName", "licenseStatus", "availabilityStatus"])
+    || (value.product.unitsPerPackage != null && (typeof value.product.unitsPerPackage !== "number" || !Number.isFinite(value.product.unitsPerPackage)))) return false;
+  return value.price == null || (object(value.price) && strings(value.price, ["rawCurrency", "observedAt"]));
+}
+
+function hasSourceUrl(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch { return false; }
+}
+
+// Source verification and downstream approved-master matching are different contracts.
+// Counts are bounded categories, never raw source/patient payloads or per-row logs.
+export function projectType2DecisionGraphMarket(index: RawMarketIndex) {
+  const rejected = { malformed: 0, verification: 0, unavailable: 0, observation: 0, source: 0 };
+  const accepted = (index.products ?? []).filter((product: unknown): product is RawProduct => {
+    if (!validProductShape(product)) { rejected.malformed++; return false; }
+    if (product.market.nfiVerificationStatus !== "nfi_verified") { rejected.verification++; return false; }
+    if (product.product.availabilityStatus === "unavailable") { rejected.unavailable++; return false; }
+    if (typeof product.market.observedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(product.market.observedAt)
+      || !Number.isFinite(Date.parse(product.market.observedAt))) { rejected.observation++; return false; }
+    if (!hasSourceUrl(product.market.nfiUrl)) { rejected.source++; return false; }
+    return true;
+  });
+  return { products: mapMarket({ ...index, products: accepted }), rejected };
+}
+
 function mapMarket(index: RawMarketIndex): IranMarketDrugProduct[] {
   const coverageByCode = insuranceByGenericCode(index.insuranceRecords ?? []);
   return (index.products ?? [])
-    .filter((product) => product.market.nfiVerificationStatus === "verified")
-    .filter((product) => product.product.availabilityStatus !== "unavailable")
     .map((product) => {
       const genericCode = product.generic.genericRegistryCode ?? undefined;
       const amountToman = product.price?.amountToman;
@@ -127,7 +166,7 @@ function mapMarket(index: RawMarketIndex): IranMarketDrugProduct[] {
         route: product.product.route ?? undefined,
         packagePresentation: packagePresentation(product),
         manufacturerName: product.product.manufacturerName ?? undefined,
-        licenseStatus: product.product.licenseStatus ?? "Active",
+        licenseStatus: product.product.licenseStatus ?? undefined,
         price: typeof amountToman === "number" && Number.isFinite(amountToman) && amountToman >= 0
           ? {
               amountToman,
@@ -135,14 +174,14 @@ function mapMarket(index: RawMarketIndex): IranMarketDrugProduct[] {
               sourceAmount: typeof product.price?.rawAmount === "number" ? product.price.rawAmount : undefined,
               sourceCurrency,
               effectiveAt: product.price?.observedAt ?? product.market.observedAt ?? undefined,
-              sourceUrl: product.market.nfiUrl ?? "https://irc.fda.gov.ir/nfi",
+              sourceUrl: product.market.nfiUrl!,
               sourceReference: product.productId,
             }
           : undefined,
         insuranceCoverages: genericCode ? coverageByCode.get(genericCode) ?? [] : [],
-        sourceUrl: product.market.nfiUrl ?? "https://irc.fda.gov.ir/nfi",
+        sourceUrl: product.market.nfiUrl!,
         sourceReference: product.productId,
-        observedAt: product.market.observedAt ?? new Date().toISOString(),
+        observedAt: product.market.observedAt!,
         matchConfidence: 100,
       } satisfies IranMarketDrugProduct;
     });
@@ -157,13 +196,8 @@ export async function loadType2DecisionGraphMarketProducts() {
   if (cache) return cache;
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
-    const response = await fetch(withBasePath("/data/glymize-clinician-market-v2.json"), { cache: "force-cache" });
-    if (!response.ok) throw new Error(`decision_graph_market_unavailable:${response.status}`);
-    const index = (await response.json()) as RawMarketIndex;
-    if (index.schemaVersion !== 2 || index.kind !== "glymize_clinician_market_index") {
-      throw new Error("decision_graph_market_schema_mismatch");
-    }
-    cache = mapMarket(index);
+    const index = await loadValidatedClinicianMarketIndex();
+    cache = projectType2DecisionGraphMarket(index).products;
     return cache;
   })().finally(() => {
     loadPromise = undefined;

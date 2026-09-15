@@ -1,5 +1,59 @@
 # معماری سامانه
 
+## Rollout evidence is not release acceptance — R29-05-A (2026-09-15)
+
+[Local matrix](R29_05_A_LOCAL_ROLLOUT_2026-09-15.md) exercises eight independent read-flag configurations and full rollback for both history families through the facade. The runner binds results to scoped source hashes and leaves provider/CPU/rows/deployment evidence unknown. No runtime or flag default changes. Remote individual/in-flight/version rollback and RC budgets remain separate gates. Git publication also respects the no-deploy boundary: Pages currently previews all branches, so an authorized Push is withheld until safe branch settings and other triggers are verified.
+
+## Narrow history lookup — R29-04-E (local implementation, 2026-09-14)
+
+[E implementation](R29_04_E_HISTORY_SCOPE_2026-09-14.md) follows D: a shared measured registry query retains exact scoped binds and first-query ownership. Only exact authorized history GET selects it under independent default-OFF PATIENT_CORE_HISTORY_SCOPE_LOOKUP_ENABLED. Full summary still reads/decrypts its own fields; opt-in history does not inherit unused companion failures. No auth/authority/write redirection, global cache or migration. Local successful fixtures use three instead of six queries; RC performance and activation remain pending.
+
+## History existence boundary — R29-04-D (review, 2026-09-14)
+
+[D contract](architecture/HISTORY_SCOPE_LOOKUP_R29_04_D.md) permits an independent default-OFF history-only scoped registry lookup in the next implementation. Existence is not authorization: original primary session/role gates and requested-payload AAD failures remain strict. Unused identifiers/demographics/latest-encounter dependencies may be removed from history, with an explicit change to unrelated-error propagation; full summary remains unchanged. Preserve archive/cursor precedence and request-owned read-session routing. No runtime implementation in this review.
+
+## Index tradeoffs — R29-04-C (2026-09-14)
+
+[Local experiments](R29_04_C_INDEX_TRADEOFFS_2026-09-14.md) measure individual observation/encounter/fulfillment/link index candidates and preserve SQL outputs. Encounter and fulfillment tie-break sorts improve independently; outer order sort/count work remains. B-tree allocation and compiled INSERT structure are not production costs. Candidates remain outside migrations; authority/runtime behavior is unchanged. Next bounded High review resolves the unused-summary history gate before any implementation.
+
+## Query/index evidence — R29-04-B (2026-09-14)
+
+[Local assessment](R29_04_B_QUERY_PLANS_2026-09-14.md) isolates hypothetical index experiments in in-memory SQLite and extracts actual source SQL. Observation ordering has a measured index candidate, but counts and correlated revision lookup remain. No runtime/schema contract changes: preserve tenant/sourceVersion/tie-break/exclusion semantics. Planner output is not rows_read or Worker CPU; require write/storage and RC evidence before choosing a migration. Timeline assessment remains separate.
+
+## Request-owned clinical keys — R29-04-A (2026-09-14)
+
+[Local implementation and evidence](R29_04_A_REQUEST_KEYS_2026-09-14.md): exact authorized history GET owns a lazy decrypt-only CryptoKey closure behind independent, default-OFF PATIENT_CORE_CRYPTO_KEY_REUSE_ENABLED. Readers accept a narrow optional decrypt capability; legacy callers retain original derivation. AAD, SQL, auth/write boundaries and decryption counts stay unchanged. No global key/PHI cache or plaintext memoization. Failed derivation is bounded to its request; future requests create fresh keys. Local tests pass; Worker CPU and RC activation remain pending. Next Medium packet assesses query plans/rows before selecting index changes.
+
+## D1 bookmark transport — R29-03-B, 2026-09-14 (conditional design)
+
+The [B review](architecture/D1_BOOKMARK_TRANSPORT_R29_03_B.md) resolves the future session-envelope boundary: exact primary-verified sessionId and expiry, trusted runtime audience/database epoch, authenticated encryption under a distinct purpose, and per-attempt/per-view generation ownership. Refresh/admin fallback and overlapping or ambiguous writes must invalidate chains; no client assertion grants authority. **Transport implementation is deferred pending a useful reviewed consumer**; current history always starts fresh-primary, so no header/crypto/lifecycle layer is added merely to round-trip an unused bookmark. A and real replica/RC gates remain unchanged and OFF. This is not full R29-03 completion; next is R29-04-A request-owned CryptoKey work.
+
+## D1 read consistency — R29-03-A, 2026-09-13 (local implementation)
+
+The [R29-03 design](architecture/D1_READ_CONSISTENCY_R29_03.md) has a [local A implementation](R29_03_A_READ_SESSIONS_2026-09-13.md): exact history GET can opt into a request-owned fresh-primary session and serialized fixed-reader capability. Only explicit string `true` enables `PATIENT_CORE_D1_READ_SESSIONS_ENABLED`; all configuration stays OFF. Original auth/revocation/authorization and write/authority contexts are retained. Cursor validation precedes session creation; the registry lookup anchors it. Failed queries stop queued execution, and final bookmark bytes are not transported/logged. Metric-v2 distinguishes requested routing from observed/unknown provider metadata. Sessions are not snapshots, permissions, revisions or offline grants. B cross-request transport and workerd/RC benefit/activation gates remain pending. Code rollback returns to direct-primary independently of provider shutdown; no new database or paid cache service.
+
+## Offline reference authority — R30-02-D1/D2, 2026-09-13 (local implementation)
+
+The [D design](architecture/OFFLINE_REFERENCE_AUTHORITY_R30_02_D.md) is implemented locally in the [D1/D2 packet](R30_02_REFERENCE_LITE_2026-09-12.md). Source `nfi_verified` is now recognized; downstream identity-match `verified` and clinical/payer gates are unchanged. Missing evidence cannot manufacture a current observation or active license. Exact `/offline/` is a standalone reference-only surface, with an explicit sanitized projection, bounded read-only loader and in-memory search; it does not call draft-preferred catalog, auth or engine singletons. The opt-in/default-off reference-lite profile replaces the experimental raw-data/four-clinical-shell bundle. Cache activation removes this scope's legacy/experimental caches, retains only a reference-lite predecessor, and preserves unrelated caches/drafts. Explicit download readiness checks profile and cache completeness. Hashes do not authorize treatment. Offline calculation and protected records retain separate policy/grant gates; no production activation.
+
+## Static/offline compatibility — 2026-09-12 (local infrastructure implemented)
+
+The [R30-02 design](architecture/STATIC_OFFLINE_COMPATIBILITY_R30_02.md) is implemented locally for A–C infrastructure: static clinician patient entry with exact query ID and narrow legacy bridge, document navigation for opt-in P0 targets, and validated market transport shared by presentation and Type 2 projections. [A–C evidence](R30_02_STATIC_COMPATIBILITY_2026-09-12.md) is historical; D1/D2 above subsequently corrects its zero-output status mismatch and narrows the offline profile. Clinical session restoration and catalog draft isolation remain offline-calculation gates. Activation stays OFF.
+
+## Public offline cache — R29-02/R30-02, 2026-09-11
+
+An opt-in static build generates content-addressed P0 snapshots and an embedded manifest for a separate Service Worker template. Browser persistent storage holds verified current/previous bundles; a bounded public-response memory cache runs in the browser worker; Pages CDN headers apply only to immutable snapshot URLs. No new Cloudflare Worker cache or PHI/auth persistence is introduced. Default build behavior preserves the legacy PWA, now with scoped cache cleanup. Actual full-app activation remains gated on dynamic patient-route export, public RSC navigation and market-loader compatibility, documented in [the cache packet](R29_02_R30_02_PUBLIC_OFFLINE_CACHE_2026-09-11.md).
+
+## Read-cost observability — R29-01, 2026-09-11
+
+`runtime-read-metrics.ts` emits additive metric version 2: returned rows (legacy `rowCount` alias), known D1 scan rows with coverage, query/decryption attempt and failure counts. Collectors remain request-local and preserve operation results/errors. Missing D1 envelopes are unknown rather than zero; summed operation wall durations are not CPU. The local benchmark runs synthetic query counts with real crypto and records process CPU separately. [R29-01 evidence and remaining RC gate](R29_01_RESOURCE_BASELINE_2026-09-11.md) prevents these local timings from being treated as deployed Worker measurements. No clinical or authorization authority changes.
+
+## Accepted local-first direction — 2026-09-11 (not yet implemented)
+
+Canonical `ROADMAP.md` sections 29–30 schedule resource budgets, classified caches and consistent D1 reads alongside PWA Offline-Lite and enrolled Windows Tauri Offline-Full. The planned desktop runs the existing deterministic clinical engine with encrypted practice/device-scoped SQLite, protected device keys and explicit offline grants. A repository adapter and revisioned outbox/inbox synchronize with Worker/D1; conflicts cannot silently overwrite clinical authority. GitHub/Cloudflare reachability must not be required to start the installed app or execute accepted local workflows. Online-only services expose unavailable/queued states. Current Worker/D1 behavior remains authoritative until the corresponding implementation gates pass.
+
+The [R30-01 architecture companion](architecture/LOCAL_FIRST_R30_01.md) now defines the design: committed server facts and pending local drafts are separate; canonical sign-off and slot reservation remain online initially; patient-account and clinician authorization stay separate. Device commands enforce scoped offline grants and existing route-equivalent permissions. Protected access cannot promise indefinite offline use with immediate remote revocation; R30-07 owns the explicit outage/renewal policy. P0/P1/P2/P3 data classes constrain all R29 caches; sync revisions, Patient Core traversal watermarks and D1 bookmarks remain distinct. No runtime capability is activated by this design.
+
 ## Patient module review lifecycle — 2026-09-10
 
 `apps/web/lib/type2-handoff-review-controller.ts` owns cancellation, active actor/practice/patient binding and confirmation concurrency. `use-type2-patient-core-handoff.ts` connects it to React and runtime auth events. Auth events invalidate an active review only when the actor, practice, or active status changed; a same-actor token/profile refresh preserves the review and still requires the confirmation-time authorized read. Clinical candidate mapping stays in `type2-patient-core-handoff.ts`; authorized reads stay in the existing Patient Core HTTP client. Confirmation performs a second authorized read and source-revision comparison before form application. This adds no patient store, treatment authority or clinical rule.

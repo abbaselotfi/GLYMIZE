@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "../components/public-document-link";
 import PathwayMedicationCards from "../components/pathway-medication-cards";
 import ClinicalDomainMedications from "../components/clinical-domain-medications";
 

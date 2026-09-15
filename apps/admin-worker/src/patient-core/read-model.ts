@@ -4,7 +4,7 @@ import type {
   PatientLongitudinalReadModel,
 } from "@glymize/contracts/patient-core";
 import type { RuntimeReadMetricsCollector } from "../runtime-read-metrics";
-import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
+import type { PatientRecordV2ReadContext, PatientRecordV2RouteContext } from "../patient-record-v2/context";
 import {
   readPatientCoreAllergies,
   readPatientCoreProblems,
@@ -12,13 +12,17 @@ import {
 import { comparePatientContexts, unavailablePatientChangeSet } from "./change-detection";
 import { readPatientCoreObservations } from "./observation-reader";
 import { emptyPatientContext, projectSnapshotContext } from "./projection";
-import { readPatientCoreSummary } from "./patient-summary-reader";
+import { readPatientCoreRegistry, readPatientCoreSummary } from "./patient-summary-reader";
 import { readRecentPatientCoreSnapshots } from "./snapshot-reader";
 import { readPatientCoreTimeline } from "./timeline-reader";
 
 export interface PatientLongitudinalReadOptions {
   metrics?: RuntimeReadMetricsCollector;
   allergyProblemAuthorityEnabled?: boolean;
+}
+
+export interface PatientLongitudinalHistoryReadOptions extends PatientLongitudinalReadOptions {
+  historyScopeLookupEnabled?: boolean;
 }
 
 export async function readPatientLongitudinalModel(
@@ -126,13 +130,15 @@ export async function readPatientLongitudinalModel(
 }
 
 export async function readPatientLongitudinalHistoryPage(
-  context: PatientRecordV2RouteContext,
+  context: PatientRecordV2ReadContext,
   patientId: string,
   family: PatientLongitudinalHistoryFamily,
   cursor: string,
-  options: PatientLongitudinalReadOptions = {},
+  options: PatientLongitudinalHistoryReadOptions = {},
 ): Promise<PatientLongitudinalHistoryPage | null> {
-  const patient = await readPatientCoreSummary(context, patientId, {
+  // D contract: opt-in history no longer depends on discarded summary fields or their failures.
+  const lookup = options.historyScopeLookupEnabled === true ? readPatientCoreRegistry : readPatientCoreSummary;
+  const patient = await lookup(context, patientId, {
     metrics: options.metrics,
   });
   if (!patient) return null;

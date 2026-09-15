@@ -5,13 +5,13 @@ import type {
   PatientCoreVerification,
   PatientObservationView,
 } from "@glymize/contracts/patient-core";
-import { decryptClinicalPayload } from "../runtime-security";
+import { decryptPatientCorePayload } from "./decryption";
 import {
   measureRuntimeReadDecryption,
   measureRuntimeReadQuery,
   type RuntimeReadMetricsCollector,
 } from "../runtime-read-metrics";
-import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
+import type { PatientRecordV2ReadContext } from "../patient-record-v2/context";
 import { patientObservationAad } from "./aad";
 import {
   decodePatientObservationCursor,
@@ -105,7 +105,7 @@ function boundedByteBudget(requested: number | undefined) {
 }
 
 export async function readPatientCoreObservations(
-  context: PatientRecordV2RouteContext,
+  context: PatientRecordV2ReadContext,
   patientId: string,
   options: PatientCoreObservationReadOptions = {},
 ): Promise<PatientCoreCollection<PatientObservationView>> {
@@ -193,13 +193,13 @@ export async function readPatientCoreObservations(
   for (const row of rows.results) {
     const payload = await measureRuntimeReadDecryption(
       options.metrics,
-      () => decryptClinicalPayload<Record<string, unknown>>(
+      () => decryptPatientCorePayload<Record<string, unknown>>(
+        context,
         {
           ciphertext: row.payload_ciphertext,
           iv: row.payload_iv,
           authTag: row.payload_auth_tag,
         },
-        context.clinicalSecret,
         patientObservationAad(context.user.practiceId, row.id),
       ),
     );

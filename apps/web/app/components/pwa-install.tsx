@@ -9,11 +9,22 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function PwaInstall() {
-  const [installPrompt, setInstallPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [availableVersion, setAvailableVersion] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    const update = () => setOffline(!navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -23,13 +34,16 @@ export default function PwaInstall() {
     const minimumCheckIntervalMs = 60_000;
 
     const checkBuildVersion = async (force = false) => {
+      if (!navigator.onLine) return;
       const now = Date.now();
       if (!force && now - lastVersionCheckAt < minimumCheckIntervalMs) return;
       lastVersionCheckAt = now;
       try {
-        const response = await fetch(`${withBasePath("/version.json")}?t=${now}`, { cache: "no-store" });
+        const response = await fetch(`${withBasePath("/version.json")}?t=${now}`, {
+          cache: "no-store",
+        });
         if (!response.ok) return;
-        const payload = await response.json() as { version?: string };
+        const payload = (await response.json()) as { version?: string };
         const version = String(payload.version ?? "").trim();
         if (!version) return;
         const previous = window.localStorage.getItem(buildVersionKey);
@@ -43,10 +57,7 @@ export default function PwaInstall() {
     const watchInstallingWorker = (worker: ServiceWorker | null) => {
       if (!worker) return;
       worker.addEventListener("statechange", () => {
-        if (
-          worker.state === "installed" &&
-          navigator.serviceWorker.controller
-        ) {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
           setWaitingWorker(worker);
         }
       });
@@ -60,12 +71,21 @@ export default function PwaInstall() {
       const resetLocalPwa = async () => {
         if ("serviceWorker" in navigator) {
           const registrations = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(registrations.map((item) => item.unregister()));
+          const scope = new URL(withBasePath("/"), window.location.origin).href;
+          await Promise.all(
+            registrations.filter((item) => item.scope === scope).map((item) => item.unregister()),
+          );
         }
 
         if ("caches" in window) {
           const keys = await caches.keys();
-          await Promise.all(keys.map((key) => caches.delete(key)));
+          const scope = new URL(withBasePath("/"), window.location.origin).href;
+          const prefixes = [`glymize-offline:${scope}:`, `glymize-pwa:${scope}:`];
+          await Promise.all(
+            keys
+              .filter((key) => prefixes.some((prefix) => key.startsWith(prefix)))
+              .map((key) => caches.delete(key)),
+          );
         }
 
         const resetKey = "glymize-local-pwa-reset-v2";
@@ -87,20 +107,25 @@ export default function PwaInstall() {
         })
         .then((registered) => {
           registration = registered;
-          if (
-            registered.waiting &&
-            navigator.serviceWorker.controller
-          ) {
+          if (registered.waiting && navigator.serviceWorker.controller) {
             setWaitingWorker(registered.waiting);
           }
           registered.addEventListener("updatefound", () =>
             watchInstallingWorker(registered.installing),
           );
           interval = setInterval(
-            () => { void registered.update(); void checkBuildVersion(true); },
+            () => {
+              if (navigator.onLine) {
+                void registered.update().catch(() => {});
+                void checkBuildVersion(true);
+              }
+            },
             5 * 60 * 1000,
           );
           void checkBuildVersion(true);
+        })
+        .catch(() => {
+          /* Failed install preserves the active bundle. */
         });
     }
 
@@ -114,15 +139,16 @@ export default function PwaInstall() {
 
     const installedHandler = () => setInstalled(true);
     const visibilityHandler = () => {
-      if (document.visibilityState === "visible") {
-        void registration?.update();
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        void registration?.update().catch(() => {});
         void checkBuildVersion();
       }
     };
 
     let reloading = false;
+    const hadController = Boolean(navigator.serviceWorker?.controller);
     const controllerHandler = () => {
-      if (localDevelopment || reloading) return;
+      if (localDevelopment || reloading || !hadController) return;
       reloading = true;
       window.location.reload();
     };
@@ -130,22 +156,25 @@ export default function PwaInstall() {
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", installedHandler, { once: true });
     document.addEventListener("visibilitychange", visibilityHandler);
-    navigator.serviceWorker?.addEventListener(
-      "controllerchange",
-      controllerHandler,
-    );
+    navigator.serviceWorker?.addEventListener("controllerchange", controllerHandler);
 
     return () => {
       if (interval) clearInterval(interval);
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", installedHandler);
       document.removeEventListener("visibilitychange", visibilityHandler);
-      navigator.serviceWorker?.removeEventListener(
-        "controllerchange",
-        controllerHandler,
-      );
+      navigator.serviceWorker?.removeEventListener("controllerchange", controllerHandler);
     };
   }, []);
+
+  if (offline) {
+    return (
+      <span className="install-status" role="status">
+        اتصال قطع است؛ فقط محتوای ذخیره‌شده ممکن است در دسترس باشد. پرونده بیمار و خدمات آنلاین در
+        دسترس نیستند.
+      </span>
+    );
+  }
 
   if (waitingWorker) {
     return (
@@ -154,12 +183,7 @@ export default function PwaInstall() {
           <b>نسخهٔ جدید GLYMIZE آماده است</b>
           <small>داده‌ها و تنظیمات تازه دریافت می‌شوند.</small>
         </span>
-        <button
-          onClick={() =>
-            waitingWorker.postMessage({ type: "SKIP_WAITING" })
-          }
-          type="button"
-        >
+        <button onClick={() => waitingWorker.postMessage({ type: "SKIP_WAITING" })} type="button">
           به‌روزرسانی
         </button>
       </div>
@@ -167,10 +191,28 @@ export default function PwaInstall() {
   }
 
   if (availableVersion) {
+    if (navigator.serviceWorker?.controller) {
+      return (
+        <span className="install-status" role="status">
+          نسخه تازه شناسایی شد؛ پس از دریافت کامل، گزینه به‌روزرسانی نمایش داده می‌شود.
+        </span>
+      );
+    }
     return (
       <div className="update-toast" role="status">
-        <span><b>نسخهٔ جدید GLYMIZE آماده است</b><small>رابط و داده‌های نسخهٔ تازه آمادهٔ بارگذاری هستند.</small></span>
-        <button onClick={() => { window.localStorage.setItem("glymize-build-version-v1", availableVersion); window.location.reload(); }} type="button">دریافت نسخه</button>
+        <span>
+          <b>نسخهٔ جدید GLYMIZE آماده است</b>
+          <small>رابط و داده‌های نسخهٔ تازه آمادهٔ بارگذاری هستند.</small>
+        </span>
+        <button
+          onClick={() => {
+            window.localStorage.setItem("glymize-build-version-v1", availableVersion);
+            window.location.reload();
+          }}
+          type="button"
+        >
+          دریافت نسخه
+        </button>
       </div>
     );
   }

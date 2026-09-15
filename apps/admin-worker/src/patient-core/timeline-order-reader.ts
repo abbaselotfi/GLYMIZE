@@ -4,8 +4,8 @@ import type {
 } from "@glymize/contracts";
 import type { PatientCoreEventView } from "@glymize/contracts/patient-core";
 import { patientFinalOrderAad } from "../patient-record-v2/orders";
-import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
-import { decryptClinicalPayload } from "../runtime-security";
+import type { PatientRecordV2ReadContext } from "../patient-record-v2/context";
+import { decryptPatientCorePayload } from "./decryption";
 import {
   measureRuntimeReadDecryption,
   measureRuntimeReadQuery,
@@ -82,7 +82,7 @@ function cursorSql(position: PatientCoreTimelineCursorPosition | undefined) {
  * replace the current Workspace order authority.
  */
 export async function readPatientCoreTimelineOrders(
-  context: PatientRecordV2RouteContext,
+  context: PatientRecordV2ReadContext,
   patientId: string,
   options: PatientCoreTimelineOrderReadOptions,
 ): Promise<PatientCoreEventView[]> {
@@ -144,13 +144,13 @@ export async function readPatientCoreTimelineOrders(
   for (const row of rows.results) {
     const payload = await measureRuntimeReadDecryption(
       options.metrics,
-      () => decryptClinicalPayload<Record<string, unknown>>(
+      () => decryptPatientCorePayload<Record<string, unknown>>(
+        context,
         {
           ciphertext: row.payload_ciphertext,
           iv: row.payload_iv,
           authTag: row.payload_auth_tag,
         },
-        context.clinicalSecret,
         patientFinalOrderAad(context.user.practiceId, row.order_id),
       ),
     );

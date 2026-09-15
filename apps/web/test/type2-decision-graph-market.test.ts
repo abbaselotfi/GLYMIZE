@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadType2DecisionGraphMarketProducts } from "../lib/type2-decision-graph-market";
+import { loadValidatedClinicianMarketIndex } from "../lib/clinician-market-v2";
+
+vi.mock("../lib/clinician-market-v2", () => ({ loadValidatedClinicianMarketIndex: vi.fn() }));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -30,7 +33,7 @@ describe("Decision Graph Iranian market provenance", () => {
             availabilityStatus: "active",
           },
           market: {
-            nfiVerificationStatus: "verified",
+            nfiVerificationStatus: "nfi_verified",
             nfiUrl: "https://irc.fda.gov.ir/nfi/source-product",
             observedAt: "2026-08-08T00:00:00.000Z",
           },
@@ -63,15 +66,8 @@ describe("Decision Graph Iranian market provenance", () => {
       ],
     };
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(marketIndex), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-      ),
-    );
+    // Projection-only fixture. The shared transport/validation is tested separately.
+    vi.mocked(loadValidatedClinicianMarketIndex).mockResolvedValue(marketIndex as never);
 
     const [product] = await loadType2DecisionGraphMarketProducts();
 

@@ -10,6 +10,9 @@ export type { PatientRecordV2RouteContext } from "./patient-record-v2/context";
 
 export interface PatientRecordV2RolloutOptions {
   patientCoreAllergyProblemAuthorityEnabled?: boolean;
+  patientCoreD1ReadSessionsEnabled?: boolean;
+  patientCoreCryptoKeyReuseEnabled?: boolean;
+  patientCoreHistoryScopeLookupEnabled?: boolean;
 }
 
 /**
@@ -28,6 +31,9 @@ export async function patientRecordV2Route(
     request,
     context,
     {
+      d1ReadSessionsEnabled: rollout.patientCoreD1ReadSessionsEnabled === true,
+      cryptoKeyReuseEnabled: rollout.patientCoreCryptoKeyReuseEnabled === true,
+      historyScopeLookupEnabled: rollout.patientCoreHistoryScopeLookupEnabled === true,
       allergyProblemAuthorityEnabled:
         rollout.patientCoreAllergyProblemAuthorityEnabled === true,
     },

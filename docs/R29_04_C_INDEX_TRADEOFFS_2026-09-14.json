@@ -1,0 +1,980 @@
+{
+  "timeline": {
+    "kind": "local-sqlite-timeline-index-assessment",
+    "node": "v24.18.0",
+    "sqlite": "3.53.1",
+    "schemaSha256": "0c09de0dd4baab9d25c1b897f3a44fd5a2fb6978a2220f4e106214aa21eaa271",
+    "sourceSha256": {
+      "../src/patient-core/timeline-reader.ts": "237a66375cb25a86011ebf33660819e12bca5856d6f7c068ca420e3e57ea31df",
+      "../src/patient-core/timeline-order-reader.ts": "8df3ccfd18d7043131f2ba1349a123db7e14d182e14e00373f5f4148e94fbc10"
+    },
+    "syntheticRows": {
+      "encounters": 360,
+      "plans": 360,
+      "orders": 360,
+      "fulfillment": 1440,
+      "links": 1440
+    },
+    "experiments": [
+      {
+        "name": "encounters",
+        "ddl": "CREATE INDEX r29_candidate_encounters ON patient_encounters(practice_id,patient_id,encounter_at DESC,('encounter:' || id) ASC)",
+        "storage": {
+          "bytes": 28672,
+          "cells": 360,
+          "pages": 7
+        },
+        "insertIdxInsertOpcodes": {
+          "baseline": 15,
+          "candidate": 16
+        },
+        "rolledBackSyntheticInsert": true,
+        "evidence": [
+          {
+            "name": "first-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX r29_candidate_encounters (practice_id=? AND patient_id=?)"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "first-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "encounter-tie-encounters",
+            "baselinePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX r29_candidate_encounters (practice_id=? AND patient_id=?)"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "encounter-tie-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "order-tie-encounters",
+            "baselinePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX r29_candidate_encounters (practice_id=? AND patient_id=?)"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "order-tie-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "older-source-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX r29_candidate_encounters (practice_id=? AND patient_id=?)"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "older-source-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "wrong-practice-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX r29_candidate_encounters (practice_id=? AND patient_id=?)"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "wrong-practice-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "before-created-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX r29_candidate_encounters (practice_id=? AND patient_id=?)"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "before-created-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          }
+        ]
+      },
+      {
+        "name": "fulfillment",
+        "ddl": "CREATE INDEX r29_candidate_fulfillment ON patient_order_fulfillment_events(practice_id,order_id,created_at DESC,id DESC)",
+        "storage": {
+          "bytes": 86016,
+          "cells": 1440,
+          "pages": 21
+        },
+        "insertIdxInsertOpcodes": {
+          "baseline": 12,
+          "candidate": 13
+        },
+        "rolledBackSyntheticInsert": true,
+        "evidence": [
+          {
+            "name": "first-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "first-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX r29_candidate_fulfillment (practice_id=? AND order_id=? AND created_at<?)",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "encounter-tie-encounters",
+            "baselinePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "candidatePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "encounter-tie-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX r29_candidate_fulfillment (practice_id=? AND order_id=? AND created_at<?)",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "order-tie-encounters",
+            "baselinePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "candidatePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "order-tie-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX r29_candidate_fulfillment (practice_id=? AND order_id=? AND created_at<?)",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "older-source-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "older-source-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX r29_candidate_fulfillment (practice_id=? AND order_id=? AND created_at<?)",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "wrong-practice-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "wrong-practice-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX r29_candidate_fulfillment (practice_id=? AND order_id=? AND created_at<?)",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "before-created-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "before-created-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX r29_candidate_fulfillment (practice_id=? AND order_id=? AND created_at<?)",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          }
+        ]
+      },
+      {
+        "name": "links",
+        "ddl": "CREATE INDEX r29_candidate_links ON patient_investigation_result_links(order_id,linked_at)",
+        "storage": {
+          "bytes": 57344,
+          "cells": 1440,
+          "pages": 14
+        },
+        "insertIdxInsertOpcodes": {
+          "baseline": 2,
+          "candidate": 3
+        },
+        "rolledBackSyntheticInsert": true,
+        "evidence": [
+          {
+            "name": "first-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "first-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING COVERING INDEX r29_candidate_links (order_id=? AND linked_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "encounter-tie-encounters",
+            "baselinePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "candidatePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "encounter-tie-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING COVERING INDEX r29_candidate_links (order_id=? AND linked_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "order-tie-encounters",
+            "baselinePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "candidatePlan": [
+              "MULTI-INDEX OR",
+              "INDEX 1",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at<?)",
+              "INDEX 2",
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=? AND encounter_at=?)",
+              "USE TEMP B-TREE FOR ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "order-tie-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING COVERING INDEX r29_candidate_links (order_id=? AND linked_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "older-source-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "older-source-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING COVERING INDEX r29_candidate_links (order_id=? AND linked_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 41,
+            "rowsEqual": true
+          },
+          {
+            "name": "wrong-practice-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "wrong-practice-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING COVERING INDEX r29_candidate_links (order_id=? AND linked_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "before-created-encounters",
+            "baselinePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH patient_encounters USING INDEX patient_encounters_patient_time_idx (patient_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          },
+          {
+            "name": "before-created-orders",
+            "baselinePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING INDEX sqlite_autoindex_patient_investigation_result_links_1 (order_id=?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "candidatePlan": [
+              "SEARCH p USING INDEX patient_final_plans_patient_signed_idx (patient_id=? AND signed_at>? AND signed_at<?)",
+              "SEARCH o USING INDEX patient_final_orders_plan_idx (plan_id=?)",
+              "CORRELATED SCALAR SUBQUERY 1",
+              "SEARCH f USING INDEX patient_order_fulfillment_order_time_idx (order_id=? AND created_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY",
+              "CORRELATED SCALAR SUBQUERY 2",
+              "SEARCH l USING COVERING INDEX r29_candidate_links (order_id=? AND linked_at<?)",
+              "USE TEMP B-TREE FOR LAST TERM OF ORDER BY"
+            ],
+            "returnedRows": 0,
+            "rowsEqual": true
+          }
+        ]
+      }
+    ],
+    "d1RowsRead": null,
+    "d1RowsWritten": null,
+    "workerCpuMs": null,
+    "remoteRequests": 0
+  },
+  "observation": {
+    "kind": "local-sqlite-observation-plan-assessment",
+    "node": "v24.18.0",
+    "sqlite": "3.53.1",
+    "schemaScope": [
+      "../migrations/0003_longitudinal_patient_records.sql",
+      "../migrations/0004_encounter_snapshot_revisions.sql"
+    ],
+    "schemaSha256": "3bf6f3a6827f080daa88018961e308a30875569b3bb601678978428ae0aad732",
+    "readerSha256": "86962a9981fc2296ddfa25d1231a9047c74e643e4192447306ff221ae4b57427",
+    "syntheticRows": {
+      "observations": 9600,
+      "snapshots": 120,
+      "patients": 3
+    },
+    "candidateSql": "CREATE INDEX r29_candidate_observation_history ON patient_observations(practice_id,patient_id,observed_at DESC,created_at DESC,id DESC)",
+    "evidence": [
+      {
+        "name": "first-count",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "candidatePlan": [
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 1,
+        "counts": {
+          "source_row_count": 1600,
+          "rejected_count": 140,
+          "raw_count": 140,
+          "eligible_count": 1320
+        },
+        "rowsEqual": true,
+        "rowsRead": null
+      },
+      {
+        "name": "first-page",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+          "USE TEMP B-TREE FOR ORDER BY"
+        ],
+        "candidatePlan": [
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 80,
+        "rowsEqual": true,
+        "rowsRead": null
+      },
+      {
+        "name": "deep-count",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "candidatePlan": [
+          "MULTI-INDEX OR",
+          "INDEX 1",
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=? AND observed_at<?)",
+          "INDEX 2",
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=? AND observed_at=? AND created_at<?)",
+          "INDEX 3",
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=? AND observed_at=? AND created_at=? AND id<?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 1,
+        "counts": {
+          "source_row_count": 824,
+          "rejected_count": 72,
+          "raw_count": 72,
+          "eligible_count": 680
+        },
+        "rowsEqual": true,
+        "rowsRead": null
+      },
+      {
+        "name": "deep-page",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+          "USE TEMP B-TREE FOR ORDER BY"
+        ],
+        "candidatePlan": [
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 80,
+        "rowsEqual": true,
+        "rowsRead": null
+      },
+      {
+        "name": "older-source-count",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "candidatePlan": [
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 1,
+        "counts": {
+          "source_row_count": 1600,
+          "rejected_count": 140,
+          "raw_count": 140,
+          "eligible_count": 1320
+        },
+        "rowsEqual": true,
+        "rowsRead": null
+      },
+      {
+        "name": "older-source-page",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+          "USE TEMP B-TREE FOR ORDER BY"
+        ],
+        "candidatePlan": [
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 80,
+        "rowsEqual": true,
+        "rowsRead": null
+      },
+      {
+        "name": "wrong-practice-count",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "candidatePlan": [
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 1,
+        "counts": {
+          "source_row_count": 0,
+          "rejected_count": null,
+          "raw_count": null,
+          "eligible_count": null
+        },
+        "rowsEqual": true,
+        "rowsRead": null
+      },
+      {
+        "name": "wrong-practice-page",
+        "baselinePlan": [
+          "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+          "USE TEMP B-TREE FOR ORDER BY"
+        ],
+        "candidatePlan": [
+          "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+        ],
+        "returnedRows": 0,
+        "rowsEqual": true,
+        "rowsRead": null
+      }
+    ],
+    "candidateStorage": {
+      "bytes": 806912,
+      "cells": 9600,
+      "pages": 197
+    },
+    "compiledInsertIdxInsertOpcodes": {
+      "baseline": 8,
+      "candidate": 9
+    },
+    "rolledBackSyntheticInsert": true,
+    "d1RowsRead": null,
+    "d1RowsWritten": null,
+    "workerCpuMs": null,
+    "remoteRequests": 0
+  }
+}

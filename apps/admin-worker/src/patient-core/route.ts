@@ -1,6 +1,9 @@
 import { RuntimeReadMetricsCollector } from "../runtime-read-metrics";
+import { createClinicalPayloadDecryptor } from "../runtime-security";
 import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
 import { patientCoreAuthorityRoute } from "./authority-route";
+import { decodePatientObservationCursor, decodePatientTimelineCursor } from "./pagination";
+import { createPatientCoreReadSession } from "./read-session";
 import {
   readPatientLongitudinalHistoryPage,
   readPatientLongitudinalModel,
@@ -52,6 +55,9 @@ function logMetrics(
 
 export interface PatientClinicalCoreRouteOptions {
   allergyProblemAuthorityEnabled?: boolean;
+  d1ReadSessionsEnabled?: boolean;
+  cryptoKeyReuseEnabled?: boolean;
+  historyScopeLookupEnabled?: boolean;
 }
 
 export async function patientClinicalCoreRoute(
@@ -89,15 +95,34 @@ export async function patientClinicalCoreRoute(
       return context.respond({ error: "patient_history_request_invalid" }, 422);
     }
 
-    const metrics = new RuntimeReadMetricsCollector();
+    const sessionsEnabled = options.d1ReadSessionsEnabled === true;
+    const metrics = new RuntimeReadMetricsCollector(
+      sessionsEnabled ? "first-primary" : "direct-primary",
+    );
     try {
+      // Preflight before creating a session; readers retain their own validation.
+      // This deliberately adds one bounded cursor verification while opt-in.
+      if (sessionsEnabled) {
+        const decode = family === "observations"
+          ? decodePatientObservationCursor : decodePatientTimelineCursor;
+        await decode(cursor, { practiceId: context.user.practiceId, patientId }, context.clinicalSecret);
+      }
+      const readSession = sessionsEnabled ? createPatientCoreReadSession(context.database) : undefined;
       const page = await readPatientLongitudinalHistoryPage(
-        context,
+        {
+          database: readSession?.database ?? context.database,
+          user: context.user,
+          clinicalSecret: context.clinicalSecret,
+          ...(options.cryptoKeyReuseEnabled === true
+            ? { decryptClinical: createClinicalPayloadDecryptor(context.clinicalSecret) } : {}),
+        },
         patientId,
         family,
         cursor,
-        { metrics },
+        { metrics, historyScopeLookupEnabled: options.historyScopeLookupEnabled === true },
       );
+      // A does not transport, persist or log bookmark bytes.
+      if (readSession) await readSession.finish();
       if (!page) return context.respond({ error: "patient_not_found" }, 404);
       logMetrics("history", metrics, page);
       return context.respond(page);
@@ -110,7 +135,7 @@ export async function patientClinicalCoreRoute(
       }
       console.error(
         "patient_core_history_read_failed",
-        error instanceof Error ? error.message : "unknown_error",
+        "read_failed",
       );
       return context.respond({ error: "patient_core_read_failed" }, 500);
     }

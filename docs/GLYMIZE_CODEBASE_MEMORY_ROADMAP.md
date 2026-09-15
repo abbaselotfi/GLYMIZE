@@ -10,6 +10,8 @@ A GLYMIZE coding task is not ready to start, and is not complete, until the appl
 
 ## 1. Mandatory ROADMAP gate — before every coding task
 
+The owner-approved model checkpoint in `ROADMAP.md` section 0 precedes this gate. R29/R30 recommendations and dependency order live in that canonical roadmap. Preserve the current checkpoint and evidence in `ACTIVE_TASK_HANDOFF.md` so a fork or new chat does not restart completed discovery. A model-switch pause is not a new approval of the already accepted task scope.
+
 Before changing code, the implementer or coding agent must:
 
 1. Read `docs/GLYMIZE_CLINICAL_PRODUCT_ROADMAP.md`.

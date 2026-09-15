@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "./components/public-document-link";
 import Image from "next/image";
 import { useEffect } from "react";
 
@@ -176,6 +176,9 @@ export default function HomePage() {
             </button>
           </fieldset>
           <nav className={styles.entryNav} aria-label={copy.entryLabel}>
+            <Link className={styles.entryLink} href="/offline/">
+              {locale === "fa" ? "مراجع آفلاین — بدون اطلاعات بیمار" : "Offline references — no patient data"}
+            </Link>
             <Link className={styles.entryLink} data-actor="patient" href="/patient">
               <span className={styles.entryMark} aria-hidden="true">
                 P

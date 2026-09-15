@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { patientWorkspaceHref } from "../../lib/patient-workspace-url";
 import type {
   Type2PatientCoreCandidateField,
   Type2PatientCoreHandoffCandidate,
@@ -77,7 +78,7 @@ export default function Type2PatientCoreHandoffReview({
   if (state === "idle") return null;
   const fa = locale === "fa";
   const patientHref = candidate
-    ? `/patients/${encodeURIComponent(candidate.scope.patientId)}`
+    ? patientWorkspaceHref(candidate.scope.patientId)
     : "/records";
 
   if (state === "loading" || state === "confirming") {

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 
 import { withBasePath } from "../lib/base-path";
 import RouteAwareShell from "./components/route-aware-shell";
+import LegacyPatientRouteBridge from "./components/legacy-patient-route-bridge";
 import "./globals.css";
 import "./internal-shell.css";
 import "./theme-overrides.css";
@@ -17,6 +18,7 @@ import "./type-2/type2-adaptive-cards-v3.css";
 import "./type-2/type2-final-ux-v4.css";
 
 export const metadata: Metadata = {
+  referrer: "no-referrer",
   title: "GLYMIZE | Patient-Centered Clinical Intelligence",
   description:
     "A bilingual physician workspace for longitudinal patient records, evidence, medication intelligence, and specialty clinical modules.",
@@ -47,6 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fa" dir="rtl" data-glymize-theme="clinical" data-glymize-mode="light">
       <body>
+        <LegacyPatientRouteBridge />
         <RouteAwareShell>{children}</RouteAwareShell>
       </body>
     </html>

@@ -12,6 +12,7 @@ export default function RouteAwareShell({
     pathname === "/patient" || pathname.startsWith("/patient/");
 
   if (isPatientAppPath) return <>{children}</>;
+  if (pathname === "/offline" || pathname === "/offline/") return <>{children}</>;
 
   return <AppShell>{children}</AppShell>;
 }

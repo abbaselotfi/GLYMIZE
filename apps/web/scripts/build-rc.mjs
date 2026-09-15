@@ -37,6 +37,7 @@ run("next.cjs", ["build", "--webpack"]);
 
 console.log("[rc-build] enforcing Cloudflare Pages asset limits");
 run("split-market-static-assets.mjs");
+run("write-offline-bundle.mjs");
 
 console.log("[rc-build] installing same-origin runtime gateway");
 run("write-pages-runtime-proxy.mjs", [OUT]);

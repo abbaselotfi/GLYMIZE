@@ -6,6 +6,7 @@ All coding agents working in this repository must follow the normative engineeri
 
 ## Before every implementation task
 
+0. Follow the owner model checkpoint and token policy in `docs/ROADMAP.md` section 0. Show the task/model recommendation before processing. On a model transition, pause for `ادامه تسک`; this is a model-switch checkpoint, not renewed scope approval. Read `docs/ACTIVE_TASK_HANDOFF.md` when continuing a fork/new chat.
 1. Read `docs/GLYMIZE_CLINICAL_PRODUCT_ROADMAP.md`.
 2. Read any directly applicable companion roadmap under `docs/`.
 3. Identify the exact roadmap item, phase, dependencies, acceptance gates, and whether the work already exists or is partially complete.

@@ -140,12 +140,12 @@ export async function hmacHex(secret: string, value: string) {
   return [...signature].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function contextKey(secret: string, context: string) {
+async function contextKey(secret: string, context: string, usages: KeyUsage[] = ["encrypt", "decrypt"]) {
   const material = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(`GLYMIZE:${context}:${secret}`),
   );
-  return crypto.subtle.importKey("raw", material, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+  return crypto.subtle.importKey("raw", material, { name: "AES-GCM" }, false, usages);
 }
 
 export async function sealPayload(payload: unknown, secret: string, context: string) {
@@ -241,13 +241,16 @@ export async function encryptClinicalPayload(
   };
 }
 
-export async function decryptClinicalPayload<T>(
-  payload: { iv: string; ciphertext: string; authTag: string },
-  secret: string,
+export type EncryptedClinicalPayload = { iv: string; ciphertext: string; authTag: string };
+export type ClinicalPayloadDecryptor = <T>(payload: EncryptedClinicalPayload, aad: string) => Promise<T | null>;
+
+async function decryptClinicalPayloadWithKey<T>(
+  payload: EncryptedClinicalPayload,
+  getKey: () => Promise<CryptoKey>,
   aad: string,
 ): Promise<T | null> {
   try {
-    const key = await contextKey(secret, "CLINICAL-DATA-V1");
+    const key = await getKey();
     const ciphertext = base64UrlToBytes(payload.ciphertext);
     const tag = base64UrlToBytes(payload.authTag);
     const combined = new Uint8Array(ciphertext.length + tag.length);
@@ -266,6 +269,23 @@ export async function decryptClinicalPayload<T>(
   } catch {
     return null;
   }
+}
+
+export async function decryptClinicalPayload<T>(
+  payload: EncryptedClinicalPayload,
+  secret: string,
+  aad: string,
+): Promise<T | null> {
+  return decryptClinicalPayloadWithKey<T>(payload, () => contextKey(secret, "CLINICAL-DATA-V1"), aad);
+}
+
+/** Create after authorization, use for one request only; never persist or share this closure. */
+export function createClinicalPayloadDecryptor(secret: string): ClinicalPayloadDecryptor {
+  let key: Promise<CryptoKey> | undefined;
+  // Cache the in-flight derivation too. A rejected derivation stays failed for this request.
+  const getKey = () => key ??= contextKey(secret, "CLINICAL-DATA-V1", ["decrypt"]);
+  return <T>(payload: EncryptedClinicalPayload, aad: string) =>
+    decryptClinicalPayloadWithKey<T>(payload, getKey, aad);
 }
 
 export function maskIdentifier(value: string) {

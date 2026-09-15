@@ -39,3 +39,4 @@ const buildEnv = isCloudflarePages
 
 run("next.cjs", ["build", "--webpack"], buildEnv);
 run("split-market-static-assets.mjs", [], buildEnv);
+run("write-offline-bundle.mjs", [], buildEnv);

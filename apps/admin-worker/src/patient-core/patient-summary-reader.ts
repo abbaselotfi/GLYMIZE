@@ -1,11 +1,11 @@
 import type { PatientLongitudinalSummary } from "@glymize/contracts";
-import { decryptClinicalPayload } from "../runtime-security";
+import { decryptPatientCorePayload } from "./decryption";
 import {
   measureRuntimeReadDecryption,
   measureRuntimeReadQuery,
   type RuntimeReadMetricsCollector,
 } from "../runtime-read-metrics";
-import type { PatientRecordV2RouteContext } from "../patient-record-v2/context";
+import type { PatientRecordV2ReadContext } from "../patient-record-v2/context";
 import { patientDemographicsAad } from "./aad";
 
 type PatientRow = {
@@ -35,12 +35,13 @@ function optionalText(value: unknown) {
   return text || undefined;
 }
 
-export async function readPatientCoreSummary(
-  context: PatientRecordV2RouteContext,
+/** Scoped existence read, not authorization. Keep the registry lookup first in history sessions. */
+export async function readPatientCoreRegistry(
+  context: PatientRecordV2ReadContext,
   patientId: string,
   options: PatientCoreSummaryReadOptions = {},
-): Promise<PatientLongitudinalSummary | null> {
-  const patient = await measureRuntimeReadQuery(
+): Promise<PatientRow | null> {
+  return measureRuntimeReadQuery(
     options.metrics,
     () => context.database.prepare(
       `SELECT id,status
@@ -49,6 +50,14 @@ export async function readPatientCoreSummary(
     ).bind(context.user.practiceId, patientId).first<PatientRow>(),
     (result) => result ? 1 : 0,
   );
+}
+
+export async function readPatientCoreSummary(
+  context: PatientRecordV2ReadContext,
+  patientId: string,
+  options: PatientCoreSummaryReadOptions = {},
+): Promise<PatientLongitudinalSummary | null> {
+  const patient = await readPatientCoreRegistry(context, patientId, options);
   if (!patient) return null;
 
   const [identifiers, demographicsRow, latestEncounter] = await Promise.all([
@@ -88,13 +97,13 @@ export async function readPatientCoreSummary(
   if (demographicsRow) {
     const payload = await measureRuntimeReadDecryption(
       options.metrics,
-      () => decryptClinicalPayload<Record<string, unknown>>(
+      () => decryptPatientCorePayload<Record<string, unknown>>(
+        context,
         {
           ciphertext: demographicsRow.payload_ciphertext,
           iv: demographicsRow.payload_iv,
           authTag: demographicsRow.payload_auth_tag,
         },
-        context.clinicalSecret,
         patientDemographicsAad(context.user.practiceId, patientId),
       ),
     );

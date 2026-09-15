@@ -2,6 +2,7 @@
 
 import type { PatientWorkspaceSnapshot } from "@glymize/contracts";
 import Link from "next/link";
+import { patientWorkspaceHref } from "../../lib/patient-workspace-url";
 import styles from "./patient-workspace-header.module.css";
 
 function identifierLabel(
@@ -54,7 +55,7 @@ export function PatientWorkspaceHeader({
         <div className={styles.headerActions}>
           <Link
             className={styles.fullWorkspaceLink}
-            href={`/patients/${encodeURIComponent(patient.patientId)}`}
+            href={patientWorkspaceHref(patient.patientId)}
           >
             {fa ? "نمای کامل بیمار" : "Open full workspace"}
           </Link>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useVolatileFormWarning } from "../../lib/use-volatile-form-warning";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type {
   GenericMedication,
@@ -255,6 +256,7 @@ export default function Type2ScenariosClient() {
   const [scenarioSortMode, setScenarioSortMode] = useState<Type2ScenarioSortMode>("balanced");
   const [hyperglycemiaSymptoms, setHyperglycemiaSymptoms] = useState(false);
   const [catabolicFeatures, setCatabolicFeatures] = useState(false);
+  useVolatileFormWarning([currentHba1c, targetHba1c, medications, context, structuredContext, patientAge, hyperglycemiaSymptoms, catabolicFeatures]);
   const [assessment, setAssessment] = useState<Type2AssessmentWithParallelSafety | null>(null);
   const [submittedRequest, setSubmittedRequest] = useState<Type2ConsiderationRequest | null>(null);
   const [costPlans, setCostPlans] = useState<Record<string, Type2CostingPlan>>({});

@@ -34,17 +34,17 @@ function observation(
 describe("C1 Patient Workspace completion surfaces", () => {
   const completionSource = fs.readFileSync(
     new URL(
-      "../app/patients/[patientId]/patient-workspace-c1-completion.tsx",
+      "../app/patients/_components/patient-workspace-c1-completion.tsx",
       import.meta.url,
     ),
     "utf8",
   );
   const workspaceLoaderSource = fs.readFileSync(
-    new URL("../app/patients/[patientId]/patient-clinical-workspace.tsx", import.meta.url),
+    new URL("../app/patients/_components/patient-clinical-workspace.tsx", import.meta.url),
     "utf8",
   );
   const workspaceViewSource = fs.readFileSync(
-    new URL("../app/patients/[patientId]/patient-clinical-workspace-view.tsx", import.meta.url),
+    new URL("../app/patients/_components/patient-clinical-workspace-view.tsx", import.meta.url),
     "utf8",
   );
 

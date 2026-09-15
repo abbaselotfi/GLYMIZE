@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "./public-document-link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -20,6 +20,7 @@ import PwaInstall from "./pwa-install";
 import ThemeControls from "./theme-controls";
 import { useGlymizeLocale } from "./use-glymize-locale";
 import runtimeStyles from "./runtime-shell.module.css";
+import { publicOfflineNavigationEnabled } from "../../lib/public-offline-navigation";
 
 type NavGroup = "clinical" | "workflow";
 type LocalQaLayoutPreset = "auto" | "command_center" | "focused_workflow" | "compact_cards" | "evidence_trace";
@@ -189,6 +190,7 @@ export default function AppShell({ children }: Readonly<{ children: React.ReactN
         </Link>
 
         <nav className="main-nav">
+          {publicOfflineNavigationEnabled && <Link href="/">{locale === "fa" ? "خانهٔ ذخیره‌شده" : "Cached home"}</Link>}
           <span className="nav-section-label">{copy.clinical}</span>
           {groupedNavigation.clinical.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);

@@ -166,6 +166,7 @@ function configureDecisionGraph(state: BrowserCatalogState) {
 export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => void) {
   let stateCache = emptyState();
   let stateLoaded = false;
+  let marketReady = false;
   let statePromise: Promise<void> | null = null;
   let publishTimer: ReturnType<typeof setTimeout> | null = null;
   let publishBatchDepth = 0;
@@ -216,7 +217,7 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
   }
 
   async function ensure() {
-    if (stateLoaded || typeof window === "undefined") return;
+    if ((stateLoaded && marketReady) || typeof window === "undefined") return;
     if (statePromise) return statePromise;
     statePromise = (async () => {
       try {
@@ -224,11 +225,18 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
           loadClinicianMarketV2(),
           loadType2DecisionGraphMarketProducts(),
         ]);
+        marketReady = true;
       } catch (error) {
         console.warn(
           "GLYMIZE clinician market v2 unavailable; retaining existing catalog only.",
           error,
         );
+      }
+      if (stateLoaded) {
+        // Retry only failed market initialization, without replacing edited catalog state.
+        configureDecisionGraph(stateCache);
+        invalidateDerivedCaches();
+        return;
       }
       const localDraft = parseStoredCatalogState(window.localStorage.getItem(storageKey));
       try {
@@ -250,7 +258,7 @@ export function createBrowserCatalogStateStore(invalidateDerivedCaches: () => vo
       configureDecisionGraph(stateCache);
       invalidateDerivedCaches();
       stateLoaded = true;
-    })();
+    })().finally(() => { statePromise = null; });
     return statePromise;
   }
 

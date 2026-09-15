@@ -65,6 +65,9 @@ interface Env {
   AI_CONFIG_MASTER_KEY: string;
   AI_RUNTIME_SHARED_SECRET: string;
   PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ENABLED?: string;
+  PATIENT_CORE_D1_READ_SESSIONS_ENABLED?: string;
+  PATIENT_CORE_CRYPTO_KEY_REUSE_ENABLED?: string;
+  PATIENT_CORE_HISTORY_SCOPE_LOOKUP_ENABLED?: string;
 
   GLYMIZE_DB?: D1Database;
   CLINICAL_DATA_MASTER_KEY?: string;
@@ -1551,6 +1554,9 @@ async function platformRoute(request:Request,env:Env):Promise<Response|null> {
       audit:(action,targetType,targetId,meta)=>
         audit(env,auth.user.id,auth.user.practiceId,action,targetType,targetId,meta),
     }, {
+      patientCoreD1ReadSessionsEnabled: env.PATIENT_CORE_D1_READ_SESSIONS_ENABLED === "true",
+      patientCoreCryptoKeyReuseEnabled: env.PATIENT_CORE_CRYPTO_KEY_REUSE_ENABLED === "true",
+      patientCoreHistoryScopeLookupEnabled: env.PATIENT_CORE_HISTORY_SCOPE_LOOKUP_ENABLED === "true",
       patientCoreAllergyProblemAuthorityEnabled:
         patientCoreAllergyProblemAuthorityEnabledFromEnv(
           env.PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ENABLED,

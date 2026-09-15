@@ -42,6 +42,29 @@ function product(overrides: Partial<IranMarketDrugProduct> = {}): IranMarketDrug
 }
 
 describe("Decision Graph V2 contract inventory adapter", () => {
+  it.each([undefined, "Unknown license date", "Revoked", "Expired"])("does not infer a current license from verified identity: %s", (licenseStatus) => {
+    const built = buildDecisionGraphInventoryFromContractsV2({ masterRegistry: [master],
+      marketProducts: [product({ licenseStatus, licenseValidUntilJalali: undefined, matchConfidence: 100 })],
+      policy: { asOf: new Date("2026-08-08T00:00:00Z") } });
+    expect(built.inventory.marketProducts[0]?.nfiMatchState).toBe("verified");
+    expect(built.inventory.marketProducts[0]?.license.currentValid).toBe(false);
+    expect(assessIranAvailabilityV2(built.inventory.knowledge[0]!, built.inventory.marketProducts).mainRecommendationEligible).toBe(false);
+  });
+  it("keeps unapproved/unmatched masters unmatched even with source confidence 100", () => {
+    for (const registry of [[], [{ ...master, reviewState: "pending" as MasterDrugRegistryEntry["reviewState"] }]]) {
+      const built = buildDecisionGraphInventoryFromContractsV2({ masterRegistry: registry,
+        marketProducts: [product({ matchConfidence: 100 })], policy: { asOf: new Date("2026-08-08T00:00:00Z") } });
+      expect(built.inventory.marketProducts[0]?.nfiMatchState).toBe("unmatched");
+    }
+  });
+  it("keeps stale evidence and unresolved package/strength explicit", () => {
+    const built = buildDecisionGraphInventoryFromContractsV2({ masterRegistry: [master],
+      marketProducts: [product({ observedAt: "2020-01-01T00:00:00Z", packagePresentation: undefined, strengthPresentation: undefined })],
+      policy: { asOf: new Date("2026-08-08T00:00:00Z") } });
+    expect(built.inventory.marketProducts[0]?.marketPresence).toBe("unknown");
+    expect(built.inventory.marketProducts[0]?.consumptionUnitsPerPurchaseUnit).toBe(0);
+    expect(built.inventory.marketProducts[0]?.strengthComponents).toEqual([]);
+  });
   it("requires WorldDrug and a verified NFI relationship for current-market eligibility", () => {
     const built = buildDecisionGraphInventoryFromContractsV2({
       masterRegistry: [master],

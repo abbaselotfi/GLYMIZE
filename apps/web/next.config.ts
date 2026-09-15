@@ -12,7 +12,10 @@ const nextConfig: NextConfig = {
   assetPrefix: basePath || undefined,
   trailingSlash: isGitHubPages,
   images: { unoptimized: true },
-  env: { NEXT_PUBLIC_BASE_PATH: basePath }
+  env: {
+    NEXT_PUBLIC_BASE_PATH: basePath,
+    NEXT_PUBLIC_OFFLINE_BUNDLE_ENABLED: String(isGitHubPages && process.env.GLYMIZE_OFFLINE_BUNDLE_ENABLED === "true"),
+  }
 };
 
 export default nextConfig;

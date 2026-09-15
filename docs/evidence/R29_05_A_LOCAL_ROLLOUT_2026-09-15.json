@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-09-15T10:16:33.033Z",
+  "kind": "local-node-fake-d1-rollout",
+  "node": "v24.18.0",
+  "baseCommit": "1f1a5bbcac69832a0659ba5e14b3b7043b0ef501",
+  "dirtyWorktree": true,
+  "fingerprint": {
+    "fileCount": 141,
+    "sha256": "b648a5e8270e552ae67c13683734c2b013149e808e1ea03f5d67e26c4d8eb2de",
+    "scope": [
+      "apps/admin-worker/src",
+      "apps/admin-worker/test",
+      "packages/contracts/src"
+    ],
+    "includes": [
+      "pnpm-lock.yaml",
+      "apps/admin-worker/package.json",
+      "this runner"
+    ]
+  },
+  "tests": [
+    "test/patient-core-read-session.test.ts",
+    "test/patient-core-read-session-boundary.test.ts"
+  ],
+  "localChecks": "passed",
+  "bitOrder": [
+    "D1 sessions",
+    "CryptoKey reuse",
+    "history scope lookup"
+  ],
+  "cases": [
+    {
+      "bits": "000",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "001",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "010",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "100",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "011",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "101",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "110",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "111",
+      "family": "observations",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "000",
+      "family": "observations",
+      "rollback": true,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "000",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "001",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "010",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "100",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "011",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "direct-primary"
+    },
+    {
+      "bits": "101",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "110",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "111",
+      "family": "timeline",
+      "rollback": false,
+      "responseEqual": true,
+      "queryCount": 3,
+      "decryptionCount": 1,
+      "expectedRouting": "first-primary"
+    },
+    {
+      "bits": "000",
+      "family": "timeline",
+      "rollback": true,
+      "responseEqual": true,
+      "queryCount": 6,
+      "decryptionCount": 2,
+      "expectedRouting": "direct-primary"
+    }
+  ],
+  "remoteAcceptance": "not_run",
+  "deploymentVersion": null,
+  "workerCpuMs": null,
+  "d1RowsRead": null,
+  "d1RowsWritten": null,
+  "providerReplication": "unverified",
+  "remoteRequests": 0
+}

@@ -1,0 +1,184 @@
+{
+  "kind": "local-sqlite-observation-plan-assessment",
+  "node": "v24.18.0",
+  "sqlite": "3.53.1",
+  "schemaScope": [
+    "../migrations/0003_longitudinal_patient_records.sql",
+    "../migrations/0004_encounter_snapshot_revisions.sql"
+  ],
+  "schemaSha256": "3bf6f3a6827f080daa88018961e308a30875569b3bb601678978428ae0aad732",
+  "readerSha256": "86962a9981fc2296ddfa25d1231a9047c74e643e4192447306ff221ae4b57427",
+  "syntheticRows": {
+    "observations": 9600,
+    "snapshots": 120,
+    "patients": 3
+  },
+  "candidateSql": "CREATE INDEX r29_candidate_observation_history ON patient_observations(practice_id,patient_id,observed_at DESC,created_at DESC,id DESC)",
+  "evidence": [
+    {
+      "name": "first-count",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "candidatePlan": [
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 1,
+      "counts": {
+        "source_row_count": 1600,
+        "rejected_count": 140,
+        "raw_count": 140,
+        "eligible_count": 1320
+      },
+      "rowsEqual": true,
+      "rowsRead": null
+    },
+    {
+      "name": "first-page",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ],
+      "candidatePlan": [
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 80,
+      "rowsEqual": true,
+      "rowsRead": null
+    },
+    {
+      "name": "deep-count",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "candidatePlan": [
+        "MULTI-INDEX OR",
+        "INDEX 1",
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=? AND observed_at<?)",
+        "INDEX 2",
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=? AND observed_at=? AND created_at<?)",
+        "INDEX 3",
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=? AND observed_at=? AND created_at=? AND id<?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 1,
+      "counts": {
+        "source_row_count": 824,
+        "rejected_count": 72,
+        "raw_count": 72,
+        "eligible_count": 680
+      },
+      "rowsEqual": true,
+      "rowsRead": null
+    },
+    {
+      "name": "deep-page",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ],
+      "candidatePlan": [
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 80,
+      "rowsEqual": true,
+      "rowsRead": null
+    },
+    {
+      "name": "older-source-count",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "candidatePlan": [
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 1,
+      "counts": {
+        "source_row_count": 1600,
+        "rejected_count": 140,
+        "raw_count": 140,
+        "eligible_count": 1320
+      },
+      "rowsEqual": true,
+      "rowsRead": null
+    },
+    {
+      "name": "older-source-page",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ],
+      "candidatePlan": [
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 80,
+      "rowsEqual": true,
+      "rowsRead": null
+    },
+    {
+      "name": "wrong-practice-count",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "candidatePlan": [
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 1,
+      "counts": {
+        "source_row_count": 0,
+        "rejected_count": null,
+        "raw_count": null,
+        "eligible_count": null
+      },
+      "rowsEqual": true,
+      "rowsRead": null
+    },
+    {
+      "name": "wrong-practice-page",
+      "baselinePlan": [
+        "SEARCH o USING INDEX patient_observations_patient_key_time_idx (patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ],
+      "candidatePlan": [
+        "SEARCH o USING INDEX r29_candidate_observation_history (practice_id=? AND patient_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH s USING INDEX sqlite_autoindex_patient_encounter_snapshots_2 (encounter_id=?)"
+      ],
+      "returnedRows": 0,
+      "rowsEqual": true,
+      "rowsRead": null
+    }
+  ],
+  "d1RowsRead": null,
+  "workerCpuMs": null,
+  "remoteRequests": 0
+}
