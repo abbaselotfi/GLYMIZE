@@ -34,6 +34,8 @@ Default: Astra Medium for implementation; Astra Light for mechanical documentati
 
 ## 1. Product North Star
 
+Publication follow-up — 2026-09-15: implementation checkpoint 7892284 committed. Owner-approved exclusion of only the current fix branch from Pages Preview is applied and GET-verified; main and other source fields unchanged. GitHub validation-only PR #143 has auto-merge off. Workers Builds API 403 was handled with read-only account inventory and both GLYMIZE Workers' disconnected Git settings in the dashboard. See the R29-05-A report follow-up; it supersedes the previous publication blocker. Push verification is separate from deployment/RC acceptance; next technical packet remains R29-05-B / Astra Medium.
+
 GLYMIZE is no longer planned as a disease-specific diabetes application.
 
 GLYMIZE is to become a bilingual Persian/English, physician-first, patient-centered **Clinical Intelligence Workspace for Adult Medicine**, initially focused on internal-medicine practice and its subspecialties, with diabetes as the first mature and safety-tested clinical module.

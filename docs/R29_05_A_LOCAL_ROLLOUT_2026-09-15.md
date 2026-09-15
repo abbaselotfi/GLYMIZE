@@ -1,5 +1,13 @@
 # R29-05-A — local rollout/rollback evidence
 
+## Publication follow-up — 2026-09-15
+
+Implementation is committed locally as 7892284. The owner subsequently approved a narrow Pages branch exclusion. At 12:14:28Z, the project PATCH and independent GET confirmed preview mode `custom`, includes `["*"]`, excludes only `fix/r28-07-handoff-confirmation-lifecycle-20260910`. Other source fields, production branch and latest deployment ID were unchanged. This supersedes the historical blocked/no-setting-change status below; no deployment was triggered by this change.
+
+The [official API](https://developers.cloudflare.com/api/resources/pages/subresources/projects/methods/edit/) requires custom mode for branch exclusions. [Branch controls](https://developers.cloudflare.com/pages/configuration/branch-build-controls/) preserve other previews with wildcard inclusion. Reversal, only if separately authorized, is restoring all mode and the original empty exclusion list; do not restore while no-deploy pushes are still required.
+
+Read-only GitHub recheck found zero repository hooks and existing PR #143, targeting main with auto-merge null. Its full validation workflow contains checks/tests, no deployment; a Push can update this existing PR and run CI. No PR edit or merge was performed. Cloudflare Workers Builds API returned 403 for all seven listed Workers, so API trigger enumeration is NOT claimed successful. Read-only browser fallback found the complete 8-application account inventory with only Pages showing a Git repository; both GLYMIZE Workers (shiny-block-9d4a and glymize-rc-portal-staging) explicitly show Settings > Builds > Git repository > Connect. No Worker setting was changed. Publication uses this UI evidence, not an assumption that 403 means no triggers. Remote SHA and post-Push deployment state must still be checked.
+
 Status: local preparation passed; remote RC acceptance NOT RUN. No deployment, migration, feature activation or paid service. Model recommendation: Astra Medium, medium relative token cost.
 
 ## Reproduce and evidence boundary
