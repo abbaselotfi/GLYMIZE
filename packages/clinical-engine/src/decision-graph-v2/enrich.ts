@@ -93,6 +93,13 @@ function buildDoseExecutionOptions(
   component: RegimenCandidateV2["components"][number],
 ): DoseExecutionOptionV2[] {
   const allProducts = currentProductsForComponent(request, component.masterDrugId);
+  const componentProductIds = new Set(allProducts.map((product) => product.productId));
+  // Keep every possible exact-product or master fallback match, in original
+  // order. Avoid rescanning unrelated market policies for every dose/product.
+  const insurancePolicies = request.inventory.insurancePolicies.filter((policy) =>
+    policy.masterDrugId === component.masterDrugId ||
+    (policy.productId !== undefined && componentProductIds.has(policy.productId)),
+  );
   const plans = component.doseOptions?.length ? component.doseOptions : component.dosePlan ? [component.dosePlan] : [];
   const currentForm = currentFormFor(request, component.masterDrugId);
   const preferredId = request.preferences.adminPreferredProductByMasterDrugId?.[component.masterDrugId];
@@ -103,7 +110,7 @@ function buildDoseExecutionOptions(
       .map((product) => calculateProductMonthlyCostV2({
         product,
         dose: plan,
-        insurancePolicies: request.inventory.insurancePolicies,
+        insurancePolicies,
         preferences: request.preferences,
         clinician: request.clinician,
       }))

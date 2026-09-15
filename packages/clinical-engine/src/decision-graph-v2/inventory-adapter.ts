@@ -334,10 +334,9 @@ function compareDate(left: ParsedJalaliDate, right: ParsedJalaliDate) {
   return (left.year - right.year) || (left.month - right.month) || (left.day - right.day);
 }
 
-function licenseState(product: IranMarketDrugProduct, asOf: Date) {
+function licenseState(product: IranMarketDrugProduct, today: ParsedJalaliDate) {
   const status = normalized(product.licenseStatus);
   const validUntil = parseJalali(product.licenseValidUntilJalali);
-  const today = currentJalali(asOf);
   const revoked = /revok|cancel|void|withdraw|لغو|باطل|ابطال/.test(status);
   const suspended = /suspend|تعلیق/.test(status);
   const expiredText = /expired|انقضا|منقض|پایان اعتبار/.test(status);
@@ -361,13 +360,28 @@ function daysBetween(fromIso: string | undefined, to: Date) {
   return Math.max(0, (to.getTime() - from.getTime()) / 86_400_000);
 }
 
-function resolveMaster(product: IranMarketDrugProduct, registry: readonly MasterDrugRegistryEntry[]) {
+function masterLookup(registry: readonly MasterDrugRegistryEntry[]) {
+  const ids = new Map<string, MasterDrugRegistryEntry>();
+  const names = new Map<string, MasterDrugRegistryEntry>();
+  for (const entry of registry) {
+    if (entry.reviewState !== "approved") continue;
+    // Preserve Array.find's first approved match, including duplicate aliases/IDs.
+    if (!ids.has(entry.id)) ids.set(entry.id, entry);
+    for (const name of [entry.canonicalName, ...(entry.searchSynonyms ?? [])]) {
+      const key = normalized(name);
+      if (!names.has(key)) names.set(key, entry);
+    }
+  }
+  return { ids, names };
+}
+
+function resolveMaster(product: IranMarketDrugProduct, lookup: ReturnType<typeof masterLookup>) {
   if (product.masterDrugId) {
-    const direct = registry.find((entry) => entry.id === product.masterDrugId && entry.reviewState === "approved");
+    const direct = lookup.ids.get(product.masterDrugId);
     if (direct) return { entry: direct, direct: true };
   }
   const productName = normalized(product.genericName);
-  const exact = registry.find((entry) => entry.reviewState === "approved" && [entry.canonicalName, ...(entry.searchSynonyms ?? [])].some((name) => normalized(name) === productName));
+  const exact = lookup.names.get(productName);
   return exact ? { entry: exact, direct: false } : undefined;
 }
 
@@ -466,13 +480,15 @@ function mapMarketProduct(
   registry: readonly MasterDrugRegistryEntry[],
   policy: InventoryAdapterPolicyV2,
   issues: InventoryBuildIssueV2[],
+  lookup: ReturnType<typeof masterLookup>,
+  today: ParsedJalaliDate,
 ): IranMarketProductV2 {
-  const resolved = resolveMaster(product, registry);
+  const resolved = resolveMaster(product, lookup);
   const master = resolved?.entry;
   const dosageFormGroup = normalizeDosageFormGroup(product.dosageForm);
   const sizing = packageSizing(product, dosageFormGroup);
   const matchState = nfiMatchState(product, resolved, policy.verifiedMatchConfidenceAtOrAbove);
-  const license = licenseState(product, policy.asOf);
+  const license = licenseState(product, today);
   const recent = daysBetween(product.observedAt, policy.asOf) <= policy.recentObservationMaxAgeDays;
   const components = master ? strengthComponents(product, master, registry) : [];
 
@@ -588,10 +604,17 @@ export function buildDecisionGraphInventoryFromContractsV2(
   const policy: InventoryAdapterPolicyV2 = { ...defaultInventoryAdapterPolicyV2, ...(input.policy ?? {}) };
   const approved = input.masterRegistry.filter((entry) => entry.reviewState === "approved");
   const issues: InventoryBuildIssueV2[] = [];
-  const products = input.marketProducts.map((product) => mapMarketProduct(product, approved, policy, issues));
+  const lookup = masterLookup(approved);
+  // One Tehran calendar conversion for this build's fixed asOf, never a global date cache.
+  const today = input.marketProducts.length ? currentJalali(policy.asOf) : undefined;
+  const products = input.marketProducts.map((product) => mapMarketProduct(product, approved, policy, issues, lookup, today!));
   const knowledge = approved.map((entry) => knowledgeEntry(entry, approved, products, issues));
+  const firstProductById = new Map<string, IranMarketProductV2>();
+  for (const product of products) {
+    if (!firstProductById.has(product.productId)) firstProductById.set(product.productId, product);
+  }
   const importedPolicies = input.marketProducts.flatMap((raw) => {
-    const mapped = products.find((product) => product.productId === raw.id)!;
+    const mapped = firstProductById.get(raw.id)!;
     return insurancePoliciesFromCoverage(mapped, raw.insuranceCoverages ?? []);
   });
   const insurancePolicies = [...importedPolicies, ...(input.insurancePolicies ?? [])];

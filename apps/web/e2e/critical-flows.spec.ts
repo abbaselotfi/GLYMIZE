@@ -60,7 +60,9 @@ test("Type 2 assessment produces ranked scenarios", async ({ page }) => {
 
   await expect(page.getByRole("heading", {
     name: /\d+ treatment scenarios(?: \+ WorldDrug review)?/,
-  })).toBeVisible();
+  // Cold assessment includes the complete verified market, unlike a simple DOM
+  // update. Measured local completion is ~6s; retain a bounded integration gate.
+  })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("A1C gap")).toBeVisible();
 });
 

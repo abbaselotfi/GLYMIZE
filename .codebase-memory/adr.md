@@ -1,5 +1,13 @@
 # GLYMIZE Codebase Memory ADR
 
+## 2026-09-16 — Bound insurance lookup without changing cost authority
+
+Dose execution prefilters policies to any current component product ID or its master ID once, preserving input order. Exact-product priority and first master fallback remain in the existing calculator, including rules naming another brand. No shared cache or policy change. Differential regression compares with unfiltered cost calculation, including duplicates and reordered inputs. Full-market integration correctness timeouts explicitly allow 15s after ~6s browser completion and 3.65–8s fixture variance; this is not acceptance of a latency SLO.
+
+## 2026-09-15 — Preserve inventory semantics while bounding repeated lookup work
+
+R29-05-B repairs real-market Type 2 assessment latency with inventory-build-local first-approved-entry ID/name indexes, a first-mapped-product ID index and one fixed-asOf Tehran calendar conversion per nonempty build. Preserve direct-ID precedence, normalized alias matching, confidence, duplicate order, license rules and clinical ranking; no global cache. New real published-market and focused semantic tests cover the previously unexercised populated runtime. Pin RC resources to active version bindings: generic settings can differ. Previous branch publication is confirmed with Pages is_skipped=true; main/activation remain separate. See docs/R29_05_B_RC_READINESS_AND_TYPE2_FIX_2026-09-15.md.
+
 ## 2026-09-15 — Separate local rollout checks, remote acceptance and Git publication
 
 R29-05-A adds a local-only source-fingerprinted Node/fake-D1 runner for all eight independent read flags and full 111-to-000 rollback across both history families. Preserve default-OFF runtime behavior and primary authority. Local equality/routing/query checks cannot certify provider replication, Worker CPU, complete D1 rows or remote rollback; unknown evidence remains explicit. Pages source metadata currently enables previews for all branches, so the owner's reviewed Commit/Push-without-Deploy permission permits local commit but not a deployment-triggering Push. No trigger settings are changed. See docs/R29_05_A_LOCAL_ROLLOUT_2026-09-15.md; next Medium publication safety resolution, then R29-05-B RC readiness planning with separate activation authority.

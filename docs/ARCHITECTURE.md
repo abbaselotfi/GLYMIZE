@@ -1,5 +1,11 @@
 # معماری سامانه
 
+September 16 R29-05-B follow-up: per-component insurance prefiltering removes only impossible product/master matches before the existing calculator; order, exact-match priority and fallback remain unchanged. No persistent/shared cache. Differential tests cover duplicate and other-brand rules. Integration timeouts now explicitly allow 15s for full-market cold execution; performance SLO/RC acceptance remains separate.
+
+## Type 2 inventory build-local indexes — R29-05-B (2026-09-15)
+
+[Regression repair and RC readiness](R29_05_B_RC_READINESS_AND_TYPE2_FIX_2026-09-15.md): approved-master and mapped-product lookups preserve first-match semantics using build-local indexes; the fixed asOf calendar conversion is shared within one build. No global patient/date cache or ranking/license policy changes. RC resource identity must come from active deployment version bindings, not generic settings alone. Prior fix-branch Git publication succeeded with Pages is_skipped=true; no deployment ran.
+
 ## Rollout evidence is not release acceptance — R29-05-A (2026-09-15)
 
 [Local matrix](R29_05_A_LOCAL_ROLLOUT_2026-09-15.md) exercises eight independent read-flag configurations and full rollback for both history families through the facade. The runner binds results to scoped source hashes and leaves provider/CPU/rows/deployment evidence unknown. No runtime or flag default changes. Remote individual/in-flight/version rollback and RC budgets remain separate gates. Git publication also respects the no-deploy boundary: Pages currently previews all branches, so an authorized Push is withheld until safe branch settings and other triggers are verified.

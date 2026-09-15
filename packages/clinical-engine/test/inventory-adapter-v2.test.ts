@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { IranMarketDrugProduct, MasterDrugRegistryEntry } from "@glymize/contracts";
 import { assessIranAvailabilityV2, buildDecisionGraphInventoryFromContractsV2, generateRegimenCandidatesV2 } from "../src/index.js";
 
@@ -42,6 +42,42 @@ function product(overrides: Partial<IranMarketDrugProduct> = {}): IranMarketDrug
 }
 
 describe("Decision Graph V2 contract inventory adapter", () => {
+  it("converts the fixed calendar date once per nonempty build and refreshes it next build", () => {
+    const formatter = vi.spyOn(Intl.DateTimeFormat.prototype, "formatToParts");
+    try {
+      const input = { masterRegistry: [master], marketProducts: Array.from({ length: 8 }, (_, index) => product({ id: `date-${index}`, licenseStatus: undefined })) };
+      const beforeExpiry = buildDecisionGraphInventoryFromContractsV2({ ...input, policy: { asOf: new Date("2026-08-08T00:00:00Z") } });
+      expect(formatter).toHaveBeenCalledTimes(1);
+      expect(beforeExpiry.inventory.marketProducts.every((row) => row.license.currentValid)).toBe(true);
+      const afterExpiry = buildDecisionGraphInventoryFromContractsV2({ ...input, policy: { asOf: new Date("2027-08-08T00:00:00Z") } });
+      expect(formatter).toHaveBeenCalledTimes(2);
+      expect(afterExpiry.inventory.marketProducts.every((row) => !row.license.currentValid)).toBe(true);
+      buildDecisionGraphInventoryFromContractsV2({ masterRegistry: [], marketProducts: [], policy: { asOf: new Date(NaN) } });
+      expect(formatter).toHaveBeenCalledTimes(2);
+    } finally { formatter.mockRestore(); }
+  });
+  it("retains first-product identity when duplicate product IDs supply separate coverage rows", () => {
+    const other = { ...master, id: "other", canonicalName: "Other" };
+    const built = buildDecisionGraphInventoryFromContractsV2({ masterRegistry: [master, other],
+      marketProducts: [product(), product({ masterDrugId: "other" })] });
+    expect(built.inventory.marketProducts.map((row) => row.masterDrugId)).toEqual([master.id, other.id]);
+    expect(built.inventory.insurancePolicies.every((row) => row.masterDrugId === master.id)).toBe(true);
+  });
+  it("preserves first approved alias match, direct-ID precedence and per-build freshness", () => {
+    const first = { ...master, id: "first", canonicalName: "First", searchSynonyms: [" TESTFORMIN HCl "] };
+    const second = { ...master, id: "second", canonicalName: "Testformin HCl" };
+    const pending = { ...first, id: "pending", reviewState: "pending" as MasterDrugRegistryEntry["reviewState"] };
+    const build = (registry: MasterDrugRegistryEntry[], masterDrugId?: string) => buildDecisionGraphInventoryFromContractsV2({
+      masterRegistry: registry, marketProducts: [product({ masterDrugId, genericName: "testformin-hcl", matchConfidence: 0 })],
+    }).inventory.marketProducts[0]!;
+    expect(build([pending, first, second])).toMatchObject({ masterDrugId: "first", nfiMatchState: "review_required" });
+    expect(build([pending, first, second], "second")).toMatchObject({ masterDrugId: "second", nfiMatchState: "verified" });
+    expect(build([pending, first, second], "pending")).toMatchObject({ masterDrugId: "first", nfiMatchState: "review_required" });
+    expect(build([second, first])).toMatchObject({ masterDrugId: "second", nfiMatchState: "review_required" });
+    first.reviewState = "pending";
+    expect(build([first, second])).toMatchObject({ masterDrugId: "second", nfiMatchState: "review_required" });
+    expect(build([pending])).toMatchObject({ nfiMatchState: "unmatched" });
+  });
   it.each([undefined, "Unknown license date", "Revoked", "Expired"])("does not infer a current license from verified identity: %s", (licenseStatus) => {
     const built = buildDecisionGraphInventoryFromContractsV2({ masterRegistry: [master],
       marketProducts: [product({ licenseStatus, licenseValidUntilJalali: undefined, matchConfidence: 100 })],

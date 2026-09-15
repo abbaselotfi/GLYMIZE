@@ -14,6 +14,8 @@
 
 ## 0. Owner model checkpoint and token policy — 2026-09-11
 
+**Current September 16 packet: R29-05-B / Astra Medium / medium token cost.** Complete Type 2 regression verification and publish all reviewed local changes on the existing fix branch. Its Pages Preview exclusion was independently rechecked; publication is no longer blocked by the old all-branches setting below. Build-local indexes/calendar reuse and component-local insurance filtering preserve clinical semantics. One browser integration wait and the new real-market test use explicit 15s correctness limits after measured cold-run variance; this is not latency-SLO acceptance. RC/production deployment destination and rollout gates remain unresolved. All R29-01 through R29-05 and R30 protected-offline obligations remain scheduled.
+
 Owner approved R29, R30 and this workflow in the continuation conversation. Implementation approval persists across chats; environment activation and existing release gates remain distinct. Recommendations below are task-routing judgments, not measured quota multipliers. Agents cannot infer the active reasoning setting from their model identity or claim to switch the owner's model without an exposed control.
 
 Before each implementation packet, display in Persian:
@@ -33,6 +35,8 @@ Default: Astra Medium for implementation; Astra Light for mechanical documentati
 **R29-05-A local checks passed:** [rollout/rollback evidence](R29_05_A_LOCAL_ROLLOUT_2026-09-15.md), 18 matrix rows; Worker 354, web 328 and engine 443 tests pass sequentially; typecheck/lint pass. Earlier parallel timing failures are disclosed. Remote RC acceptance remains not run. **Next: publication safety resolution, then R29-05-B RC readiness planning / Astra Medium / medium relative token cost.** Owner approved reviewed Commit/Push without Deploy, but Pages previews all branches: Push is blocked until explicitly authorized branch-setting remediation and trigger recheck. No deployment, migration or main merge. Same-model continuation needs no renewed scope approval. All five R29 items and protected offline obligations remain scheduled.
 
 ## 1. Product North Star
+
+R29-05-B — 2026-09-15: [RC readiness and Type 2 CI repair](R29_05_B_RC_READINESS_AND_TYPE2_FIX_2026-09-15.md). Previous checkpoint is on GitHub with confirmed skipped Pages build/deploy. Populated-market E2E regression is addressed with semantics-preserving build-local indexes/calendar reuse; full verification and repair publication pending. Remote target must be pinned by active-version bindings; plan ceilings/isolation/candidate deployment remain unverified. Continue Astra Medium for bounded repair/CI verification, no deployment until destination and gates are resolved. All R29 and protected-offline obligations remain scheduled.
 
 Publication follow-up — 2026-09-15: implementation checkpoint 7892284 committed. Owner-approved exclusion of only the current fix branch from Pages Preview is applied and GET-verified; main and other source fields unchanged. GitHub validation-only PR #143 has auto-merge off. Workers Builds API 403 was handled with read-only account inventory and both GLYMIZE Workers' disconnected Git settings in the dashboard. See the R29-05-A report follow-up; it supersedes the previous publication blocker. Push verification is separate from deployment/RC acceptance; next technical packet remains R29-05-B / Astra Medium.
 

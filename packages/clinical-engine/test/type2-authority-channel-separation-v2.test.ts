@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { calculateProductMonthlyCostV2 } from "../src/decision-graph-v2/cost.js";
 import {
   applyHardGatesV2,
   defaultDecisionGraphPolicyV2,
@@ -132,6 +133,37 @@ function baseRequest(): DecisionGraphRequestV2 {
 }
 
 describe("Type 2 authority-channel separation", () => {
+  it("preserves exact insurance priority and first master fallback after component filtering", () => {
+    const request = baseRequest();
+    request.preferences.insuranceProviders = ["social_security", "health_insurance", "unknown"];
+    const selectedProduct = request.inventory.marketProducts[0]!;
+    const item = candidate("WD-ORAL", "oral_glucose_lowering", "oral", "tablet");
+    const plan = {
+      ruleId: "test-dose", indication: "type2", administrationsPerDay: 1,
+      presentationUnitsPerDay: 1, dosageFormGroup: "tablet", evidence: [evidence],
+    };
+    item.components[0]!.dosePlan = plan;
+    request.inventory.insurancePolicies = [
+      { id: "unrelated", provider: "social_security", masterDrugId: "OTHER", coveragePercent: 99 },
+      { id: "first-fallback", provider: "health_insurance", masterDrugId: "WD-ORAL", productId: "other-brand", coveragePercent: 35 },
+      { id: "fallback", provider: "social_security", masterDrugId: "WD-ORAL", coveragePercent: 40 },
+      { id: "exact", provider: "social_security", productId: selectedProduct.productId, masterDrugId: "OTHER", coveragePercent: 60 },
+      { id: "duplicate", provider: "social_security", productId: selectedProduct.productId, coveragePercent: 90 },
+      { id: "later-fallback", provider: "health_insurance", masterDrugId: "WD-ORAL", coveragePercent: 80 },
+    ];
+    for (let run = 0; run < 2; run += 1) {
+      const expected = calculateProductMonthlyCostV2({ product: selectedProduct, dose: plan,
+        insurancePolicies: request.inventory.insurancePolicies, preferences: request.preferences });
+      const actual = enrichCandidateWithDoseMarketCostV2(request, item).components[0]!.selectedProductCost;
+      expect(actual).toBeDefined();
+      expect(actual).toEqual(expected);
+      if (run === 0) {
+        expect(actual!.insurance.map((cost) => cost.rawCoveragePercent)).toEqual([60, 35, undefined]);
+        request.inventory.insurancePolicies.reverse();
+      }
+    }
+  });
+
   it("keeps oral-only as a selection constraint rather than a clinical exclusion", () => {
     const injectable = medication({
       masterDrugId: "WD-INJECT",
