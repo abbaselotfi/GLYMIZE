@@ -1,5 +1,9 @@
 # معماری سامانه
 
+## RC deployment boundary — R29-05-C (2026-09-19)
+
+`apps/admin-worker/wrangler.rc.jsonc` pins the existing RC Worker/D1/KV/R2 independently of the production config, retains remote variables, and discovers only owner-authorized migration 0018. Migration 0019 and new read/offline flags remain gated. Pages' provider-labelled production slot belongs to `rc.glymize.ir`; direct upload there does not merge Git main or deploy the production Worker. [Release evidence and recovery points](R29_05_C_RC_DEPLOYMENT_2026-09-19.md) distinguish deployment smoke from clinical/performance acceptance.
+
 September 16 R29-05-B follow-up: per-component insurance prefiltering removes only impossible product/master matches before the existing calculator; order, exact-match priority and fallback remain unchanged. No persistent/shared cache. Differential tests cover duplicate and other-brand rules. Integration timeouts now explicitly allow 15s for full-market cold execution; performance SLO/RC acceptance remains separate.
 
 ## Type 2 inventory build-local indexes — R29-05-B (2026-09-15)

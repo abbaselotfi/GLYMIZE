@@ -1,6 +1,10 @@
 # GLYMIZE active task handoff
 
-Updated: 2026-09-16
+Updated: 2026-09-19
+
+- **RC release completed:** 0018 applied; Worker 787faa91-1d2c-41ce-8a78-929dde88c9c6 and Pages 45784fd0-be72-4b17-9315-a400e78c0401 live at https://rc.glymize.ir. HTTP and bounded unauthenticated browser smoke pass; initial networkidle timeout is disclosed in the release report. Production and 0019 unchanged. Configuration/tests/docs publication follows; authenticated acceptance and controlled R29 performance/flag rollout remain outstanding. This checkpoint supersedes in-progress and destination-blocked entries below.
+
+- **Current R29-05-C / Astra Medium:** owner selected RC and separately authorized only migration 0018. Candidate 6f70c58 is on GitHub; CI 35022947290 passed. RC D1 3fa1a950... now has 0018 with verified roles/triggers/FK integrity; 0019 untouched. New RC-only Wrangler config pins resources and exact migration filename, preserves remote variables. Old 4.115.0 migration attempt failed atomically on CRLF triggers; one-off 4.135.0 succeeded without SQL/dependency changes. RC Worker version 787faa91-1d2c-41ce-8a78-929dde88c9c6 is live, variables/secret metadata unchanged, health ready. Frontend upload/smoke/publication of evidence in progress. See R29_05_C_RC_DEPLOYMENT_2026-09-19.md for recovery points. No production/main merge or new feature activation; older unresolved-target notes are superseded.
 
 - **Publication-ready checkpoint:** fresh-build Playwright critical flows PASS, 4/4 (Type 2 flow 9.2s including navigation/input). Full local gates above/below pass. Current branch contains origin/main (3 ahead/0 behind before this commit); PR #143 declarations present and auto-merge off; Pages exact branch exclusion reverified. Commit/Push is authorized and being executed; remote SHA/CI and skipped deployment event must be verified afterward. Deployment destination still unresolved.
 
