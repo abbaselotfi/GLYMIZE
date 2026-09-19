@@ -1,5 +1,9 @@
 # معماری سامانه
 
+## Windows reference shell — R30-03-A (2026-09-20; design, not implementation)
+
+[The Windows shell contract](architecture/WINDOWS_SHELL_R30_03_A.md) chooses embedded Tauri 2 static assets with a dedicated reference-only build profile, isolated staging and reused `/offline/` UI/parser/P0 projection. It does not wrap the RC website or run a Node sidecar. No clinician auth, public-cache permission bypass, privileged IPC, arbitrary local files/SQL/HTTP, remote navigation or Service Worker startup requirement belongs to the first desktop packet. Explicit native navigation policy, capabilities and CSP are separately verified in the packaged WebView2 runtime. A disconnected installer includes its WebView2 prerequisite; signed distribution remains R30-08. R30-04/05/06/07 retain encrypted local records, engine authority, sync and grants. Next B implementation uses Sol High after the owner checkpoint; C supplies actual native acceptance. Current web/RC behavior is unchanged.
+
 ## RC deployment boundary — R29-05-C (2026-09-19)
 
 `apps/admin-worker/wrangler.rc.jsonc` pins the existing RC Worker/D1/KV/R2 independently of the production config, retains remote variables, and discovers only owner-authorized migration 0018. Migration 0019 and new read/offline flags remain gated. Pages' provider-labelled production slot belongs to `rc.glymize.ir`; direct upload there does not merge Git main or deploy the production Worker. [Release evidence and recovery points](R29_05_C_RC_DEPLOYMENT_2026-09-19.md) distinguish deployment smoke from clinical/performance acceptance.

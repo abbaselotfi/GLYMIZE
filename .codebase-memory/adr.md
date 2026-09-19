@@ -1,5 +1,9 @@
 # GLYMIZE Codebase Memory ADR
 
+## 2026-09-20 — Embed a reference-only Windows shell before protected offline capabilities
+
+R30-03-A selects Tauri 2 embedded static assets and a dedicated reference-only desktop profile reusing the existing page/parser/P0 projection. Isolate staging from Pages/RC outputs and inherited API settings; never package a stale gateway or use a remote website/Node sidecar as startup. No privileged app commands/plugins, remote navigation, clinician auth or SW dependency in the initial shell. Explicit native navigation, CSP and capability tests precede acceptance; future app handlers require command manifests plus business authorization. Use an offline WebView2 prerequisite for disconnected installation; signing is still a release gate. No encrypted PHI, grants, sync or clinical authority is introduced. R30-03-B implementation uses Sol High after the owner checkpoint; C records real native installation/blackout evidence, not substituted browser smoke. See docs/architecture/WINDOWS_SHELL_R30_03_A.md and docs/ARCHITECTURE.md. This is design only; all five R29 obligations remain.
+
 ## 2026-09-20 — Route implementation packets through Sol High and resume local-first order
 
 Sol High replaces Astra Medium for future implementation packets. Preserve historical model labels as execution records. Sol Extra High requires a separate checkpoint and a concrete reason; pause before every model or reasoning-level change. Astra High remains bounded to security, authority, consistency and architecture reviews. R29-05-C RC deployment/evidence is complete at `932c1a1` with passing CI. C1 workspace is implemented; C2 interaction/usability evidence remains open. Resume the canonical local-first sequence at R30-03-A Tauri/Windows shell architecture, then return to Sol High for implementation.
