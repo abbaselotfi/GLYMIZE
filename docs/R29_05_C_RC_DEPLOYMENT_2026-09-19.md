@@ -33,6 +33,8 @@ Post-deploy HTTP: `/`, `/type-2/` and `/runtime-api/v1/platform-v3` return 200; 
 
 This is deployment verification, not completion of R29 benchmark/replication/rollback-exercise gates or protected offline clinical acceptance. Authenticated RC workflow acceptance remains outstanding. Configuration, tests, Roadmap and ADR evidence are published separately from the already deployed runtime candidate.
 
+Publication follow-up: evidence/configuration commit `932c1a1e5cd1cbf94ec3d9462f329e249ec1e8e1` is on the fix branch and GitHub Actions run `35457811581` passed. Its exact-branch Pages event was skipped, so canonical RC Pages deployment `45784fd0-be72-4b17-9315-a400e78c0401` remained active.
+
 ## Repository gate
 
 Pre-refresh accumulated graph delta: 117 to 120 paths; Git independently identifies this packet's seven edited/new files. Whole-document ADR synchronized and full local index refreshed: 8363 nodes / 32174 edges, 25 known partial files, zero skipped. Exact-source fallback covers the migration/configuration and changed test; the graph is not exhaustive evidence. Local graph binary remains ignored. PR #143 remains open with auto-merge disabled; exact fix-branch Pages Preview exclusion independently reverified before publication. No main merge or automatic RC re-deployment is part of this evidence commit.

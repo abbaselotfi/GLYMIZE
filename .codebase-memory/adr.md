@@ -1,5 +1,9 @@
 # GLYMIZE Codebase Memory ADR
 
+## 2026-09-20 — Route implementation packets through Sol High and resume local-first order
+
+Sol High replaces Astra Medium for future implementation packets. Preserve historical model labels as execution records. Sol Extra High requires a separate checkpoint and a concrete reason; pause before every model or reasoning-level change. Astra High remains bounded to security, authority, consistency and architecture reviews. R29-05-C RC deployment/evidence is complete at `932c1a1` with passing CI. C1 workspace is implemented; C2 interaction/usability evidence remains open. Resume the canonical local-first sequence at R30-03-A Tauri/Windows shell architecture, then return to Sol High for implementation.
+
 ## 2026-09-19 — Pin RC resources and the authorized migration ceiling
 
 Use a separate RC-only Wrangler config with exact existing Worker/D1/KV/R2 IDs, keep_vars, unchanged compatibility date, and migrations_pattern matching only 0018. Do not alter the default production config or activate default-off features. Pages main deployment slot serves the RC custom domain and does not imply Git main merge. Preserve previous Worker/Pages version IDs and a D1 Time Travel bookmark; restore is an incident decision that can discard later writes. Use a fixed one-off Wrangler 4.135.0 for the known CRLF-trigger migration bug, leaving canonical SQL and dependency lockfile unchanged. See docs/R29_05_C_RC_DEPLOYMENT_2026-09-19.md.
