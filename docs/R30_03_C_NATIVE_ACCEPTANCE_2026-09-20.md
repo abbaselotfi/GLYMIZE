@@ -43,7 +43,7 @@ The package is intentionally unsigned because trusted code signing belongs to R3
 | Effective native policy | External `fetch` rejected with a `connect-src` CSP violation; `window.__TAURI__` absent; `window.open` denied; runtime navigation to local `/admin/` cancelled and remained on the reference page. |
 | Process cleanup | App and all seven observed descendants exited after the bounded test. |
 
-Repository gates pass sequentially: desktop 5/5, Rust 3/3, Worker 356, clinical engine 447, web 330 with one intentional skip, and API 2. Turbo typecheck passes 9/9 tasks and lint passes 7/7. The final refreshed graph records 8,558 nodes / 32,842 edges, 25 known partial parses and zero skipped files. New native-test and navigation symbols resolve; direct source remains authoritative where graph heuristic edges are spurious or generated/binary files are excluded.
+Repository gates pass sequentially: desktop 5/5, Rust 3/3, Worker 356, clinical engine 447, web 330 with one intentional skip, and API 2. Turbo typecheck passes 9/9 tasks and lint passes 7/7. The final refreshed graph records 8,559 nodes / 32,844 edges, 25 known partial parses and zero skipped files. New native-test and navigation symbols resolve; direct source remains authoritative where graph heuristic edges are spurious or generated/binary files are excluded.
 
 ## Publication evidence
 
