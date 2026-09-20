@@ -43,7 +43,13 @@ The package is intentionally unsigned because trusted code signing belongs to R3
 | Effective native policy | External `fetch` rejected with a `connect-src` CSP violation; `window.__TAURI__` absent; `window.open` denied; runtime navigation to local `/admin/` cancelled and remained on the reference page. |
 | Process cleanup | App and all seven observed descendants exited after the bounded test. |
 
-Repository gates pass sequentially: desktop 5/5, Rust 3/3, Worker 356, clinical engine 447, web 330 with one intentional skip, and API 2. Turbo typecheck passes 9/9 tasks and lint passes 7/7. The refreshed graph records 8,558 nodes / 32,843 edges, 25 known partial parses and zero skipped files. New native-test and navigation symbols resolve; direct source remains authoritative where graph heuristic edges are spurious or generated/binary files are excluded.
+Repository gates pass sequentially: desktop 5/5, Rust 3/3, Worker 356, clinical engine 447, web 330 with one intentional skip, and API 2. Turbo typecheck passes 9/9 tasks and lint passes 7/7. The final refreshed graph records 8,558 nodes / 32,842 edges, 25 known partial parses and zero skipped files. New native-test and navigation symbols resolve; direct source remains authoritative where graph heuristic edges are spurious or generated/binary files are excluded.
+
+## Publication evidence
+
+Implementation commit `ea02642b8ac212edd5e266ff421ae72ca1e75dc3` and clean-candidate evidence commit `db505e9fc17a2736eadb0c186c7bf74b06c200a0` were pushed to `fix/r28-07-handoff-confirmation-lifecycle-20260910`. GitHub PR #143 remains open against `main` with auto-merge disabled. Validation run [`35524913635`](https://github.com/abbaselotfi/GLYMIZE/actions/runs/35524913635) passed in 4m24s, including the Roadmap/Graph declarations, monorepo typecheck, lint, tests and four critical web flows.
+
+Cloudflare Pages recorded preview event `a0e289d6-2f79-4e90-af32-03cead0d71e8` for exact commit `db505e9fc17a2736eadb0c186c7bf74b06c200a0` with `is_skipped=true`. Queued, initialize, clone, build and deploy stages all remained `idle`; the branch-specific Preview exclusion remained exact. This is publication evidence only: no Pages build/deploy, main merge, Worker deployment, migration or production change occurred.
 
 ## Network limitation and remaining acceptance
 
