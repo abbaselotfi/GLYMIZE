@@ -21,8 +21,10 @@ Windows packaging required the standard Tauri `icons/icon.ico`; it is generated 
 | WebView2 present case | `153.0.4234.48` |
 | Locked Rust graph | 430 lock entries (the build resolved 429 dependencies); `Cargo.lock` 109,844 bytes, SHA-256 `6F5B6663744EA437C87AC11418EB60C975C59F42A7A5F1DB76037F0A07407384` |
 | Offline WebView2 input | 213,053,648 bytes; SHA-256 `AD9B350625E132481BC0953EEE9E032810134DF9FEDBD7BE364C3F4E0E4DBD64`; valid Microsoft Corporation Authenticode signature |
-| Dirty-tree NSIS candidate | 219,074,533 bytes; SHA-256 `F4A9F90518FA672DD703E2FC1C663963F1BA42590811B1E78B78EA28579039DD`; unsigned/internal test only |
-| Install result | Exit `0`; one HKCU uninstall entry; version `0.1.0`; no pre-existing installation |
+| Clean source/artifact | Commit `ea02642b8ac212edd5e266ff421ae72ca1e75dc3`; manifest `18015f82d63957dbceebb3f0`; 14 assets / 3,436,548 bytes; `sourceDirty=false` |
+| Clean NSIS candidate | 219,074,637 bytes; SHA-256 `13C48BAF7FF641C551E998CA39B07D2DB44969A948784843376034D520CD9BEB`; unsigned/internal test only |
+| Installed executable | 9,775,616 bytes; SHA-256 `EF98364B09A5111AB8DDC02FC2DDF533F8F4CA9F6FBAEA069FD245B95CEE3F8C` |
+| Install result | Initial install and final clean-candidate reinstall exit `0`; one HKCU uninstall entry; version `0.1.0`; no pre-existing installation before the initial run |
 
 The first native compile correctly failed because the required Windows ICO was absent. After generating the resource, the Rust release binary compiled. The first NSIS attempt then exposed an intermittent TLS EOF at the Microsoft WebView2 CDN. Windows BITS downloaded the exact official redirect target into Tauri's standard cache; its Microsoft signature and SHA-256 were checked before packaging. The later Tauri HEAD request and NSIS build succeeded. This cache intervention is build-host evidence, not an end-user runtime dependency.
 
@@ -35,8 +37,8 @@ The package is intentionally unsigned because trusted code signing belongs to R3
 | Rust navigation policy | 3/3 pass: exact allowed routes plus scheme/origin/port/path/query/fragment/credential negatives. |
 | Desktop build/security tests | 5/5 pass, including empty capability/no IPC-plugin assertions and exact background-network arguments. |
 | Installed startup | Responsive native window titled `GLYMIZE · Local Reference`; observed app working set about 28 MB and 1.19 CPU-seconds after 15 seconds. |
-| Installed UI through local CDP test hook | CDP ready in 1,098 ms; search UI ready in 2,463 ms; `metformin` returns 30 cards. The hook is test-process-only and is not configured in the product. |
-| Page network isolation | Reload/search produced 15 local page requests and zero external page requests while page traffic used a `127.0.0.1:9` black-hole proxy. No cloud fallback occurred. |
+| Installed UI through local CDP test hook | Final clean candidate: CDP ready in 2,701 ms; search UI ready in 4,101 ms; `metformin` returns 30 cards. The hook is test-process-only and is not configured in the product. |
+| Page network isolation | Final reload/search produced 17 local page requests and zero external page requests while page traffic used a `127.0.0.1:9` black-hole proxy. The clean staged-browser control used 12 local/zero external requests. No cloud fallback occurred. |
 | Renderer state | Only the optional P1 UI-language key existed (`fa`); query text was not stored. Session storage and Service Worker registrations were empty. |
 | Effective native policy | External `fetch` rejected with a `connect-src` CSP violation; `window.__TAURI__` absent; `window.open` denied; runtime navigation to local `/admin/` cancelled and remained on the reference page. |
 | Process cleanup | App and all seven observed descendants exited after the bounded test. |
