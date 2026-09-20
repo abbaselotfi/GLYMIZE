@@ -9,7 +9,8 @@
     "lint": "biome lint --diagnostic-level=error .",
     "test": "node --test test/reference-profile.test.mjs",
     "test:artifact": "node scripts/test-reference-artifact.mjs",
-    "test:browser": "node scripts/test-reference-browser.mjs"
+    "test:browser": "node scripts/test-reference-browser.mjs",
+    "test:native-runtime": "node scripts/test-native-runtime.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

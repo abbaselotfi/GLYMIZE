@@ -1,5 +1,9 @@
 # معماری سامانه
 
+## Windows installed reference evidence — R30-03-C1 (2026-09-20; partial acceptance)
+
+[The C1 evidence](R30_03_C_NATIVE_ACCEPTANCE_2026-09-20.md) records a real MSVC Rust build, committed Cargo lock, offline-WebView2 NSIS package, non-admin current-user installation and effective installed-runtime checks. The installed renderer performs only local page requests, keeps search volatile, exposes no global Tauri API and rejects external fetch, new windows and non-reference navigation. Browser background-suppression flags are defense in depth, not authority: Evergreen WebView2 still made two runtime-owned Microsoft connections on the test machine, so zero-process-egress is not claimed. A disposable clean Windows environment must still prove WebView2-absent installation, no-toolchain startup, reboot and full firewall/DNS blackout in C2. The unsigned package is internal evidence only; signing remains R30-08. No protected offline capability or R29 obligation changed.
+
 ## Windows reference shell implementation — R30-03-B (2026-09-20; native acceptance pending)
 
 [The B implementation](R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) adds an isolated deterministic desktop export/stage, strict file/hash/P0 manifest validation, installed-reference semantics and a minimal Tauri 2 scaffold. The native candidate grants no IPC commands/plugins, denies remote navigation/new windows/downloads, disables asset filesystem access and uses a restrictive CSP plus offline WebView2 NSIS candidate. Browser evidence proves the staged renderer makes no external requests and creates no SW/storage state; it does not prove the effective compiled WebView or installer. Rust/MSVC provisioning, Cargo lock, native compile/install/blackout and effective policy negatives remain R30-03-C. Normal root and `/GLYMIZE` web exports retain their tested behavior. No PHI, auth, clinical authority, migration, cloud activation or signing boundary changed.

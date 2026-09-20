@@ -59,6 +59,8 @@ test("native scaffold exposes no IPC command or remote navigation permission", a
   assert.deepEqual(config.app.security.capabilities[0].permissions, []);
   assert.equal(config.app.withGlobalTauri, false);
   assert.equal(config.app.windows[0].create, false);
+  assert.equal(config.app.windows[0].additionalBrowserArgs,
+    "--disable-background-networking --disable-component-update --disable-domain-reliability --disable-sync --metrics-recording-only --no-first-run");
   assert.equal(config.bundle.windows.webviewInstallMode.type, "offlineInstaller");
   const rust = await readFile(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
   assert.match(rust, /on_navigation/);

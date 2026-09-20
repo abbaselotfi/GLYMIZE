@@ -23,7 +23,8 @@
         "devtools": false,
         "dragDropEnabled": false,
         "zoomHotkeysEnabled": false,
-        "browserExtensionsEnabled": false
+        "browserExtensionsEnabled": false,
+        "additionalBrowserArgs": "--disable-background-networking --disable-component-update --disable-domain-reliability --disable-sync --metrics-recording-only --no-first-run"
       }
     ],
     "security": {

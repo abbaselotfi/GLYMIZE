@@ -1,6 +1,6 @@
 # R30-03-A — Windows shell and static-export boundary
 
-Date: 2026-09-20. Status: bounded Astra High design complete; [R30-03-B reference implementation](../R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) complete locally; installed-Windows acceptance NOT complete. Parent contracts: [R30-01](LOCAL_FIRST_R30_01.md), [reference authority](OFFLINE_REFERENCE_AUTHORITY_R30_02_D.md) and [Roadmap sections 29–30](../ROADMAP.md). Next packet: R30-03-C / Sol High.
+Date: 2026-09-20. Status: bounded Astra High design and [R30-03-B reference implementation](../R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) complete; [R30-03-C1 native evidence](../R30_03_C_NATIVE_ACCEPTANCE_2026-09-20.md) passes the WebView2-present build/install/runtime boundary but not clean-machine/runtime-absent/full-blackout acceptance. Parent contracts: [R30-01](LOCAL_FIRST_R30_01.md), [reference authority](OFFLINE_REFERENCE_AUTHORITY_R30_02_D.md) and [Roadmap sections 29–30](../ROADMAP.md). Next packet: R30-03-C2 / Sol High in a disposable Windows environment.
 
 ## 1. Decision and current evidence
 
