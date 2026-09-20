@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .next/
+.next-desktop-reference/
 out/
 coverage/
 playwright-report/

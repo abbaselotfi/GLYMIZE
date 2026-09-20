@@ -1,6 +1,6 @@
 # R30-03-A — Windows shell and static-export boundary
 
-Date: 2026-09-20. Status: bounded Astra High design complete; implementation and installed-Windows acceptance NOT complete. Parent contracts: [R30-01](LOCAL_FIRST_R30_01.md), [reference authority](OFFLINE_REFERENCE_AUTHORITY_R30_02_D.md) and [Roadmap sections 29–30](../ROADMAP.md). Next packet: R30-03-B / Sol High, after the owner model checkpoint.
+Date: 2026-09-20. Status: bounded Astra High design complete; [R30-03-B reference implementation](../R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) complete locally; installed-Windows acceptance NOT complete. Parent contracts: [R30-01](LOCAL_FIRST_R30_01.md), [reference authority](OFFLINE_REFERENCE_AUTHORITY_R30_02_D.md) and [Roadmap sections 29–30](../ROADMAP.md). Next packet: R30-03-C / Sol High.
 
 ## 1. Decision and current evidence
 
@@ -56,7 +56,7 @@ Unsigned internal candidates must be labelled untrusted/test-only. Do not recomm
 | **R30-03-C / Sol High** | Windows native compile/package and actual WebView2 tests. Clean-user install without Node/Rust/Git; cold launch and reboot with all network blocked; runtime-present and runtime-absent offline installation cases; native negative navigation/IPC/CSP cases. Record exact OS/runtime/compiler/app versions, package hash/size, local CPU/RAM/startup and network attempts. If native tooling/VM unavailable, report that gate open, never substitute browser smoke. |
 | **R30-03-D / bounded Astra High only if needed** | Review demonstrated native boundary failures or any proposed capability expansion. R30-04 encryption/grants remain their own design checkpoint. R30-08 owns trusted release/signing, not an unsigned C artifact. |
 
-B acceptance matrix (all initially pending):
+B acceptance matrix is implemented and recorded in the B evidence report. Actual native-policy assertions below remain C where noted:
 
 - Deterministic clean staging; planted stale gateway/secret/admin file, symlink, unsafe path, missing asset or hash mismatch prevents successful packaging.
 - Packaged reference search matches the existing parser/projection; exact ID set and meaningful nonempty results, bounded 30-row pagination and volatile search are preserved. Invalid/missing data yields visible failure, no cloud retry.

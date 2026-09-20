@@ -17,23 +17,30 @@ import "./type-2/type2-evidence-trace-v3.css";
 import "./type-2/type2-adaptive-cards-v3.css";
 import "./type-2/type2-final-ux-v4.css";
 
-export const metadata: Metadata = {
-  referrer: "no-referrer",
-  title: "GLYMIZE | Patient-Centered Clinical Intelligence",
-  description:
-    "A bilingual physician workspace for longitudinal patient records, evidence, medication intelligence, and specialty clinical modules.",
-  manifest: withBasePath("/manifest.webmanifest"),
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "GLYMIZE",
-  },
-  icons: {
-    icon: withBasePath("/glymize-favicon.svg"),
-    shortcut: withBasePath("/glymize-favicon.svg"),
-    apple: withBasePath("/glymize-app-icon.png"),
-  },
-};
+const isDesktopReferenceBuild =
+  process.env.NEXT_PUBLIC_DESKTOP_REFERENCE_PROFILE === "true";
+
+export function generateMetadata(): Metadata {
+  return {
+    referrer: "no-referrer",
+    title: "GLYMIZE | Patient-Centered Clinical Intelligence",
+    description:
+      "A bilingual physician workspace for longitudinal patient records, evidence, medication intelligence, and specialty clinical modules.",
+    ...(isDesktopReferenceBuild ? {} : {
+      manifest: withBasePath("/manifest.webmanifest"),
+      appleWebApp: {
+        capable: true,
+        statusBarStyle: "default" as const,
+        title: "GLYMIZE",
+      },
+    }),
+    icons: {
+      icon: withBasePath("/glymize-favicon.svg"),
+      shortcut: withBasePath("/glymize-favicon.svg"),
+      apple: withBasePath("/glymize-app-icon.png"),
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -49,8 +56,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fa" dir="rtl" data-glymize-theme="clinical" data-glymize-mode="light">
       <body>
-        <LegacyPatientRouteBridge />
-        <RouteAwareShell>{children}</RouteAwareShell>
+        {isDesktopReferenceBuild ? children : <>
+          <LegacyPatientRouteBridge />
+          <RouteAwareShell>{children}</RouteAwareShell>
+        </>}
       </body>
     </html>
   );

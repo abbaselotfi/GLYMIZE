@@ -13,6 +13,7 @@ assert.equal(manifest.profile, "reference-lite");
 assert(!manifest.assets.some((asset) => /admin-catalog|market-v2|\/type-[12]\/|\/pregnancy\//.test(asset.path)));
 const profile = await mkdtemp(path.join(tmpdir(), "glymize-static-browser-"));
 let context;
+let page;
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, "http://fixture.test");
   if (!url.pathname.startsWith(`${basePath}/`)) { response.writeHead(404).end(); return; }
@@ -40,7 +41,7 @@ try {
   const origin = `http://glymize.test:${server.address().port}`;
   const options = {
     headless: true,
-    ...(process.env.PLAYWRIGHT_USE_SYSTEM_CHROME === "1" ? { channel: "chrome" } : {}),
+    channel: process.env.PLAYWRIGHT_USE_SYSTEM_CHROME === "1" ? "chrome" : "chromium",
     args: ["--host-resolver-rules=MAP glymize.test 127.0.0.1", "--no-proxy-server", `--unsafely-treat-insecure-origin-as-secure=${origin}`],
   };
   context = await chromium.launchPersistentContext(profile, options);
@@ -51,7 +52,8 @@ try {
     localStorage.setItem("synthetic-cache-migration-seeded", "1");
     void Promise.all([caches.open("unrelated-application"), caches.open(`glymize-offline:${scope}:old-experimental`), caches.open(`glymize-pwa:${scope}:old-shell`)]);
   }, { scope: `${origin}${basePath}/` });
-  let page = await context.newPage();
+  page = await context.newPage();
+  page.on("pageerror", (error) => console.error("[static-browser] page error", error));
   console.log("[static-browser] legacy route");
   const id = "synthetic-A%2F+&ب";
   await page.goto(`${origin}${basePath}/patients/${encodeURIComponent(id)}/`);
@@ -127,6 +129,7 @@ try {
   console.log(JSON.stringify({ browser: context.browser().version(), version: manifest.version, basePath, legacyIdRoundTrip: true, unrelated404: true, offlineNavigation: true, restart: true, hostBlackout: true, privateDenied: true, clinicalAccess: "not claimed; existing auth gate preserved" }));
 } catch (error) {
   console.error("[static-browser] failed", error);
+  console.error("[static-browser] current URL", page?.url());
   throw error;
 } finally {
   await context?.close();

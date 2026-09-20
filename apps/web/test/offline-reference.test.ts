@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { loadOfflineReference, parseOfflineReference, searchOfflineReferences } from "../lib/offline-reference";
+import { loadDesktopReference, loadOfflineReference, parseDesktopReferenceManifest, parseOfflineReference, searchOfflineReferences } from "../lib/offline-reference";
 
 const projectorUrl = new URL("../scripts/offline-reference-projection.mjs", import.meta.url).href;
 const { projectOfflineReference } = await import(projectorUrl);
@@ -44,6 +44,31 @@ describe("standalone P0 reference boundary", () => {
     await expect(loadOfflineReference(new AbortController().signal)).rejects.toThrow("OFFLINE_REFERENCE_TOO_LARGE");
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 503 })));
     await expect(loadOfflineReference(new AbortController().signal)).rejects.toThrow("OFFLINE_REFERENCE_UNAVAILABLE");
+  });
+  it("binds a desktop package manifest to the exact projected source", async () => {
+    const projected = fixture();
+    const manifest = { schemaVersion: 1, profile: "desktop-reference", version: "b".repeat(24),
+      sourceRevision: "c".repeat(40), sourceDirty: false, sourceHash: projected.sourceHash,
+      sourceDate: projected.sourceDate, totalBytes: 123, assets: [{ path: "offline/index.html", bytes: 123, sha256: "d".repeat(64) }] };
+    expect(parseDesktopReferenceManifest(manifest)).toEqual(manifest);
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(Response.json(manifest))
+      .mockResolvedValueOnce(Response.json(projected));
+    vi.stubGlobal("fetch", fetch);
+    const loaded = await loadDesktopReference(new AbortController().signal);
+    expect(loaded.bundleVersion).toBe(manifest.version);
+    expect(fetch).toHaveBeenNthCalledWith(1, "/desktop-reference-manifest.json", expect.objectContaining({ credentials: "omit", cache: "no-store" }));
+    expect(fetch).toHaveBeenNthCalledWith(2, "/data/offline-reference.json", expect.objectContaining({ credentials: "omit" }));
+  });
+  it("rejects malformed desktop manifests and mismatched projected sources", async () => {
+    const projected = fixture();
+    const manifest = { schemaVersion: 1, profile: "desktop-reference", version: "b".repeat(24),
+      sourceRevision: "c".repeat(40), sourceDirty: false, sourceHash: "e".repeat(64),
+      sourceDate: projected.sourceDate, totalBytes: 123, assets: [{ path: "offline/index.html", bytes: 123, sha256: "d".repeat(64) }] };
+    expect(() => parseDesktopReferenceManifest({ ...manifest, remoteApi: "https://example.test" })).toThrow();
+    expect(() => parseDesktopReferenceManifest({ ...manifest, assets: [{ ...manifest.assets[0], path: "admin/index.html" }] })).toThrow();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json(manifest)).mockResolvedValueOnce(Response.json(projected)));
+    await expect(loadDesktopReference(new AbortController().signal)).rejects.toThrow("DESKTOP_REFERENCE_SOURCE_MISMATCH");
   });
   it("keeps auth, draft, engine and patient APIs out of the dedicated source surface", () => {
     const page = readFileSync(new URL("../app/offline/page.tsx", import.meta.url), "utf8");

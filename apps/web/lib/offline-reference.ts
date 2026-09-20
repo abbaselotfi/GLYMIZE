@@ -3,6 +3,9 @@ import { withBasePath } from "./base-path";
 export type OfflineReferenceRow = { id: string; name: string; brand: string | null; form: string | null;
   strength: string | null; license: string | null; observation: string | null; sourceUrl: string | null };
 export type OfflineReference = { schemaVersion: 1; profile: "reference-lite"; sourceHash: string; sourceDate: string; rows: OfflineReferenceRow[] };
+export type DesktopReferenceManifest = { schemaVersion: 1; profile: "desktop-reference"; version: string;
+  sourceRevision: string; sourceDirty: boolean; sourceHash: string; sourceDate: string; totalBytes: number;
+  assets: { path: string; bytes: number; sha256: string }[] };
 const rowKeys = ["id", "name", "brand", "form", "strength", "license", "observation", "sourceUrl"];
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
@@ -50,6 +53,43 @@ export async function loadOfflineReference(signal: AbortSignal) {
   for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.length; }
   return { data: parseOfflineReference(JSON.parse(new TextDecoder().decode(joined))),
     bundleVersion: response.headers.get("x-glymize-offline-version") };
+}
+
+export function parseDesktopReferenceManifest(value: unknown): DesktopReferenceManifest {
+  const keys = ["schemaVersion", "profile", "version", "sourceRevision", "sourceDirty", "sourceHash", "sourceDate", "totalBytes", "assets"];
+  if (!record(value) || Object.keys(value).sort().join() !== keys.sort().join()
+    || value.schemaVersion !== 1 || value.profile !== "desktop-reference"
+    || typeof value.version !== "string" || !/^[a-f0-9]{24}$/.test(value.version)
+    || typeof value.sourceRevision !== "string" || !/^[a-f0-9]{40}$/.test(value.sourceRevision)
+    || typeof value.sourceDirty !== "boolean"
+    || typeof value.sourceHash !== "string" || !/^[a-f0-9]{64}$/.test(value.sourceHash)
+    || typeof value.sourceDate !== "string" || !Number.isFinite(Date.parse(value.sourceDate))
+    || typeof value.totalBytes !== "number" || !Number.isSafeInteger(value.totalBytes) || value.totalBytes <= 0
+    || !Array.isArray(value.assets) || !value.assets.length || value.assets.length > 500) throw new Error("DESKTOP_REFERENCE_MANIFEST_INVALID");
+  const paths = new Set<string>();
+  for (const asset of value.assets) {
+    if (!record(asset) || Object.keys(asset).sort().join() !== ["path", "bytes", "sha256"].sort().join()
+      || typeof asset.path !== "string" || !/^(?:offline\/index\.html|data\/offline-reference\.json|_next\/static\/[A-Za-z0-9_./-]+|[A-Za-z0-9_-]+\.(?:png|svg|ico))$/.test(asset.path)
+      || asset.path.includes("..") || paths.has(asset.path)
+      || typeof asset.bytes !== "number" || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0
+      || typeof asset.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(asset.sha256)) throw new Error("DESKTOP_REFERENCE_ASSET_INVALID");
+    paths.add(asset.path);
+  }
+  return value as DesktopReferenceManifest;
+}
+
+export async function loadDesktopReference(signal: AbortSignal) {
+  const manifestResponse = await fetch(withBasePath("/desktop-reference-manifest.json"), {
+    signal, credentials: "omit", redirect: "error", referrerPolicy: "no-referrer", cache: "no-store",
+  });
+  if (!manifestResponse.ok) throw new Error("DESKTOP_REFERENCE_MANIFEST_UNAVAILABLE");
+  const length = Number(manifestResponse.headers.get("content-length") ?? 0);
+  if (length > 256 * 1024) throw new Error("DESKTOP_REFERENCE_MANIFEST_TOO_LARGE");
+  const manifest = parseDesktopReferenceManifest(await manifestResponse.json());
+  const loaded = await loadOfflineReference(signal);
+  if (loaded.data.sourceHash !== manifest.sourceHash || loaded.data.sourceDate !== manifest.sourceDate)
+    throw new Error("DESKTOP_REFERENCE_SOURCE_MISMATCH");
+  return { ...loaded, bundleVersion: manifest.version, desktopManifest: manifest };
 }
 
 export function searchOfflineReferences(rows: readonly OfflineReferenceRow[], query: string, page: number) {

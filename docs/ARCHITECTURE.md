@@ -1,6 +1,10 @@
 # معماری سامانه
 
-## Windows reference shell — R30-03-A (2026-09-20; design, not implementation)
+## Windows reference shell implementation — R30-03-B (2026-09-20; native acceptance pending)
+
+[The B implementation](R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) adds an isolated deterministic desktop export/stage, strict file/hash/P0 manifest validation, installed-reference semantics and a minimal Tauri 2 scaffold. The native candidate grants no IPC commands/plugins, denies remote navigation/new windows/downloads, disables asset filesystem access and uses a restrictive CSP plus offline WebView2 NSIS candidate. Browser evidence proves the staged renderer makes no external requests and creates no SW/storage state; it does not prove the effective compiled WebView or installer. Rust/MSVC provisioning, Cargo lock, native compile/install/blackout and effective policy negatives remain R30-03-C. Normal root and `/GLYMIZE` web exports retain their tested behavior. No PHI, auth, clinical authority, migration, cloud activation or signing boundary changed.
+
+## Windows reference shell — R30-03-A (2026-09-20; design)
 
 [The Windows shell contract](architecture/WINDOWS_SHELL_R30_03_A.md) chooses embedded Tauri 2 static assets with a dedicated reference-only build profile, isolated staging and reused `/offline/` UI/parser/P0 projection. It does not wrap the RC website or run a Node sidecar. No clinician auth, public-cache permission bypass, privileged IPC, arbitrary local files/SQL/HTTP, remote navigation or Service Worker startup requirement belongs to the first desktop packet. Explicit native navigation policy, capabilities and CSP are separately verified in the packaged WebView2 runtime. A disconnected installer includes its WebView2 prerequisite; signed distribution remains R30-08. R30-04/05/06/07 retain encrypted local records, engine authority, sync and grants. Next B implementation uses Sol High after the owner checkpoint; C supplies actual native acceptance. Current web/RC behavior is unchanged.
 

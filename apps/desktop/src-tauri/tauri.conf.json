@@ -1,0 +1,75 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GLYMIZE Reference",
+  "version": "0.1.0",
+  "identifier": "ir.glymize.reference",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "GLYMIZE · Local Reference",
+        "url": "offline/index.html",
+        "create": false,
+        "width": 1180,
+        "height": 800,
+        "minWidth": 760,
+        "minHeight": 600,
+        "resizable": true,
+        "decorations": true,
+        "devtools": false,
+        "dragDropEnabled": false,
+        "zoomHotkeysEnabled": false,
+        "browserExtensionsEnabled": false
+      }
+    ],
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "reference-only-no-ipc",
+          "description": "The bundled reference window has no Tauri IPC permissions.",
+          "windows": ["main"],
+          "platforms": ["windows"],
+          "permissions": []
+        }
+      ],
+      "assetProtocol": {
+        "enable": false,
+        "scope": []
+      },
+      "dangerousDisableAssetCspModification": false,
+      "freezePrototype": true,
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self'",
+        "font-src": "'self'",
+        "img-src": "'self' data:",
+        "connect-src": "'self'",
+        "object-src": "'none'",
+        "frame-src": "'none'",
+        "worker-src": "'none'",
+        "form-action": "'none'",
+        "base-uri": "'none'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["../../web/public/glymize-app-icon.png"],
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}
