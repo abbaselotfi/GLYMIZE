@@ -149,7 +149,9 @@ function Get-AppState {
     if (-not (Test-Path -LiteralPath $root)) { continue }
     foreach ($key in Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue) {
       $item = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction SilentlyContinue
-      if ($null -ne $item -and [string]$item.DisplayName -eq $ApplicationName) {
+      if ($null -eq $item) { continue }
+      $displayName = $item.PSObject.Properties['DisplayName']
+      if ($null -ne $displayName -and [string]$displayName.Value -eq $ApplicationName) {
         $registration = $item
         break
       }
@@ -157,14 +159,16 @@ function Get-AppState {
     if ($null -ne $registration) { break }
   }
   $installRoot = Join-Path $env:LOCALAPPDATA $ApplicationName
-  if ($null -ne $registration -and [string]$registration.InstallLocation) {
-    $installRoot = ([string]$registration.InstallLocation).Trim('"')
+  $installLocation = if ($null -eq $registration) { $null } else { $registration.PSObject.Properties['InstallLocation'] }
+  if ($null -ne $installLocation -and [string]$installLocation.Value) {
+    $installRoot = ([string]$installLocation.Value).Trim('"')
   }
+  $displayVersion = if ($null -eq $registration) { $null } else { $registration.PSObject.Properties['DisplayVersion'] }
   $executable = Join-Path $installRoot $ApplicationExecutable
   $uninstaller = Join-Path $installRoot 'uninstall.exe'
   return [pscustomobject]@{
     registered = [bool]($null -ne $registration)
-    version = if ($null -eq $registration) { $null } else { [string]$registration.DisplayVersion }
+    version = if ($null -eq $displayVersion) { $null } else { [string]$displayVersion.Value }
     installRoot = $installRoot
     executable = $executable
     executablePresent = [bool](Test-Path -LiteralPath $executable)
@@ -355,15 +359,17 @@ function Invoke-RuntimeProbe([string]$Executable) {
     $locationAfterDeniedNavigation = [string]$locationResult.result.value
     $processIds = @(Get-ProcessTreeIds $process.Id)
     $externalConnections = @(Get-ExternalConnections $processIds)
-    $languageKeysOnly = @($value.local.PSObject.Properties.Name | Where-Object { $_ -ne 'glymize-ui-language' }).Count -eq 0
-    $queryPersisted = @($value.local.PSObject.Properties.Value | Where-Object { [string]$_ -eq 'metformin' }).Count -gt 0
+    $localProperties = @($value.local.PSObject.Properties)
+    $sessionProperties = @($value.session.PSObject.Properties)
+    $languageKeysOnly = @($localProperties | Where-Object { [string]$_.Name -ne 'glymize-ui-language' }).Count -eq 0
+    $queryPersisted = @($localProperties | Where-Object { [string]$_.Value -eq 'metformin' }).Count -gt 0
     $passed = (
       [string]$value.profile -eq 'installed-native-reference' -and
       [string]$value.url -eq $ExpectedUrl -and
       [int]$value.results -eq 30 -and
       @($value.externalResources).Count -eq 0 -and
       $languageKeysOnly -and -not $queryPersisted -and
-      @($value.session.PSObject.Properties).Count -eq 0 -and
+      $sessionProperties.Count -eq 0 -and
       [int]$value.workers -eq 0 -and
       [bool]$value.externalFetchRejected -and
       @($value.violations | Where-Object { [string]$_.directive -eq 'connect-src' }).Count -gt 0 -and

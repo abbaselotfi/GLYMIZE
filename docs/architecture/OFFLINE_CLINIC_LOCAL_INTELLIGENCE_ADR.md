@@ -118,7 +118,7 @@ No ADR status may move from Proposed to Accepted merely because roadmap document
 
 Final acceptance requires a clean offline Windows VM installed from removable media; Local Only workspace/account creation; offline re-login after restart; patient/encounter/diagnosis/medication/lab/history operations; deterministic clinical execution; one supported local-AI tier; encrypted backup/restore; Clinic Host pairing and PWA use on independently tested Android and iOS paths; authorized patient transfer; reconnect/sync/conflict behavior; and proof that GitHub/Cloudflare blocking does not disable accepted local workflows.
 
-This ADR records no completed capability. R30-03-C2 remains open until its real clean-VM runner finalizes. No migration, provider/model activation, deployment or clinical behavior change is authorized here.
+This ADR itself records no completed capability. Subsequent real-VM evidence accepted the reference-only R30-03-C2 clean-Windows/full-blackout gate on 2026-09-21; that closure does not implement this ADR's protected Offline Clinic target. No migration, provider/model activation, clinical behavior or production deployment is authorized here.
 
 ## Constraint references
 

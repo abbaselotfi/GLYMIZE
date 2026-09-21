@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "packet": "R30-03-C2",
+  "status": "accepted",
+  "executedAtUtc": "2026-09-21T20:22:21.002Z",
+  "candidate": {
+    "sourceRevision": "ea02642b8ac212edd5e266ff421ae72ca1e75dc3",
+    "referenceManifestVersion": "18015f82d63957dbceebb3f0",
+    "kitManifestSha256": "C2A9FB3827EBC91D908411500FC98239547DDA5823389F35C9F3F4A31CFF6A32",
+    "installerSha256": "13C48BAF7FF641C551E998CA39B07D2DB44969A948784843376034D520CD9BEB",
+    "acceptanceScriptSha256": "83DAC943C5F50F2A05587EB55647DC8814D177B1D35CD32BE753D0CC401BB436"
+  },
+  "environment": {
+    "os": "Microsoft Windows 11 Pro",
+    "buildNumber": 22631,
+    "architecture": "64-bit",
+    "nonElevated": true,
+    "developerToolchainCount": 0,
+    "applicationInitiallyAbsent": true,
+    "webView2InitialState": "preinstalled",
+    "webView2RegistrationCount": 1,
+    "networkBlackoutMaintained": true,
+    "rebootObserved": true
+  },
+  "phases": [
+    {
+      "phase": "Preflight",
+      "passed": true,
+      "blockingFailures": 0,
+      "rawEvidenceSha256": "DD687BF4E025965D26ABF28010ADC43229EF102C6BFBEDF5F35693301166180B"
+    },
+    {
+      "phase": "Install",
+      "passed": true,
+      "blockingFailures": 0,
+      "installerExitCode": 0,
+      "webView2ProvisioningPath": "preinstalled",
+      "runtimeProbePassed": true,
+      "runtimeReadyMs": 4935,
+      "rawEvidenceSha256": "6D6D22B94F8335077A356C701845E91B37F0CCD2A39FFCCF6019C6FE6883887A"
+    },
+    {
+      "phase": "PostReboot",
+      "passed": true,
+      "blockingFailures": 0,
+      "runtimeProbePassed": true,
+      "runtimeReadyMs": 2337,
+      "rawEvidenceSha256": "FC45E60EA17955276331B4B03C8F4CE4C9A7BA9A0ADFCAB311FFFEBF5E634A5E"
+    },
+    {
+      "phase": "UninstallReinstall",
+      "passed": true,
+      "blockingFailures": 0,
+      "applicationRemovedBeforeReinstall": true,
+      "applicationRestored": true,
+      "runtimeProbePassed": true,
+      "runtimeReadyMs": 1988,
+      "rawEvidenceSha256": "84D6017D0D49F5E9FF4542D3E3FF6EB42E3811667C8821171C5A4726E831535D"
+    },
+    {
+      "phase": "Finalize",
+      "passed": true,
+      "accepted": true,
+      "blockingFailures": 0,
+      "allRequiredPhasesPresentPassedSameKit": true,
+      "rawEvidenceSha256": "64A08EB174F6713C91A2E4F37154BEFD0D15B0025AEC0D00621669EAC188A440"
+    }
+  ],
+  "runtimePolicy": {
+    "probeCount": 3,
+    "allPassed": true,
+    "searchResultCountPerProbe": 30,
+    "externalPageResourceCount": 0,
+    "externalProcessConnectionCount": 0,
+    "serviceWorkerCount": 0,
+    "externalFetchRejected": true,
+    "connectSrcViolationObserved": true,
+    "globalTauriApiAbsent": true,
+    "newWindowDenied": true,
+    "nonReferenceNavigationDenied": true
+  },
+  "privacy": {
+    "rawEvidenceCommitted": false,
+    "omitted": [
+      "computer name",
+      "user name",
+      "filesystem paths",
+      "registry paths",
+      "process identifiers",
+      "network addresses"
+    ]
+  }
+}

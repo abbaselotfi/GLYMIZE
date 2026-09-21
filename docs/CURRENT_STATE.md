@@ -1,7 +1,7 @@
 # GLYMIZE Current State
 
-Snapshot date: 2026-09-10
-Repository baseline: R28-01 through R28-07 are complete in repository history. R28-07 exact candidate `0af430a87aec5ca03607f4210e20d0d5f23528b9` passed PR validation run `34440472004` (#244) and the local exact-head POST Roadmap + Graph Gate, then merged through PR #141 as `main@f92aee7459ea5194d4b6dccbe3dc6a12f6ec6192`. Direct-main validation run `34441361566` (#136) and Codebase Memory snapshot run `34441361551` (#63) passed. Type 2 Decision Graph v2 remains treatment authority. Migration `0019` remains unapplied/default-off and no external deployment is claimed.
+Snapshot date: 2026-09-22
+Repository baseline: canonical execution has advanced through the R30-03 reference-only Windows shell. R30-03-C2 passed a real clean non-elevated Windows 11 x64 VM sequence—Preflight, offline Install, reboot, UninstallReinstall and Finalize—with the NIC disconnected throughout; Finalize accepted externally pinned manifest SHA-256 `C2A9FB3827EBC91D908411500FC98239547DDA5823389F35C9F3F4A31CFF6A32`. This does not add protected local PHI/auth, signing, sync, clinical parity or production acceptance. Type 2 Decision Graph v2 remains treatment authority; migration `0019` remains unapplied/default-off; incomplete R29 RC evidence stays open.
 
 This document is a factual repository snapshot, not a product promise or replacement for the ordered [Project Overview and Roadmap](PROJECT_OVERVIEW_AND_ROADMAP.md). The remaining open roadmap families are status-classified in [Remaining Roadmap Re-baseline](REMAINING_ROADMAP_REBASELINE_2026-09-08.md); that audit does not convert implemented code into V1 scope or deployment claims. It describes code, routes, tests, migrations, workflow configuration, and checked-in default feature state present in the repository. It does not assert that an uninspected remote environment has been deployed or activated.
 
@@ -84,6 +84,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Partial, gated, or disabled by default
 
+- R30-03 is complete only for the deterministic reference-only Windows shell and its clean-machine/full-blackout gate. Encrypted local records, Local Only workspace/authentication, shared clinical execution, sync, backup/recovery, trusted signing and full Clinic Host/PWA acceptance remain R30-04 onward and R31 work.
 - Patient Identity v2, provider directory, referral service, care relationships, multi-practice patient contexts, scheduling availability, slot discovery, slot locking, and booking have schema/contracts/runtime tests and substantial UI/runtime implementation, but repository presence alone does not prove production activation. Their RC checkpoints and feature-capability surfaces must not be described as production availability without environment evidence.
 - With the R28-06 rollout flag disabled, Patient Core retains the pre-authority snapshot fallback in which allergies/problems remain `not_available/source_not_exposed`. [`PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ADR.md`](architecture/PATIENT_CORE_ALLERGY_PROBLEM_AUTHORITY_ADR.md) records **Accepted — Option A** on 2026-09-10. The selected authority is dedicated bounded longitudinal Allergy/Problem persistence inside the existing Worker/D1 Patient Record v2 runtime of record with explicit reconciliation and append-only revisions. Migration `0019` application, rollout activation and external deployment remain separately gated.
 - Patient Core medication state is currently derived from immutable encounter-snapshot reconciliation, while cross-cutting contexts are a bounded snapshot flag subset. Shared freshness remains `unknown` unless a reviewed clinical-use-specific policy supplies versioned current/stale semantics; there is no universal cutoff.
@@ -106,11 +107,11 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Immediate continuation boundary
 
-R28-01 through R28-07 are complete. **R28-08 is now the next canonical engineering task.** R28-07 establishes the typed module registry and governed Patient Core → Type 2 handoff without transferring treatment authority from Decision Graph v2 or treating module registration as release eligibility.
+**STOP before R30-04-A and switch the owner-visible model selector to Astra High.** R30-04-A is the next canonical packet: encrypted local SQLite/storage, key custody and recovery design. No R31 implementation may bypass that dependency.
 
-Proceed in canonical order with R28-08. Its constrained patient-aware AI boundary must preserve patient/practice authorization, source provenance, provider isolation, context-switch/revocation safety and the facts/rules/evidence/AI-synthesis distinction. AI must not write canonical patient facts, sign orders or become deterministic clinical authority. R28-09 remains the exact-candidate clinic-ready acceptance packet.
+The accepted C2 evidence is not authorization to add PHI to the reference shell or to activate a migration, local AI provider, sync path, protected feature or production deployment. R29-01 through R29-05 remain open wherever their RC CPU/latency/rows, cache activation, D1 replication/bookmarks, query/index benefit, Turnstile/Smart Placement or rollback evidence is still missing.
 
-Migration `0019`, Allergy/Problem runtime activation, backfill, unrelated clinical/freshness-policy changes and RC/production deployment remain separately gated.
+Migration `0019`, Allergy/Problem runtime activation, backfill, unrelated clinical/freshness-policy changes and production deployment remain separately gated.
 
 During that sequence:
 

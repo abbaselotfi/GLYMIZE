@@ -74,7 +74,13 @@ test("acceptance script keeps the full fail-closed phase and Windows 11 WebView2
     "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "api.cloudflare.com", "github.com",
     "ExpectedKitManifestSha256", "CLEAN_MACHINE_ACCEPTANCE_INCOMPLETE", "installed-native-reference",
     "webview2-available-offline-after-install", "webView2ProvisioningPath",
+    "PSObject.Properties['DisplayName']", "PSObject.Properties['InstallLocation']", "PSObject.Properties['DisplayVersion']",
   ]) assert(script.includes(token), `missing acceptance token: ${token}`);
+  assert(!script.includes("$item.DisplayName"));
+  assert(!script.includes("$registration.InstallLocation"));
+  assert(!script.includes("$registration.DisplayVersion"));
+  assert(!script.includes("PSObject.Properties.Name"));
+  assert(!script.includes("PSObject.Properties.Value"));
   assert(!script.includes("webview2-initially-absent"));
   assert(!/Invoke-WebRequest\s+https?:/i.test(script));
 });
