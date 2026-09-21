@@ -6,8 +6,9 @@
   "scripts": {
     "build:reference": "node scripts/build-reference.mjs",
     "build:native": "pnpm run build:reference && tauri build --bundles nsis",
+    "package:clean-machine-kit": "node scripts/package-clean-machine-kit.mjs",
     "lint": "biome lint --diagnostic-level=error .",
-    "test": "node --test test/reference-profile.test.mjs",
+    "test": "node --test test/reference-profile.test.mjs test/clean-machine-kit.test.mjs",
     "test:artifact": "node scripts/test-reference-artifact.mjs",
     "test:browser": "node scripts/test-reference-browser.mjs",
     "test:native-runtime": "node scripts/test-native-runtime.mjs"
