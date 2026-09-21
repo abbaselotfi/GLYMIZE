@@ -4,6 +4,8 @@ Status: Living roadmap / architecture contract
 Updated: 2026-08-16
 Primary release branch: `release/glymize-clinical-ui-auth-v1`
 
+Canonical integration note (2026-09-21): [ROADMAP §16.1 — Offline Clinic & Local Intelligence](ROADMAP.md#161-glymize--offline-clinic--local-intelligence) extends these clinical/product contracts into one Offline-native product. It does not create a second Patient Core, Clinical Engine, Evidence Platform or AI authority. Where this older companion differs on sequencing or local-runtime/model selection, the canonical roadmap and its Proposed ADR control; no capability is complete from this note.
+
 ## 0. Product north star
 
 GLYMIZE is not intended to remain a diabetes-drug recommender. The long-term product is a physician-facing clinical workspace that:

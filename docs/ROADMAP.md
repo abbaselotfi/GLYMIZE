@@ -14,11 +14,11 @@
 
 ## 0. Owner model checkpoint and token policy — 2026-09-11
 
-**September 21 current packet: R30-03-C2 clean-machine acceptance preparation / Sol High / medium token cost.** [C2 kit evidence](R30_03_C2_ACCEPTANCE_KIT_2026-09-21.md) adds a portable, hash-bound Windows PowerShell 5.1 runner for WebView2-absent/no-toolchain/non-elevated blackout install, runtime policy, reboot and uninstall/reinstall. Only the ordered final phase can emit `accepted=true`; the current workstation audit correctly remains false because WebView2, toolchains, the earlier test install and Internet access are present. Its non-accepting runtime audit still returns 30 local metformin results with effective CSP/navigation/storage negatives and records two runtime-owned external TLS connections. A disposable Windows 11 x64 VM remains required; C2 is prepared but not accepted. R29-05-C RC remains live with only migration 0018; production, 0019 and default-OFF R29/protected-offline features are unchanged.
+**September 21 current packet: Offline Clinic & Local Intelligence roadmap integration / Sol High / high relative token cost.** This documentation-only review adds the cross-cutting §16.1 program and a [Proposed Offline Clinic ADR](architecture/OFFLINE_CLINIC_LOCAL_INTELLIGENCE_ADR.md). The owner-approved target is one product that can operate permanently as an intentional Local Only clinic, optionally become Cloud-linked, host trusted LAN/PWA clients and use a replaceable local-AI provider without creating a second Patient Core or clinical engine. Current Worker/D1, Patient Portal and clinical-authority behavior is unchanged; no runtime, migration, model/provider, RC or production activation follows from the roadmap.
 
 **Current product/UI position.** C1 Visual Patient Workspace is an implemented foundation on RC: patient context, ten-second brief/completion surfaces, current/source/history presentation and governed Type 2 handoff exist. C2 touch/pen/accessibility standard remains partial, and observed physician usability remains R28-09. R30-03 now has an installed Windows reference-only candidate with real local search and no privileged IPC/online auth. It is not protected offline operation, a signed release or full blackout acceptance.
 
-**Next model checkpoint: R30-03-C2 VM execution / Sol High / medium relative token cost.** Same model; no selector change is required. Run the prepared kit in a disposable Windows 11 x64 VM that begins without WebView2 or developer toolchains and has its virtual NIC disconnected before Preflight. Preserve the gate as open until all five phases finalize against the published manifest hash. After C2, R30-04-A encryption/storage design is an **Astra High** checkpoint and processing must pause before that model change. Signing, encrypted PHI and grants retain their later gates.
+**Next engineering checkpoint after this roadmap is published: R30-03-C2 VM execution / Sol High / medium relative token cost.** Same model; no selector change is required. Run the prepared kit in a disposable Windows 11 x64 VM that begins without WebView2 or developer toolchains and has its virtual NIC disconnected before Preflight. Preserve the gate as open until all five phases finalize against the published manifest hash. After C2, R30-04-A encryption/storage/key/recovery design is an **Astra High** checkpoint and processing must pause before that model change. The R31 tasks below do not bypass that order.
 
 **Historical September 16 packet: R29-05-B / Astra Medium / medium token cost.** Type 2 regression verification and reviewed publication completed before R29-05-C. Its Pages Preview exclusion was independently rechecked. Build-local indexes/calendar reuse and component-local insurance filtering preserve clinical semantics. One browser integration wait and the real-market test use explicit 15s correctness limits after measured cold-run variance; this is not latency-SLO acceptance. The September 20 checkpoint above supersedes its unresolved-deployment wording.
 
@@ -1001,6 +1001,14 @@ Required gates:
 - audit/provenance review;
 - explicit release disclaimer/claims review.
 
+When an Offline Clinic candidate is in release scope, Phase H also requires the
+§16.1/R31 acceptance slice appropriate to that candidate: offline-media install
+on a clean Windows VM, explicit Local Only versus Cloud-linked authority,
+encrypted-store and backup/restore evidence, shared Clinical Engine/evidence
+parity, and—where Clinic Host is enabled—trusted HTTPS pairing plus separate
+Android and iOS PWA evidence. A browser-only or simulated-offline smoke cannot
+close those gates.
+
 ### Phase I — Cardiovascular & Kidney Expansion
 
 Objectives:
@@ -1063,6 +1071,99 @@ This is ongoing, not a final one-time phase.
 
 ---
 
+## 16.1 GLYMIZE — Offline Clinic & Local Intelligence
+
+**Status:** owner-approved cross-cutting product direction; roadmap/Proposed ADR recorded, implementation and acceptance pending.
+
+**Architecture companion:** [Proposed Offline Clinic & Local Intelligence ADR](architecture/OFFLINE_CLINIC_LOCAL_INTELLIGENCE_ADR.md).
+**Position in the roadmap:** this is not a detached final phase. It is an integration program across Patient Core (B), Practice/Patient Workspace (C/L), Evidence and AI (E), Clinical Modules (F/G), Clinic-Ready Acceptance (H/N), Production Hardening (M), R29 resource work and R30 local-first infrastructure.
+
+### 16.1.1 Current-state connection and non-duplication rule
+
+Reuse the existing architecture:
+
+- Worker/D1 Patient Record v2 remains the implemented patient/encounter runtime authority until each local adapter and authority transition passes R30/R31 gates;
+- Patient Clinical Core projections/contracts remain the shared context for UI, Clinical Modules and AI; no second patient model or store is introduced as an application-level authority;
+- Decision Graph v2 remains physician-facing Type 2 selection/ranking authority; the same reviewed clinical engine/rule bundles execute offline and online;
+- Evidence Assistant retrieval and Evidence Platform governance remain the citation/evidence boundary;
+- Local AI is a provider/runtime behind the existing Copilot abstraction, not a new independent assistant or medical authority;
+- additive central Patient Identity and practice-local Patient Record remain distinct; offline identifiers are mapped through reviewed links, never silent merges;
+- Patient Portal/patient sessions remain a separate trust domain from clinician/care-team authentication;
+- the existing Tauri 2 shell, PWA assets, SQLite direction, R29 measurements and R30 sync/grant/update plans are extended rather than restarted.
+
+This section records target behavior only. It does not complete R29, R30-03-C2 or any R31 task, and it changes no current clinical/runtime behavior.
+
+### 16.1.2 Product invariants
+
+1. A clinic may intentionally remain **Local Only** indefinitely. Accepted local workflows must not require GitHub, Cloudflare or initial Internet access.
+2. Cloud Sync is opt-in. Local Only and Cloud-linked clinics have explicit, different trust/identity states.
+3. A locally created physician account is a local clinic owner/actor; it is not centrally verified professional identity until a separate online verification/enrollment succeeds.
+4. A clinic has one operational clinic database. LAN/mobile clients use the Clinic Host; they do not create independently writable patient databases.
+5. Internal patient, encounter and operation identity uses random UUIDs. National ID, foreign-resident ID, passport+issuing-country and temporary local identifiers are typed aliases. Never manufacture a national-ID-looking value such as a `0000` prefix.
+6. Local and cloud execution share contracts, clinical rules, evidence objects and confirmation boundaries. Storage/transport adapters may differ; clinical meaning may not.
+7. AI cannot write canonical facts, alter Clinical Authority or execute treatment actions without physician confirmation. AI failure cannot stop record management or deterministic clinical rules.
+8. Device pairing QR and patient-transfer QR are different protocols and namespaces. Scanning alone never grants patient access.
+9. Clinical sync conflicts preserve both histories and require reviewed resolution; no automatic last-write-wins for facts, identity links, signed plans or orders.
+10. RC/production isolation, patient/practice scope, RBAC, append-only/revision history, migration compatibility and rollback evidence remain mandatory.
+
+### 16.1.3 Twelve-axis integration map
+
+| Axis | Reused owner tasks / additive task | Phase connections | Acceptance boundary |
+| --- | --- | --- | --- |
+| **A. Offline Desktop Application** | R30-03 and R30-08; R31-01 | C, H, M | Install from USB/external disk/optical media on clean Windows without downloads; create a Local Only workspace; cold restart and continued operation with all network blocked; optional later Cloud enrollment does not rewrite local history. R30-03-C2 still owns the current reference-shell clean-VM gate. |
+| **B. Local Database** | R30-04/05/06; R31-01 | B, M | One encrypted clinic database covers the approved patient/encounter/diagnosis/medication/lab/history subset plus provenance, revisions, audit and outbox. Test WAL/journals/temp/attachments, interrupted migration, corruption, wrong/lost key and cross-practice access. SQLite/encryption selection remains R30-04-A. |
+| **C. Offline Authentication** | R30-07; R31-01 | B, L, M | First-install local owner, individual staff accounts, offline logout/re-login, RBAC, lockout and recovery work without Cloud. Cloud-linked grants retain revocation/expiry rules; Local Only authority is not falsely labelled centrally verified. Patient offline access uses a separately prepared encrypted subset and patient trust boundary. |
+| **D. Patient Identity & Offline Patient Creation** | Existing Patient Record v2/P5 identity; R31-02 | B, L, M | Create local patients using internal UUIDs and typed real/temporary identifiers; preserve aliases/history during reviewed duplicate linking; test national-ID collision/checksum, foreign resident, passport+country, undocumented patient and later central mapping without silent merge or duplicate visit. |
+| **E. GLYMIZE Clinic Host** | R30-05/06 and promoted R30-10; R31-03 | B, C, E, L, M | One host owns DB, narrow local API, auth/RBAC, PWA, deterministic engine, selected local-AI runtime and sync queue. Single-device mode works without network setup; multi-device writes converge through the host transaction boundary. |
+| **F. QR Device Pairing & Local PWA** | R30-10; R31-04 | C, L, M | Separate network/bootstrap and pairing tokens; host identity plus short-lived authenticated challenge; physician approval and role assignment before data access. HTTPS/certificate trust, Service Worker scope and install/reconnect are independently tested on supported Android and iOS paths. Plain LAN HTTP is not accepted for protected PWA operation. |
+| **G. Offline Patient Transfer** | R31-05 | B, L, M | Authorized, consented, scope-minimized encrypted package preserves UUIDs, revisions and provenance. QR carries bounded bootstrap/fingerprint material; file carries larger payload. Recipient authenticity, expiry, tamper/wrong-key rejection and idempotent re-import/sync prevent duplicate visits. Transfer QR cannot be parsed as pairing QR. |
+| **H. Offline Clinical Engine** | R30-05/08; R31-06 | D, E, F, G, H, N | Same Decision Graph v2/Clinical Module/Evidence artifacts and input contracts produce parity for reviewed cases offline/online. Expose rule/evidence version/date, missing/stale state, hard exclusions and physician confirmation. No AI substitution or new rule/dose/threshold. |
+| **I. Local AI integrated with Copilot** | R28-08/E1; R31-07 | E, H, N | Evaluate provider/runtime/model candidates before selection for Persian/English grounding, citations, safety, prompt contamination, RAM/VRAM/CPU, latency, package size, hardware tiers and redistribution license. Supported local AI may summarize/Q&A/explain/retrieve/draft; failure falls back to deterministic/extractive operation. No Qwen, Ollama, llama.cpp or other candidate is preselected. |
+| **J. Optional Cloud Synchronization** | R30-06; R31-08 | B, L, M, N; R29 cloud measurements | Durable outbox/inbox, idempotency, acknowledgements, delta/tombstone/base revision and conflict UI survive crash/retry/reorder. Local work stays until acknowledged. Show last sync/backlog/conflicts; warn weekly when eligible unsent work exceeds seven days, but suppress sync warnings in intentional Local Only mode. |
+| **K. Local Backup & Recovery** | R30-04/08; R31-09 | H, M, N | Offline encrypted backup, restore and workspace relocation recover unsynced data, attachments, revisions, audit/outbox and required key metadata. Test replacement device, wrong/lost key, corruption, interrupted restore/migration and revoked/cloud-linked state without requiring Internet. |
+| **L. Offline Distribution & Acceptance** | R30-08/09, R28-09/R29-05 final gates; R31-10 | H, M, N | Exact signed/versioned candidate on a clean offline Windows VM: removable-media install, local account/patient/visit, deterministic engine, one supported local-AI tier, restart/re-login, QR-hosted PWA, care-team use, transfer, backup/restore and later sync. Android/iOS paths are separate. No component is complete from a simulated substitute. |
+
+PWA installability and Service Workers require a trusted secure origin; `localhost` exceptions do not make an arbitrary phone-to-LAN HTTP address acceptable. Clinic Host design must therefore solve HTTPS identity and certificate trust instead of instructing users to bypass warnings. The Windows installer continues to include the offline WebView2 standalone prerequisite and must test runtime-absent installation.
+
+### 16.1.4 Additive task backlog
+
+These IDs are additive integration tasks. They do not renumber or replace R28–R30.
+
+| ID | Scope | Dependencies | Acceptance and model checkpoint |
+| --- | --- | --- | --- |
+| **R31-01** | Define/implement Local Only vs Cloud-linked workspace profiles, local owner/staff authentication, database bootstrap and authority transition. | R30-03-C2; R30-04-A; R30-05/07 contracts | Astra High design, then Sol High implementation. Prove offline first install/re-login/RBAC/recovery and that local accounts are not centrally verified. |
+| **R31-02** | Typed local patient identity, UUID/revision namespace, temporary/foreign/passport identifiers and later central matching/duplicate-link history. | Patient Record v2/Patient Core; R31-01; R30-05/06 | Astra High identity/conflict design, then Sol High. Collision, mapping, merge-history and idempotency matrix; no fake national ID or silent merge. |
+| **R31-03** | Clinic Host process boundary: one DB, narrow local API, auth/RBAC, PWA/engine/AI adapters and sync queue; single-device mode is the first slice. | R30-04/05/07; R31-01/02 | Astra High boundary/threat design, then Sol High. No arbitrary SQL/file/HTTP capability; concurrent LAN clients preserve one transactional authority. |
+| **R31-04** | LAN discovery, HTTPS identity/trust bootstrap, QR device pairing, role approval and local PWA lifecycle. | R31-03; R30-02/03/10 | Astra High security design, then Sol High. Independent Windows-host/Android/iOS tests; replay/expired/wrong-host/role-change/offline-reconnect negatives. |
+| **R31-05** | Offline patient-transfer export/import protocol, authorization/consent, encrypted package and deduplication. | R30-04/05; R31-02/03 | Astra High security/identity design, then Sol High. Tamper/wrong recipient/re-import/later-sync/duplicate-visit and QR-namespace tests. |
+| **R31-06** | Versioned offline Clinical Engine, Clinical Module, medication and approved-evidence bundle parity. | R30-05/08; existing engine/evidence release gates | Sol High implementation; short Astra High authority audit if bundle policy changes. Exact golden/parity cases, version/freshness/source UI and unchanged hard-exclusion/confirmation evidence. |
+| **R31-07** | Local-AI candidate benchmark, license/distribution review, hardware tiers and provider integration into existing Copilot. | E1/R28-08 privacy boundary; R31-03/06 | Sol High evaluation harness; Astra High safety/provider-selection review before activation. No model/runtime default until measured and licensed. AI-off/failure/extractive fallback and bilingual citation tests. |
+| **R31-08** | Optional Cloud Sync protocol, identity mapping, durable outbox/inbox, conflict UI and seven-day warning policy. | R30-06; R31-01/02/03; Worker/D1 command parity | Astra High consistency design, then Sol High. Crash/retry/reorder/duplicate/tombstone/revocation/concurrent-clinic tests; Local Only has no sync nag. |
+| **R31-09** | Encrypted backup, restore, key recovery and workspace relocation independent of Cloud. | R30-04/08; R31-01/03/08 | Astra High key/recovery design, then Sol High. Restore unsynced data on replacement hardware; wrong key/corruption/version/revocation fail safely. |
+| **R31-10** | Offline-clinic release matrix and removable-media distribution bundles, including selectable clinical/evidence/local-AI packs by supported hardware tier. | R30-08/09; R31-01 through R31-09; R28-09; R29-05 final evidence | Sol High execution; bounded Astra High final audit. One exact candidate SHA and signed hashes; real clean VM plus separate Android/iOS acceptance. |
+
+### 16.1.5 Revised execution order
+
+1. Publish this documentation/ADR packet; no runtime change.
+2. Complete real **R30-03-C2** clean-Windows execution on Sol High. If no disposable VM exists, keep the gate open.
+3. Pause and switch to **Astra High** for **R30-04-A** encryption/storage/key/recovery design. R31 work must not bypass it.
+4. Design then implement R31-01/R31-02 with R30-04/05/07: local workspace, local RBAC and identity/revision foundations.
+5. Implement R31-03/R31-04 with promoted R30-10: single-host first, then trusted LAN/PWA pairing with independent Android/iOS gates.
+6. Implement R31-06 before Local AI so deterministic clinical/evidence bundles remain the authority; then evaluate/integrate R31-07 through the existing Copilot boundary.
+7. Implement R31-05 transfer and R31-08 synchronization only after crypto, identity and host command contracts stabilize.
+8. Implement R31-09 recovery before release acceptance.
+9. Close R31-10/R30-09/R28-09 and the installed-product portion of R29-05 only on one exact candidate with real blackout/recovery/LAN/mobile/sync evidence.
+
+R29-01 through R29-05 remain open wherever RC CPU/latency/rows, eligible cache activation, D1 replication/bookmarks, query/index benefit, Turnstile/Smart Placement or final rollback evidence is missing. D1 replication optimizes eligible cloud reads; it is not the local SQLite sync protocol. R29-02 public caches are not the encrypted operational clinic database. Provider work may proceed independently when its own gates are met, but it cannot close the offline-clinic release gate.
+
+### 16.1.6 Final end-to-end acceptance scenario
+
+On one exact signed/versioned candidate, start with a clean Windows VM with no Internet and no preinstalled WebView2/runtime dependencies. Install from removable media, create a Local Only clinic owner and workspace, restart and re-login, add role-scoped staff, create a patient using each supported identifier class, record an encounter/diagnosis/medication/lab/history, run Decision Graph/Clinical Engine and one supported local-AI tier, inspect evidence/version/provenance, pair an Android client and an iOS client through separately accepted HTTPS/PWA paths, use care-team RBAC, export/import an authorized patient package without duplication, back up and restore unsynced work, then enable connectivity and prove idempotent sync/conflict behavior. Every unavailable or unsupported step fails visibly without false success.
+
+No individual task or final scenario is complete from roadmap text, mocked provider output, browser-only smoke or file existence.
+
+---
+
 ## 17. Dependency order
 
 The default order is:
@@ -1091,6 +1192,12 @@ C Visual Touch-First Workspace
            M Platform hardening/interoperability
 
 N Validation/Product Learning runs continuously across all phases.
+
+§16.1 Offline Clinic & Local Intelligence is cross-cutting rather than a new
+terminal phase: it binds B/C/E/H/L/M/N and the R29/R30 foundations. Its ordering
+is controlled by §16.1.5; later clinical-domain expansion does not need to wait
+for every R31 task, but no Offline Clinic release claim may bypass its applicable
+identity, storage, clinical-authority, recovery, LAN/mobile or sync gates.
 ```
 
 Some work in C, D, and E may proceed in parallel **only** after their shared Patient Clinical Core contracts are stable enough to avoid duplicate schemas or unsafe rework.
@@ -1195,7 +1302,12 @@ Evaluate:
 - clinical usefulness rated by physicians;
 - consistency across supported languages;
 - safe behavior when evidence is absent or conflicting;
-- model-to-model regression when providers change.
+- model-to-model regression when providers change;
+- Persian and English quality on locally supported hardware tiers;
+- CPU, RAM, VRAM, latency, power and package-size budgets;
+- artifact provenance, license and offline-redistribution/update rights;
+- grounded citation fidelity under missing, stale and conflicting evidence;
+- AI-disabled, model-load-failure and extractive-fallback behavior.
 
 ---
 
@@ -1213,7 +1325,7 @@ PostgreSQL remains an architecture foundation, not the current runtime authority
 
 ### External AI providers
 
-Provider additions/replacements remain implementation decisions subject to privacy, security, cost, capability, and evaluation review.
+Provider additions/replacements remain implementation decisions subject to privacy, security, cost, capability, license/redistribution and evaluation review. R31-07 owns the local-provider candidate matrix and hardware tiers. No Qwen, Ollama, llama.cpp or other model/runtime name in an older design note is an approved default until measured evidence and the owner gate select it.
 
 ---
 
@@ -1509,14 +1621,14 @@ R30-03 progress — 2026-09-20: [A design](architecture/WINDOWS_SHELL_R30_03_A.m
 | R30-01 | Inventory supported workflows as local-full, local-read-only, queued or online-only; record authority/write owner, PHI class, device/practice scope, freshness and degraded behavior. Threat model covers device theft, revoked users, clock rollback, stale rules and conflicting writes. Define unresolved policy choices explicitly. | Existing patient/auth/clinical contracts | Astra High, bounded design packet |
 | R30-02 | Versioned complete app-shell/chunk/catalog/rule/font precache, no mandatory runtime CDN. Test offline cold restart after completed install, failed/partial updates and rollback. UI states offline/freshness clearly; sensitive API responses never enter public caches. | R30-01; coordinate R29-02 | Sol High |
 | R30-03 | Tauri 2 Windows shell reusing web UI and clinical engine, static-export compatibility spike, least-privilege desktop capabilities and installer pipeline. [A design](architecture/WINDOWS_SHELL_R30_03_A.md), [B implementation](R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) and [C1 present-runtime native evidence](R30_03_C_NATIVE_ACCEPTANCE_2026-09-20.md) pass. C2 must still test clean/runtime-absent installation, no-toolchain startup, reboot and full blackout. Signed distribution evidence is required before release. | R30-01/02 | Astra High design, Sol High implementation |
-| R30-04 | Encrypted local SQLite, migrations, practice/device-scoped data subset, Stronghold/key management and encrypted backup/restore. ADR chooses SQLCipher Community versus envelope encryption based on build, search, metadata exposure and recovery tests. Test lost key, corrupt DB, interrupted migration and cross-practice access. | R30-01/03 | Astra High design, Sol High implementation |
+| R30-04 | Encrypted local SQLite, migrations, practice/device-scoped data subset, Stronghold/key management and encrypted backup/restore. R30-04-A must choose SQLCipher Community versus envelope encryption based on build, search, WAL/journal/temp/attachment metadata exposure, key custody and recovery tests; the [Proposed Offline Clinic ADR](architecture/OFFLINE_CLINIC_LOCAL_INTELLIGENCE_ADR.md) does not make that choice. Test lost key, corrupt DB, interrupted migration and cross-practice access. | R30-01/03; before R31-01/03/09 | **Astra High design checkpoint**, then Sol High implementation |
 | R30-05 | Shared repository/storage ports and local/remote adapters with existing validation and authorization boundaries. Local execution must not create parallel clinical authority or bypass patient binding/confirmation. Contract parity tests for supported local operations. | R30-01/04 | Astra High design, Sol High implementation |
-| R30-06 | Durable transactional outbox/inbox, delta sync, idempotency, revisions, acknowledgements and conflict UI. Test offline edits, retry/crash, duplicate delivery, delete/tombstone, reconnect and concurrent devices. No automatic last-write-wins for clinical facts/orders; no duplicate patient/encounter or file-number allocation. | R30-04/05/07 contract | Astra High design, Sol High implementation |
-| R30-07 | Device enrollment, local lock and signed time-bounded offline authorization grants; practice/role scope, expiry/clock rollback and revocation catch-up. Explicitly state that offline revocation cannot be instantaneous. No fabricated lease duration or indefinite fallback; expired/invalid grant fails closed for protected actions. | R30-01/04 | Astra High design, Sol High implementation |
+| R30-06 | Durable transactional outbox/inbox, delta sync, idempotency, revisions, acknowledgements and conflict UI. Test offline edits, retry/crash, duplicate delivery, delete/tombstone, reconnect and concurrent devices. No automatic last-write-wins for clinical facts/orders; no duplicate patient/encounter or file-number allocation. Cloud-linked UI shows last sync/backlog/conflicts and warns weekly when eligible unsent work is older than seven days; intentional Local Only mode has no sync nag. | R30-04/05/07 contract; R31-08 | Astra High design, Sol High implementation |
+| R30-07 | Define two authority profiles. Cloud-linked devices use enrollment, local lock and signed time-bounded offline grants with practice/role scope, expiry/clock rollback and revocation catch-up; offline revocation cannot be instantaneous and an expired/invalid grant fails closed for protected actions. Local Only clinics instead use a locally established owner and local RBAC protected by the selected key/recovery design; those accounts are never represented as centrally verified and later enrollment is an explicit audited transition. | R30-01/04; R31-01 | Astra High design, Sol High implementation |
 | R30-08 | Bundled versioned data, signed installers/updates, independent update origins and offline-file update path with verification/rollback. Startup continues with the last accepted bundle when hosts are blocked. No cloud signing secrets in clients. | R30-03/04 | Sol High |
 | R30-09 | Blackout/recovery evidence for blocked GitHub, Cloudflare, DNS and all Internet; cold launch, scoped local reads/writes, reboot, backup, reconnect/conflicts and update rollback. Measure cloud-request reduction plus local CPU/memory/disk and battery tradeoffs. Online AI/SMS/email/payer actions display unavailable/queued, never false success. | R30-02 through R30-08 | Sol High; short Astra High final audit |
-| R30-10 | Optional P1 Clinic Hub for multiple LAN devices without Internet. Decide local authority, enrollment, backup and conflict ownership before implementing; retain single-device desktop as initial scope. | R30-09 | Astra High design, Sol High implementation |
+| R30-10 | Required target Clinic Host for multiple trusted LAN devices without Internet, implemented only after the single-device desktop slice. One host owns the operational database, narrow local API, auth/RBAC, PWA assets, Clinical Engine/local-AI adapters and sync queue. HTTPS host identity/certificate trust, discovery, separate QR bootstrap/pairing, physician approval and independent Android/iOS PWA acceptance are mandatory; scanning alone grants no access. | R30-03/04/05/07; R31-01/03/04 | Astra High design, Sol High implementation |
 
-Developer prerequisites: Tauri/Rust/Cargo and Windows MSVC build tools, official SQLite/Stronghold plugins, selected open-source encryption integration, existing test tools. End users install the Windows package and WebView2 if absent; they need no Git, Node or Rust. Record installer signing/toolchain distribution costs explicitly; do not claim a zero-cost trusted-signing service. Redis is not required for local storage. Optional independent mirror/VPS and Clinic Hub are separately scoped later work; offline operation itself requires no new hosted service.
+Developer prerequisites: Tauri/Rust/Cargo and Windows MSVC build tools, official SQLite/Stronghold plugins, the encryption integration selected by R30-04-A, and existing test tools. End users install the Windows package and bundled offline WebView2 prerequisite if absent; they need no Git, Node or Rust. Record installer signing/toolchain distribution costs explicitly; do not claim a zero-cost trusted-signing service. Redis is not required for local storage. An independent mirror/VPS remains separately scoped; the required target Clinic Host uses local hardware and offline operation itself requires no new hosted service.
 
-Execution order: documentation/model checkpoint → R30-01 → R29-01 → R29-02/R30-02 → R29-03/04 → R30-03/04 → R30-05 and R30-07 → R30-06 → R30-08/09 → R29-05 final installed-product RC gate. R30-10 remains optional. Collect RC performance evidence earlier where independently possible. Preserve all existing clinical review, migration and production activation gates.
+Execution order: prior R30-01 through R30-03-C1 foundations → this documentation/ADR packet → real R30-03-C2 on Sol High → pause/switch to Astra High for R30-04-A → R30-04/05/07 with R31-01/02 → single-device R31-03 then R30-10/R31-04 Clinic Host → R31-06 then R31-07 → R31-05/R31-08 → R31-09 → R30-08/09 and R31-10 exact-candidate acceptance → R29-05 final installed-product RC gate. Collect R29 RC performance/replication/rollback evidence earlier where independently possible, but do not close any R29 task without its missing remote evidence. Preserve all clinical review, migration and production activation gates.

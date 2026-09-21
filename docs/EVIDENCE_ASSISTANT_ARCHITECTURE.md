@@ -1,5 +1,7 @@
 # GLYMIZE Evidence Assistant Architecture
 
+> **Candidate status (2026-09-21):** model/runtime names in this document are historical candidates, not approved defaults. Canonical [ROADMAP §16.1/R31-07](ROADMAP.md#161-glymize--offline-clinic--local-intelligence) requires a measured Persian/English, safety, citation, hardware, latency, package-size, license and redistribution evaluation before any local provider is selected or activated.
+
 ## Purpose
 
 The Evidence Assistant is a clinician-facing, read-only question-answering layer over the approved clinical evidence corpus. It is deliberately separated from the deterministic Clinical Recommendation Engine.
@@ -34,7 +36,7 @@ The API can connect to any local OpenAI-compatible endpoint through:
 - `GLYMIZE_EVIDENCE_LLM_MODEL`
 - optional `GLYMIZE_EVIDENCE_LLM_API_KEY`
 
-Recommended initial desktop backend: `llama.cpp` with an Apache-2.0 Qwen multilingual model. The LLM is used only to translate, synthesize and format retrieved evidence. Retrieval and citations remain controlled by GLYMIZE.
+Historical desktop candidate: `llama.cpp` with a permissively distributable multilingual model from the Qwen family. This pairing is not selected by the architecture. R31-07 must validate the exact runtime, weights, license/redistribution terms and supported hardware tier. Any accepted LLM is used only to translate, synthesize and format retrieved evidence; retrieval and citations remain controlled by GLYMIZE.
 
 Example local endpoint shape:
 
@@ -89,11 +91,11 @@ Preferred behavior when an LLM is available:
 
 When no LLM is available, multilingual retrieval should search Persian and English evidence aliases directly and return extractive evidence without pretending that translation/generation occurred.
 
-## Recommended model strategy
+## Candidate model strategy — evaluation required
 
 ### Generator / translator
 
-Primary free local model family: Qwen3.
+Previously identified candidate family: Qwen3. These sizes are hypotheses for benchmarking, not approved defaults.
 
 - Qwen3-1.7B: practical first local model for modest hardware; explicit multilingual support includes Persian.
 - Qwen3-4B: preferred when hardware permits because synthesis quality is more important than raw speed for clinician Q&A.
@@ -101,9 +103,9 @@ Primary free local model family: Qwen3.
 
 ### Retrieval embedding
 
-Browser / low-resource first choice: `multilingual-e5-small` because it supports multilingual retrieval with a substantially smaller footprint than large embedding models.
+Browser / low-resource candidate: `multilingual-e5-small`, to be compared with other eligible multilingual retrievers for footprint, retrieval quality and redistribution terms.
 
-Higher-resource local/server option: `Qwen3-Embedding-0.6B` or BGE-M3, with hybrid lexical+dense retrieval and optional reranking.
+Higher-resource local/server candidates include `Qwen3-Embedding-0.6B` and BGE-M3, with hybrid lexical+dense retrieval and optional reranking; no candidate is selected until R31-07 acceptance.
 
 Document embeddings should be precomputed during evidence publication so the runtime device only needs to embed the clinician query.
 

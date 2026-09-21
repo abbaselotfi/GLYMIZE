@@ -1,5 +1,13 @@
 # معماری سامانه
 
+## Proposed Offline Clinic & Local Intelligence target — 2026-09-21
+
+The owner-approved target is recorded in [canonical ROADMAP §16.1](ROADMAP.md#161-glymize--offline-clinic--local-intelligence) and the [Proposed Offline Clinic ADR](architecture/OFFLINE_CLINIC_LOCAL_INTELLIGENCE_ADR.md). It extends the current R30 path into one offline-native product: a clinic may remain intentionally Local Only indefinitely or complete an explicit transition to Cloud-linked operation. Local accounts/RBAC are authoritative only inside their encrypted local workspace and are not represented as centrally verified professional identity.
+
+The target reuses Patient Clinical Core contracts, Patient Record v2 adapters, Decision Graph v2, Clinical Modules, Medication Intelligence, governed Evidence objects, the existing Copilot provider boundary, Patient Identity mapping and the separate Patient Portal trust domain. One Clinic Host owns one operational clinic database; LAN/PWA clients do not create independently writable clinic databases. Internal UUIDs remain record authority while real and temporary human identifiers are typed aliases. Local AI remains optional and non-authoritative, and no model/runtime is selected before R31-07 evaluation.
+
+This is a proposed future authority/topology contract, not current runtime state. Worker/D1 remains the implemented authority until R30/R31 command, storage, identity, sync and migration gates pass. R30-03-C2 still needs a real clean Windows VM; R30-04-A must begin only after switching to Astra High. No migration, deployment, provider activation or clinical behavior changes through this documentation packet.
+
 ## Windows clean-machine acceptance automation — R30-03-C2 (2026-09-21; execution pending)
 
 [The C2 preparation packet](R30_03_C2_ACCEPTANCE_KIT_2026-09-21.md) adds a hash-bound portable kit and a Windows PowerShell 5.1 acceptance runner that needs no Git, Node, Rust or MSVC on the target. Its ordered fail-closed phases prove a WebView2-absent/non-elevated/blackout preflight, offline current-user install, effective reference UI/CSP/navigation/storage/process-egress policy, reboot, silent uninstall/reinstall and same-kit finalization. Only `Finalize` can set `accepted=true`, and it requires an externally supplied kit-manifest SHA-256 plus passing evidence from every prior phase. The current workstation is deliberately disqualified because WebView2/toolchains/the prior test install and Internet access are present; its runtime audit still reproduces local UI success plus runtime-owned external TLS connections. A disposable Windows 11 x64 VM remains required, so R30-03 is not complete and no protected-offline, signing, deployment or R29 boundary changed.
