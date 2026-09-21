@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "packet": "R30-03-C2",
+  "capturedAtUtc": "2026-09-21T00:40:24.782702Z",
+  "accepted": false,
+  "status": "current-host-disqualified-disposable-vm-required",
+  "candidate": {
+    "sourceRevision": "ea02642b8ac212edd5e266ff421ae72ca1e75dc3",
+    "referenceManifestVersion": "18015f82d63957dbceebb3f0",
+    "installerSha256": "13C48BAF7FF641C551E998CA39B07D2DB44969A948784843376034D520CD9BEB",
+    "kitManifestSha256": "F6EB07416C01290A5EEA37D09037C3AC60E191E75463B135B09E58A172F9A144"
+  },
+  "hostQualification": {
+    "windows11X64": true,
+    "nonElevated": true,
+    "webView2InitiallyAbsent": false,
+    "developerToolchainsAbsent": false,
+    "networkBlackout": false,
+    "applicationInitiallyAbsent": false
+  },
+  "runtimeAudit": {
+    "accepted": false,
+    "cdpReadyMs": 3106,
+    "url": "https://tauri.localhost/offline/index.html",
+    "results": 30,
+    "externalPageResources": 0,
+    "cspExternalFetchRejected": true,
+    "localNavigationDenied": true,
+    "globalTauri": "undefined",
+    "externalProcessConnections": [
+      {
+        "remoteAddress": "52.98.253.50",
+        "remotePort": 443,
+        "count": 2
+      }
+    ]
+  },
+  "remainingGate": "Run Preflight, Install, PostReboot, UninstallReinstall and Finalize in a disposable WebView2-absent Windows 11 x64 VM with its virtual NIC disconnected."
+}
