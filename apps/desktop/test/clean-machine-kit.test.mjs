@@ -47,6 +47,7 @@ test("stages a hash-bound standalone clean-machine kit", async () => {
     assert.equal(manifest.acceptanceScript.sha256, sha256(copiedScript));
     assert.deepEqual(copiedInstaller, value.installer);
     assert.deepEqual(manifest.requiredPhases, ["Preflight", "Install", "PostReboot", "UninstallReinstall", "Finalize"]);
+    assert.equal(manifest.acceptanceConstraints.initialWebView2, "recorded; Windows 11 preinstalled or absent");
     const firstManifestBytes = await readFile(path.join(value.outputRoot, "kit-manifest.json"));
     await createCleanMachineKit({ ...value, acceptanceScriptPath: ACCEPTANCE_SCRIPT });
     const secondManifestBytes = await readFile(path.join(value.outputRoot, "kit-manifest.json"));
@@ -65,14 +66,16 @@ test("rejects a desktop artifact built from dirty source", async () => {
   }
 });
 
-test("acceptance script keeps the full fail-closed phase and WebView2 contract", async () => {
+test("acceptance script keeps the full fail-closed phase and Windows 11 WebView2 contract", async () => {
   const script = await readFile(ACCEPTANCE_SCRIPT, "utf8");
   for (const token of [
     "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
     "Preflight", "Install", "PostReboot", "UninstallReinstall", "Finalize",
     "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "api.cloudflare.com", "github.com",
     "ExpectedKitManifestSha256", "CLEAN_MACHINE_ACCEPTANCE_INCOMPLETE", "installed-native-reference",
+    "webview2-available-offline-after-install", "webView2ProvisioningPath",
   ]) assert(script.includes(token), `missing acceptance token: ${token}`);
+  assert(!script.includes("webview2-initially-absent"));
   assert(!/Invoke-WebRequest\s+https?:/i.test(script));
 });
 

@@ -79,7 +79,7 @@ export async function createCleanMachineKit({
     requiredPhases: ["Preflight", "Install", "PostReboot", "UninstallReinstall", "Finalize"],
     acceptanceConstraints: {
       target: "Windows 11 x64 disposable VM",
-      initialWebView2: "absent",
+      initialWebView2: "recorded; Windows 11 preinstalled or absent",
       toolchains: "Git, Node, pnpm, Rust, Cargo, MSVC and MSBuild absent",
       network: "DNS, GitHub and Cloudflare blocked before install through finalization",
       privilege: "non-elevated current-user install",

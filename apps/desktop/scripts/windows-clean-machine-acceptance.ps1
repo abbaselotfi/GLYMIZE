@@ -444,11 +444,11 @@ function Invoke-Preflight($Kit, $HostSnapshot) {
   $blackout = Get-BlackoutSnapshot
   $app = Get-AppState
   $gates = @(New-BaseGates $Kit $HostSnapshot)
-  $gates += New-Gate 'webview2-initially-absent' ($webView.Count -eq 0) 'no official pv registration' $webView
   $gates += New-Gate 'developer-toolchains-absent' ($tools.Count -eq 0) 'no Git/Node/pnpm/Rust/Cargo/MSVC/MSBuild' $tools
   $gates += New-Gate 'network-blackout-before-install' ([bool]$blackout.passed) 'DNS and TCP/443 blocked for GitHub and Cloudflare' $blackout.targets
   $gates += New-Gate 'application-initially-absent' (-not $app.registered -and -not $app.executablePresent) 'not installed' $app
-  return [pscustomobject]@{ gates = $gates; observations = [pscustomobject]@{ webView2 = $webView; toolchains = $tools; blackout = $blackout; app = $app } }
+  $webViewInitialState = if ($webView.Count -eq 0) { 'absent' } else { 'preinstalled' }
+  return [pscustomobject]@{ gates = $gates; observations = [pscustomobject]@{ webView2InitialState = $webViewInitialState; webView2 = $webView; toolchains = $tools; blackout = $blackout; app = $app } }
 }
 
 function Invoke-AuditRuntime($Kit, $HostSnapshot) {
@@ -480,7 +480,8 @@ function Install-Candidate($Kit) {
 }
 
 function Invoke-Install($Kit, $HostSnapshot) {
-  [void](Assert-PriorPhase 'Preflight' $Kit.manifestSha256)
+  $preflight = Assert-PriorPhase 'Preflight' $Kit.manifestSha256
+  $initialWebView = @($preflight.observations.webView2)
   $blackoutBefore = Get-BlackoutSnapshot
   $exitCode = Install-Candidate $Kit
   $app = Get-AppState
@@ -490,10 +491,12 @@ function Invoke-Install($Kit, $HostSnapshot) {
   $gates = @(New-BaseGates $Kit $HostSnapshot)
   $gates += New-Gate 'installer-exit' ($exitCode -eq 0) 0 $exitCode
   $gates += New-Gate 'current-user-application-installed' ($app.registered -and $app.executablePresent -and $app.installRoot.StartsWith($env:LOCALAPPDATA, [StringComparison]::OrdinalIgnoreCase)) 'registered executable under LOCALAPPDATA' $app
-  $gates += New-Gate 'embedded-webview2-installed-offline' ($webView.Count -gt 0) 'official pv registration present after install' $webView
+  $webViewExpected = if ($initialWebView.Count -eq 0) { 'installer provisions an official pv registration while offline' } else { 'preinstalled official pv registration remains available while offline' }
+  $gates += New-Gate 'webview2-available-offline-after-install' ($webView.Count -gt 0) $webViewExpected $webView
   $gates += New-Gate 'network-blackout-during-install' ($blackoutBefore.passed -and $blackoutAfter.passed) 'blackout before and after install' @($blackoutBefore, $blackoutAfter)
   $gates += New-Gate 'installed-runtime-reference-policy' ([bool]$runtime.passed) 'local reference passes UI, CSP, navigation, state and process-egress checks' $runtime
-  return [pscustomobject]@{ gates = $gates; observations = [pscustomobject]@{ exitCode = $exitCode; app = $app; webView2 = $webView; runtime = $runtime; blackoutBefore = $blackoutBefore; blackoutAfter = $blackoutAfter } }
+  $webViewProvisioningPath = if ($initialWebView.Count -eq 0) { 'installer-provisioned' } else { 'preinstalled' }
+  return [pscustomobject]@{ gates = $gates; observations = [pscustomobject]@{ exitCode = $exitCode; app = $app; webView2Initial = $initialWebView; webView2ProvisioningPath = $webViewProvisioningPath; webView2 = $webView; runtime = $runtime; blackoutBefore = $blackoutBefore; blackoutAfter = $blackoutAfter } }
 }
 
 function Invoke-PostReboot($Kit, $HostSnapshot) {

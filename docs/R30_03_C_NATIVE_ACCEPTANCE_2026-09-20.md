@@ -1,6 +1,6 @@
 # R30-03-C1 — Windows native build and installed-runtime evidence
 
-Date: 2026-09-20. Model: Sol High. Status: native build, current-user install and WebView2-present runtime acceptance pass locally; clean-machine/runtime-absent, reboot and full network-blackout acceptance remain open. Parent evidence: [R30-03-B](R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) and [R30-03-A](architecture/WINDOWS_SHELL_R30_03_A.md).
+Date: 2026-09-20. Model: Sol High. Status: native build, current-user install and WebView2-present runtime acceptance pass locally; clean-machine, reboot and full network-blackout acceptance remain open. Microsoft includes Evergreen WebView2 with Windows 11, so Runtime absence is tracked as a separate compatibility case rather than a clean-Windows-11 precondition. Parent evidence: [R30-03-B](R30_03_B_DESKTOP_REFERENCE_2026-09-20.md) and [R30-03-A](architecture/WINDOWS_SHELL_R30_03_A.md).
 
 ## Delivered native boundary
 
@@ -57,7 +57,7 @@ Page-level operation is independent of GitHub, Cloudflare and external fetches. 
 
 The current account is non-administrative, Windows Sandbox is not installed, and removing the machine's shared WebView2 runtime would be unsafe. The following gates remain R30-03-C2 and must run in a disposable clean Windows environment:
 
-- install with WebView2 absent and all external networking disabled, using only the embedded prerequisite;
+- install with the initial Windows 11 WebView2 state recorded and all external networking disabled; require an official Runtime after installation and identify whether it was preinstalled or installer-provisioned;
 - install/start without Git, Node, Rust or Visual Studio present;
 - cold restart after reboot plus uninstall/reinstall evidence;
 - firewall/DNS/GitHub/Cloudflare blackout with process-level connection evidence;
