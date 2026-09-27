@@ -1,6 +1,6 @@
 # GLYMIZE Current State
 
-Snapshot date: 2026-09-22
+Snapshot date: 2026-09-27
 Repository baseline: canonical execution has advanced through the R30-03 reference-only Windows shell. R30-03-C2 passed a real clean non-elevated Windows 11 x64 VM sequence—Preflight, offline Install, reboot, UninstallReinstall and Finalize—with the NIC disconnected throughout; Finalize accepted externally pinned manifest SHA-256 `C2A9FB3827EBC91D908411500FC98239547DDA5823389F35C9F3F4A31CFF6A32`. This does not add protected local PHI/auth, signing, sync, clinical parity or production acceptance. Type 2 Decision Graph v2 remains treatment authority; migration `0019` remains unapplied/default-off; incomplete R29 RC evidence stays open.
 
 This document is a factual repository snapshot, not a product promise or replacement for the ordered [Project Overview and Roadmap](PROJECT_OVERVIEW_AND_ROADMAP.md). The remaining open roadmap families are status-classified in [Remaining Roadmap Re-baseline](REMAINING_ROADMAP_REBASELINE_2026-09-08.md); that audit does not convert implemented code into V1 scope or deployment claims. It describes code, routes, tests, migrations, workflow configuration, and checked-in default feature state present in the repository. It does not assert that an uninspected remote environment has been deployed or activated.
@@ -107,7 +107,7 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Immediate continuation boundary
 
-**STOP before R30-04-A and switch the owner-visible model selector to Astra High.** R30-04-A is the next canonical packet: encrypted local SQLite/storage, key custody and recovery design. No R31 implementation may bypass that dependency.
+**R30-04-A design is recorded; protected storage is not implemented.** [The design](architecture/ENCRYPTED_LOCAL_STORAGE_R30_04_A.md) selects the SQLCipher Community native candidate, workspace-scoped keys and offline recovery obligations. **STOP and switch to Sol High for R30-04-B1**, the isolated synthetic-data build/storage spike. B2 key-protocol review requires Astra High; C integration depends on R30-05/07 contracts. R30-04 and dependent R31 capabilities remain open.
 
 The accepted C2 evidence is not authorization to add PHI to the reference shell or to activate a migration, local AI provider, sync path, protected feature or production deployment. R29-01 through R29-05 remain open wherever their RC CPU/latency/rows, cache activation, D1 replication/bookmarks, query/index benefit, Turnstile/Smart Placement or rollback evidence is still missing.
 

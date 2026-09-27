@@ -34,7 +34,7 @@ A central time-bounded grant is not silently reused as the root authority for a 
 
 A clinic host owns one encrypted operational database for its workspace. Desktop use on that same machine is the first deployment slice. Later phones/tablets are clients of the host over a reviewed local API; they do not each maintain independently writable clinic databases.
 
-The local schema must preserve internal UUIDs, practice/patient scope, append-only or revisioned history, provenance, source versions, optimistic revisions, outbox/inbox state and conflict evidence. SQLite remains the leading candidate because it fits the existing Tauri/R30 direction, but the encryption method and key/recovery design remain R30-04-A decisions. Plain SQLite plus Stronghold is not presumed to encrypt database pages, WAL, journals, temp files, attachments or backups.
+The local schema must preserve internal UUIDs, practice/patient scope, append-only or revisioned history, provenance, source versions, optimistic revisions, outbox/inbox state and conflict evidence. [R30-04-A](ENCRYPTED_LOCAL_STORAGE_R30_04_A.md) selects SQLCipher Community page encryption as the native implementation candidate with separate attachment/key/backup envelopes. Exact build, key protocol and recovery proof remain B1/B2/C gates, not accepted runtime. Plain SQLite plus Stronghold is not presumed to encrypt database pages, WAL, journals, temp files, attachments or backups.
 
 ### 4. Identity is typed; UUID remains internal authority
 
@@ -103,7 +103,7 @@ The existing Patient Core projection is the shared read/context contract. The ex
 
 ## Open decisions and owner gates
 
-1. R30-04-A: SQLite encryption approach, page/metadata exposure, device/password binding, key rotation, backup custody and recovery proof — **Astra High before implementation**.
+1. R30-04-A design recorded 2026-09-27 after owner-confirmed Astra High: SQLCipher native candidate, password/device factors, separate recovery and explicit metadata limits. **Next B1 / Sol High:** synthetic Windows build/storage evidence; **B2 / Astra High:** exact custody protocol review before implementation; C integrates only after R30-05/07 contracts. No protected capability or broader ADR acceptance follows from A.
 2. Local Only root-account lifecycle, recovery quorum and later central enrollment without identity elevation.
 3. Clinic Host TLS identity, certificate trust/bootstrap, discovery and network-isolation design for Windows, Android and iOS.
 4. Local API protocol/capability surface and process isolation for database, AI and imported documents.

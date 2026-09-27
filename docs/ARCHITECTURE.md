@@ -1,12 +1,18 @@
 # معماری سامانه
 
+## R30-04-A — Encrypted local storage design (2026-09-27; implementation pending)
+
+[The bounded design](architecture/ENCRYPTED_LOCAL_STORAGE_R30_04_A.md) selects SQLCipher Community page encryption as the candidate behind a native-only repository adapter. Separate authenticated envelopes cover attachment objects, key custody and portable backup; the renderer receives no generic SQL/key-export capability. Each workspace has independent keys, a planned password plus Windows-user-protected device unlock, and a separately held offline recovery secret. Local Only authority is local RBAC, not an expiring central grant or verified professional identity. Cloud-linked grants and Patient Portal remain distinct trust domains.
+
+This is a design decision, not evidence that storage or recovery is implemented. B1 proves the synthetic Windows build/search/side-file/backup behavior; B2 pins and tests the exact custody protocol; C integrates only after R30-05/07 contracts. R31-09 reuses these recovery primitives. No current Worker/D1, clinical authority, migration or reference-shell runtime changes; the broader Offline Clinic ADR stays Proposed.
+
 ## Proposed Offline Clinic & Local Intelligence target — 2026-09-21
 
 The owner-approved target is recorded in [canonical ROADMAP §16.1](ROADMAP.md#161-glymize--offline-clinic--local-intelligence) and the [Proposed Offline Clinic ADR](architecture/OFFLINE_CLINIC_LOCAL_INTELLIGENCE_ADR.md). It extends the current R30 path into one offline-native product: a clinic may remain intentionally Local Only indefinitely or complete an explicit transition to Cloud-linked operation. Local accounts/RBAC are authoritative only inside their encrypted local workspace and are not represented as centrally verified professional identity.
 
 The target reuses Patient Clinical Core contracts, Patient Record v2 adapters, Decision Graph v2, Clinical Modules, Medication Intelligence, governed Evidence objects, the existing Copilot provider boundary, Patient Identity mapping and the separate Patient Portal trust domain. One Clinic Host owns one operational clinic database; LAN/PWA clients do not create independently writable clinic databases. Internal UUIDs remain record authority while real and temporary human identifiers are typed aliases. Local AI remains optional and non-authoritative, and no model/runtime is selected before R31-07 evaluation.
 
-This is a proposed future authority/topology contract, not current runtime state. Worker/D1 remains the implemented authority until R30/R31 command, storage, identity, sync and migration gates pass. R30-03-C2 now has accepted real clean-Windows/full-blackout evidence for the reference-only shell; R30-04-A must begin only after switching to Astra High. No migration, provider activation or clinical behavior change follows from C2.
+This is a proposed future authority/topology contract, not current runtime state. Worker/D1 remains the implemented authority until R30/R31 command, storage, identity, sync and migration gates pass. R30-03-C2 has accepted real clean-Windows/full-blackout evidence for the reference-only shell. R30-04-A was reviewed with owner-confirmed Astra High; its SQLCipher/native custody candidate still needs B1/B2 implementation evidence. No migration, provider activation or clinical behavior change follows from C2.
 
 ## Windows clean-machine acceptance — R30-03-C2 (2026-09-21; accepted)
 

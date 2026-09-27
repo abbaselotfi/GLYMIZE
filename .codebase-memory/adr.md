@@ -1,5 +1,13 @@
 # GLYMIZE Codebase Memory ADR
 
+## 2026-09-27 — Select a native encrypted-storage candidate without activating PHI
+
+R30-04-A selects SQLCipher Community page encryption behind a narrow native repository port, with separate authenticated attachment/key/backup envelopes. Independent workspace keys, password/device factors and separately held offline recovery must work for Local Only without central identity elevation. Do not expose generic SQL/Stronghold commands, copy server master secrets or assume an encrypted database protects every temp/log/backup surface. B1 proves the exact Windows synthetic build/storage candidate; B2 reviews and tests custody; C integrates after R30-05/07. R31-09 reuses recovery primitives. This is conditional design, not current runtime or encryption acceptance; broader Offline Clinic ADR stays Proposed. See docs/architecture/ENCRYPTED_LOCAL_STORAGE_R30_04_A.md. Next checkpoint: Sol High for B1; all incomplete R29 gates remain.
+
+## 2026-09-21 — Accept the reference-only clean-Windows C2 gate
+
+This later evidence supersedes C1's pending clean-machine wording below, not its historical observations. Pinned v3 manifest C2A9FB3827EBC91D908411500FC98239547DDA5823389F35C9F3F4A31CFF6A32 passed Preflight, Install, real reboot, UninstallReinstall and Finalize on a non-admin Windows 11 VM without developer toolchains and with disconnected NIC; accepted=true. See docs/evidence/R30_03_C2_CLEAN_VM_ACCEPTANCE_2026-09-21.json. A naturally WebView2-absent target and signing remain separate. This accepts no PHI/auth/sync/clinical capability and does not complete R29.
+
 ## 2026-09-21 — Propose Offline Clinic authority profiles without changing current runtime
 
 Record an owner-approved, cross-cutting Offline Clinic target in canonical ROADMAP §16.1 and `docs/architecture/OFFLINE_CLINIC_LOCAL_INTELLIGENCE_ADR.md`. One product reuses Patient Core, Decision Graph v2, Clinical Modules, Evidence governance and the existing Copilot boundary. A Local Only clinic may operate indefinitely under locally established owner/RBAC authority without being labelled centrally verified; a Cloud-linked clinic uses explicit central enrollment, scoped offline grants, sync and revocation limits. One Clinic Host owns one encrypted operational database, and LAN/PWA clients are not independent writers. Internal UUIDs remain authority; Iranian national ID, foreign-resident ID, passport+country and temporary identifiers are typed aliases. No local-AI model/runtime, SQLite encryption scheme or TLS bootstrap is selected by this proposal. Worker/D1 remains current runtime authority; R30-03-C2, R30-04-A, all R31 implementation/acceptance and incomplete R29 evidence stay open. No runtime, migration, deployment or clinical behavior change.
