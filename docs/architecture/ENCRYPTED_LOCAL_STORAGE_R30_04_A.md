@@ -4,6 +4,8 @@ Started: 2026-09-22; reviewed: 2026-09-27. Status: bounded design packet; implem
 
 ## 1. Source baseline and decision boundary
 
+**September 29 follow-up:** [Astra High B2 decision](KEY_CUSTODY_R30_04_B2_DECISION_2026-09-29.md) retains SQLCipher and reopens the native custody dependency/memory selection after the completed probes. References below to Stronghold describe the candidate direction, not a mandatory accepted product dependency. Lock/recovery invariants are refined in that decision; the exact persistence protocol remains open. Next Sol High remediation precedes final selection and the persistent harness. Historical A/B1 results are preserved.
+
 Baseline `f4d4c6feda967c7fd825ad248179ea45df37138c`, equal to fetched `origin/main`, clean before task. R30-03-C2 accepts only the reference shell. Directly inspected:
 
 - `apps/desktop/src-tauri/Cargo.toml`, `src/main.rs`, `tauri.conf.json`: Tauri only, reference routes, empty IPC permissions; no SQLite or Stronghold integration in these files.

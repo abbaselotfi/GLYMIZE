@@ -57,4 +57,6 @@ The experimental notice records direct resolved licenses, but this is not the di
 
 ## Next checkpoint
 
+**Checkpoint consumed:** [the September 29 Astra High decision](architecture/KEY_CUSTODY_R30_04_B2_DECISION_2026-09-29.md) reopens dependency/memory selection and specifies lock/recovery requirements. Next is bounded Sol High remediation/KDF evidence before final format selection. The paragraph below records the original handoff; probe evidence is unchanged.
+
 Pause and switch to **Astra High**. That bounded review must decide whether this dependency graph remains acceptable and freeze the exact memory policy, KDF parameters/bounds, key hierarchy, canonical AAD/nonces, Stronghold snapshot protection, DPAPI factor, recovery/replacement-device, rotation/rewrap and handle-close ordering. If the candidate cannot meet the boundary, reopen the candidate decision; do not weaken it silently. Only after that checkpoint may Sol High implement the persistent synthetic custody/recovery harness.

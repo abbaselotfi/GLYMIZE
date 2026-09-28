@@ -4,6 +4,8 @@ Date: 2026-09-28. Status: **review findings recorded; B2 remains open**. This is
 
 ## 1. Material correction to B1 evidence
 
+**Later Astra High disposition (2026-09-29):** [dependency/lifecycle decision](KEY_CUSTODY_R30_04_B2_DECISION_2026-09-29.md) reopens custody and memory selection, records checked lock/recovery requirements and schedules bounded Sol High remediation before final protocol selection. This supersedes this paper's next-task wording; the candidate table remains unfrozen and historical evidence is retained.
+
 **Subsequent implementation evidence:** [the Sol High corrective raw-key proof](../R30_04_B2_RAW_KEY_PROOF_2026-09-28.md) passes the raw-key and backup-negative obligations below. [The bounded Windows-memory and Stronghold probes](../R30_04_B2_MEMORY_STRONGHOLD_FEASIBILITY_2026-09-29.md) are also complete. They reproduce the memory-lock failure and prove a private native custody path plus its SQLCipher-copy boundary; final dependency/protocol/memory-policy selection and persistent custody evidence remain open. None of these prerequisites closes B2.
 
 `apply_raw_key` passes exactly 32 binary bytes to `sqlite3_key`. The pinned SQLCipher source interprets this as passphrase input and derives the page key with PBKDF2; it is **not the raw-key path**. The raw-key-only form is 67 ASCII bytes: `x'` + 64 hexadecimal characters + `'`, passed with an explicit length through the native API. A raw page key still has separate HMAC-key derivation; do not claim all KDF work disappears. See [SQLCipher API](https://www.zetetic.net/sqlcipher/sqlcipher-api/) and [upstream README](https://github.com/sqlcipher/sqlcipher/blob/master/README.md).

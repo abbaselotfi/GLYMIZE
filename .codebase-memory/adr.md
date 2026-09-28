@@ -1,5 +1,9 @@
 # GLYMIZE Codebase Memory ADR
 
+## 2026-09-29 — Reopen B2 custody selection and require checked workspace locking
+
+Astra High retains SQLCipher but does not promote the tested Stronghold dependency graph or accept a production memory policy. Unchecked memory-lock results, observed SQLCipher failures and two maintenance warnings require bounded dependency/failure-observability remediation before exact protocol selection. One coordinator stops admission, invalidates epochs, settles admitted operations, explicitly closes every keyed statement/connection/backup handle, then clears custody; failed cleanup cannot publish Locked. Recovery binds complete authenticated generations and works without old DPAPI or Internet. Next Sol High remediation/KDF matrix, then Astra High final selection/vectors, then Sol High persistent synthetic harness. B2 remains open; C still needs R30-05/07. See docs/architecture/KEY_CUSTODY_R30_04_B2_DECISION_2026-09-29.md. No runtime, clinical, migration, provider, main merge or deployment change.
+
 ## 2026-09-27 — Select a native encrypted-storage candidate without activating PHI
 
 R30-04-A selects SQLCipher Community page encryption behind a narrow native repository port, with separate authenticated attachment/key/backup envelopes. Independent workspace keys, password/device factors and separately held offline recovery must work for Local Only without central identity elevation. Do not expose generic SQL/Stronghold commands, copy server master secrets or assume an encrypted database protects every temp/log/backup surface. B1 proves the exact Windows synthetic build/storage candidate; B2 reviews and tests custody; C integrates after R30-05/07. R31-09 reuses recovery primitives. This is conditional design, not current runtime or encryption acceptance; broader Offline Clinic ADR stays Proposed. See docs/architecture/ENCRYPTED_LOCAL_STORAGE_R30_04_A.md. Next checkpoint: Sol High for B1; all incomplete R29 gates remain.

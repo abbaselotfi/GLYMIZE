@@ -6,7 +6,7 @@ Primary release branch: `release/glymize-clinical-ui-auth-v1`
 
 Canonical integration note (2026-09-21): [ROADMAP §16.1 — Offline Clinic & Local Intelligence](ROADMAP.md#161-glymize--offline-clinic--local-intelligence) extends these clinical/product contracts into one Offline-native product. It does not create a second Patient Core, Clinical Engine, Evidence Platform or AI authority. Where this older companion differs on sequencing or local-runtime/model selection, the canonical roadmap and its Proposed ADR control; no capability is complete from this note.
 
-Current engineering checkpoint (2026-09-29): R30-04-B2 raw-key and bounded Windows-memory/Stronghold prerequisite probes are recorded in the canonical Roadmap. They do not change clinical authority or activate protected local storage. Astra High protocol/memory-policy selection remains mandatory before the Sol High persistent custody harness.
+Current engineering checkpoint (2026-09-29): [R30-04-B2 Astra High decision](architecture/KEY_CUSTODY_R30_04_B2_DECISION_2026-09-29.md) retains completed prerequisites and reopens custody dependency/memory selection. Next is bounded Sol High remediation/KDF evidence, then Astra High exact protocol selection, then the persistent synthetic harness. Lock/recovery requirements are recorded; clinical authority and protected local runtime are unchanged. B2 remains open.
 
 ## 0. Product north star
 
