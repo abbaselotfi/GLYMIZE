@@ -75,12 +75,28 @@ fn hex_decode_32(value: &str) -> AnyResult<[u8; 32]> {
     Ok(result)
 }
 
+fn raw_key_spec(key: &[u8; 32]) -> [u8; 67] {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut spec = [0_u8; 67];
+    spec[..2].copy_from_slice(b"x'");
+    for (index, byte) in key.iter().enumerate() {
+        spec[2 + index * 2] = HEX[(byte >> 4) as usize];
+        spec[3 + index * 2] = HEX[(byte & 15) as usize];
+    }
+    spec[66] = b'\'';
+    spec
+}
+
 fn apply_raw_key(connection: &Connection, key: &[u8; 32]) -> AnyResult<()> {
+    // SQLCipher treats 32 binary bytes as a passphrase. The native raw-key
+    // interface requires x'<64 hex digits>', with an explicit 67-byte length.
+    // This synthetic-only harness does not establish production zeroization.
+    let spec = raw_key_spec(key);
     let status = unsafe {
         rusqlite::ffi::sqlite3_key(
             connection.handle(),
-            key.as_ptr().cast::<c_void>(),
-            key.len() as i32,
+            spec.as_ptr().cast::<c_void>(),
+            spec.len() as i32,
         )
     };
     if status != rusqlite::ffi::SQLITE_OK {
@@ -392,7 +408,7 @@ fn assert_canaries_absent(root: &Path, canaries: &[&str]) -> AnyResult<Vec<Value
 }
 
 fn expect_unreadable(path: &Path, key: Option<&[u8; 32]>) -> AnyResult<String> {
-    let connection = Connection::open(path)?;
+    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     if let Some(key) = key {
         apply_raw_key(&connection, key)?;
     }
@@ -404,6 +420,58 @@ fn expect_unreadable(path: &Path, key: Option<&[u8; 32]>) -> AnyResult<String> {
         )),
         Err(error) => Ok(error.to_string()),
     }
+}
+
+fn verify_raw_key_interoperability(root: &Path) -> AnyResult<Value> {
+    // Fixed public synthetic fixture; intentionally independent of raw_key_spec.
+    const FIXTURE: &str = "x'000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f'";
+    let key: [u8; 32] = std::array::from_fn(|index| index as u8);
+    let path = root.join("raw-key-interop.db");
+    let writer = Connection::open(&path)?;
+    writer.pragma_update(None, "key", FIXTURE)?;
+    writer.execute_batch(
+        "CREATE TABLE raw_key_probe(value INTEGER NOT NULL); INSERT INTO raw_key_probe VALUES (1);",
+    )?;
+    drop(writer);
+
+    let native = open_keyed(&path, &key, false)?;
+    let initial: i64 = native.query_row("SELECT value FROM raw_key_probe", [], |row| row.get(0))?;
+    if initial != 1 {
+        return Err(failure("RAW_KEY_PRAGMA_TO_NATIVE_MISMATCH"));
+    }
+    native.execute("UPDATE raw_key_probe SET value = 2", [])?;
+    drop(native);
+    let reader = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    reader.pragma_update(None, "key", FIXTURE)?;
+    let updated: i64 = reader.query_row("SELECT value FROM raw_key_probe", [], |row| row.get(0))?;
+    if updated != 2 {
+        return Err(failure("RAW_KEY_NATIVE_TO_PRAGMA_MISMATCH"));
+    }
+    drop(reader);
+
+    let passphrase = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let status = unsafe {
+        rusqlite::ffi::sqlite3_key(passphrase.handle(), key.as_ptr().cast::<c_void>(), 32)
+    };
+    if status != rusqlite::ffi::SQLITE_OK {
+        return Err(failure("BINARY_PASSPHRASE_PROBE_SETUP_FAILED"));
+    }
+    if passphrase
+        .query_row("SELECT count(*) FROM sqlite_master", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .is_ok()
+    {
+        return Err(failure("RAW_KEY_DATABASE_ACCEPTED_BINARY_PASSPHRASE"));
+    }
+    drop(passphrase);
+    expect_unreadable(&path, None)?;
+    expect_unreadable(&path, Some(&synthetic_wrong_key()))?;
+    Ok(json!({
+        "pragmaToNative": "pass", "nativeToPragma": "pass",
+        "sameBytesAsBinaryPassphraseRejected": "pass",
+        "wrongKeyRejected": "pass", "noKeyRejected": "pass"
+    }))
 }
 
 fn tamper_copy(source: &Path, destination: &Path) -> AnyResult<()> {
@@ -466,6 +534,9 @@ fn backup_round_trip(
     }
     drop(restored);
 
+    let no_key_error = expect_unreadable(backup_path, None)?;
+    let wrong_key_error = expect_unreadable(backup_path, Some(source_key))?;
+
     let bytes = fs::read(backup_path)?;
     if contains_bytes(&bytes, STORAGE_CANARY.as_bytes()) {
         return Err(failure("BACKUP_CONTAINS_PLAINTEXT_CANARY"));
@@ -475,7 +546,9 @@ fn backup_round_trip(
         "bytes": bytes.len(),
         "cohortRows": count,
         "unsentOperationState": state,
-        "separateSyntheticBackupKey": true
+        "separateSyntheticBackupKey": true,
+        "noKeyRejected": {"status": "pass", "errorClass": no_key_error},
+        "sourceDatabaseKeyRejected": {"status": "pass", "errorClass": wrong_key_error}
     }))
 }
 
@@ -617,6 +690,9 @@ fn run_spike(evidence_path: &Path) -> AnyResult<()> {
     let run_root = evidence_parent.join(format!("run-{}-{started_epoch_ms}", std::process::id()));
     fs::create_dir(&run_root)?;
 
+    stage("raw-key-interoperability");
+    let raw_key_interoperability = verify_raw_key_interoperability(&run_root)?;
+
     let database_path = run_root.join("clinic-spike.db");
     let tampered_path = run_root.join("clinic-spike-tampered.db");
     let backup_path = run_root.join("clinic-spike-backup.db");
@@ -685,7 +761,7 @@ fn run_spike(evidence_path: &Path) -> AnyResult<()> {
     };
 
     let report = json!({
-        "schema": "glymize.r30-04-b1.sqlcipher-spike-evidence.v1",
+        "schema": "glymize.r30-04-b1.sqlcipher-spike-evidence.v2",
         "accepted": true,
         "scope": {
             "syntheticDataOnly": true,
@@ -704,7 +780,9 @@ fn run_spike(evidence_path: &Path) -> AnyResult<()> {
         },
         "cipher": {
             "version": version,
-            "rawBinaryKeyApi": "sqlite3_key",
+            "keyApi": "sqlite3_key",
+            "keyMode": "raw-256-hex-blob",
+            "keySpecBytes": 67,
             "compileOptions": compile_options,
             "tempStoreEffective": "MEMORY",
             "cipherMemorySecurity": "OFF in B1 after Windows VirtualLock failure; requires B2 review",
@@ -712,6 +790,7 @@ fn run_spike(evidence_path: &Path) -> AnyResult<()> {
             "synchronous": "FULL"
         },
         "checks": {
+            "rawKeyInteroperability": raw_key_interoperability,
             "correctKeyAndWorkspaceIdentity": "pass",
             "noKeyRejected": {"status": "pass", "errorClass": no_key_error},
             "wrongKeyRejected": {"status": "pass", "errorClass": wrong_key_error},
@@ -780,7 +859,46 @@ fn main() -> AnyResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{hex_decode_32, hex_encode, latency_summary, lookup_token, synthetic_database_key};
+    use super::{
+        hex_decode_32, hex_encode, latency_summary, lookup_token, raw_key_spec,
+        synthetic_database_key,
+    };
+
+    #[test]
+    fn raw_key_spec_preserves_every_byte_value_and_exact_format() {
+        for value in 0..=255_u8 {
+            let spec = raw_key_spec(&[value; 32]);
+            assert_eq!(spec.len(), 67);
+            assert_eq!(&spec[..2], b"x'");
+            assert_eq!(spec[66], b'\'');
+            assert_eq!(
+                std::str::from_utf8(&spec[2..66]).unwrap(),
+                format!("{value:02x}").repeat(32)
+            );
+        }
+    }
+
+    #[test]
+    fn raw_key_spec_matches_independent_known_answer() {
+        let key = std::array::from_fn(|index| index as u8);
+        assert_eq!(
+            &raw_key_spec(&key),
+            b"x'000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f'"
+        );
+    }
+
+    #[test]
+    fn key_pipe_rejects_invalid_lengths_and_non_hex_input() {
+        for invalid in [
+            "".to_owned(),
+            "0".repeat(63),
+            "0".repeat(65),
+            "z".repeat(64),
+            "é".repeat(32),
+        ] {
+            assert!(hex_decode_32(&invalid).is_err());
+        }
+    }
 
     #[test]
     fn synthetic_key_pipe_encoding_round_trips() {

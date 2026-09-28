@@ -2,7 +2,7 @@
 
 This crate is an isolated Windows-native, synthetic-data acceptance harness. It is not linked to the GLYMIZE Tauri shell and exposes no renderer IPC, authentication, patient model, D1 migration, or runtime activation path.
 
-Review correction (2026-09-28): the current `apply_raw_key` helper actually supplies a 32-byte binary passphrase to SQLCipher. The raw-key claim below is historical and not proven; do not reuse that helper for production custody. See [B2 findings and corrective gates](../../../../docs/architecture/KEY_CUSTODY_R30_04_B2_REVIEW.md). Original evidence is preserved; corrected encoding/tests are the next synthetic packet.
+Review correction and proof (2026-09-28): the original helper supplied a 32-byte binary passphrase. It now encodes the required 67-byte raw-key form and passes independent PRAGMA/native interoperability and same-bytes passphrase rejection. See [corrective evidence](../../../../docs/R30_04_B2_RAW_KEY_PROOF_2026-09-28.md) and [remaining B2 gates](../../../../docs/architecture/KEY_CUSTODY_R30_04_B2_REVIEW.md). Historical v1 evidence is unchanged. This remains synthetic code, not production custody or a zeroization guarantee. Use a new evidence path for corrected v2 runs; do not overwrite the historical v1 artifact.
 
 Run from the repository root on Windows with Rust, Visual Studio C++ x64 Build Tools, and a complete Perl distribution available:
 

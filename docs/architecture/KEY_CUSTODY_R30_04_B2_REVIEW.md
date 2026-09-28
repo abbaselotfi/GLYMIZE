@@ -4,6 +4,8 @@ Date: 2026-09-28. Status: **review findings recorded; B2 remains open**. This is
 
 ## 1. Material correction to B1 evidence
 
+**Subsequent implementation evidence:** [the Sol High corrective raw-key proof](../R30_04_B2_RAW_KEY_PROOF_2026-09-28.md) now passes the raw-key and backup-negative obligations below. The following diagnosis describes the preserved pre-fix B1 source. Windows memory/native-custody feasibility and final protocol selection remain open; the correction does not close B2.
+
 `apply_raw_key` passes exactly 32 binary bytes to `sqlite3_key`. The pinned SQLCipher source interprets this as passphrase input and derives the page key with PBKDF2; it is **not the raw-key path**. The raw-key-only form is 67 ASCII bytes: `x'` + 64 hexadecimal characters + `'`, passed with an explicit length through the native API. A raw page key still has separate HMAC-key derivation; do not claim all KDF work disappears. See [SQLCipher API](https://www.zetetic.net/sqlcipher/sqlcipher-api/) and [upstream README](https://github.com/sqlcipher/sqlcipher/blob/master/README.md).
 
 Exact inspected artifact: `libsqlite3-sys 0.38.2/sqlcipher/sqlite3.c`, SHA-256 `EA0BF0B08F688CA5D9312B2E33E7F81B3F4AE54B5016FB062AE1F2632A30A1B9`, lines 111183–111234. Its format/length checks select the raw branch; the fallback invokes the provider KDF. The B1 Rust call is at `apps/desktop/spikes/r30-04-b1-sqlcipher/src/main.rs:78`.

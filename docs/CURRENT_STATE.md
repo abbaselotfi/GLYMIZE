@@ -108,6 +108,8 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Immediate continuation boundary
 
+**Latest evidence:** [corrective raw-key proof](R30_04_B2_RAW_KEY_PROOF_2026-09-28.md) passed 6/6 Rust tests, native Release interoperability/backup/storage gates and monorepo checks. Only the isolated spike changed; v1 historical evidence is preserved. Continue Sol High Windows-memory and native Stronghold feasibility probes; final custody protocol and B2 acceptance remain open. This supersedes the raw-key-pending wording in the review checkpoint below.
+
 **September 28 superseding checkpoint:** [B2 review findings](architecture/KEY_CUSTODY_R30_04_B2_REVIEW.md) are recorded; B2 remains open. B1 is binary-passphrase evidence, not raw-key proof. Next model checkpoint is **Sol High** for corrected raw-key and bounded memory/Stronghold feasibility probes; then bounded Astra High protocol finalization, then Sol High custody implementation. This supersedes the historical model checkpoint, not its retained safety gates. No runtime/PHI/migration/deployment change.
 
 **R30-04-B1 observations are retained only for the isolated binary-passphrase candidate; protected storage is not implemented.** [The evidence and correction](R30_04_B1_SQLCIPHER_SPIKE_2026-09-28.md) preserve the R30-04-A workspace-key/offline-recovery obligations. Raw-key proof and final B2 custody acceptance remain pending. C integration depends on R30-05/07 contracts. R30-04 and dependent R31 capabilities remain open.
