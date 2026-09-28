@@ -134,7 +134,9 @@
     "graphGate": {
       "status": "pass",
       "nodes": 9183,
-      "edges": 34368,
+      "postGateEdges": 34368,
+      "postCommitRefreshEdges": 34385,
+      "edgeCountNote": "semantic-edge count varied by 17 across full refreshes of the same structural source",
       "parsePartialFiles": 28,
       "skippedFiles": 0
     }

@@ -46,7 +46,7 @@ The experimental notice records direct resolved licenses, but this is not the di
 - Documentation: 112 relative links across 11 changed Markdown files PASS; JSON and PowerShell parsing, `git diff --check` and exact path staging PASS.
 - Gitleaks scanned the staged 103.25 KB and reported one reviewed public prose false positive around the words `password rewrap`; no credential or patient data is present and no rule was disabled.
 - Semgrep 1.178.0 initially hit its Windows gitignore lexer defect and scanned zero files, so that attempt is not counted. The explicit five-file rerun with the same `p/rust` and `p/security-audit` rules scanned all target lines and reported five reviewed informational findings: three required SQLCipher FFI `unsafe` sites and two bounded synthetic CLI `args_os` sites. No rule was suppressed.
-- Final POST Roadmap/Graph Gate observation: PASS at 9,183 nodes / 34,368 edges, 28 known partial files and zero skipped. The two new partial files are PowerShell parser ranges already covered by direct full-source review; both Rust sources have no recorded parse gap. Coverage is best-effort and deterministic tests remain authoritative.
+- Final POST Roadmap/Graph Gate observation: PASS at 9,183 nodes / 34,368 edges; the post-commit full refresh over the same structural source reports 9,183 / 34,385. The semantic-edge count varied by 17 across full refreshes, so both observations are retained rather than presented as a source delta. Both report 28 known partial files and zero skipped. The two new partial files are PowerShell parser ranges already covered by direct full-source review; both Rust sources have no recorded parse gap. Coverage is best-effort and deterministic tests remain authoritative.
 
 | Artifact | SHA-256 |
 | --- | --- |
