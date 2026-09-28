@@ -108,7 +108,9 @@ The counts are file inventory, not a claim that every route or migration is acti
 
 ## Immediate continuation boundary
 
-**R30-04-B1 is accepted only as an isolated synthetic-data spike; protected storage is not implemented.** [The evidence](R30_04_B1_SQLCIPHER_SPIKE_2026-09-28.md) validates the pinned Windows SQLCipher candidate and preserves the R30-04-A workspace-key/offline-recovery obligations. **STOP and switch to Astra High for R30-04-B2**, the bounded exact key-protocol review. C integration depends on R30-05/07 contracts. R30-04 and dependent R31 capabilities remain open.
+**September 28 superseding checkpoint:** [B2 review findings](architecture/KEY_CUSTODY_R30_04_B2_REVIEW.md) are recorded; B2 remains open. B1 is binary-passphrase evidence, not raw-key proof. Next model checkpoint is **Sol High** for corrected raw-key and bounded memory/Stronghold feasibility probes; then bounded Astra High protocol finalization, then Sol High custody implementation. This supersedes the historical model checkpoint, not its retained safety gates. No runtime/PHI/migration/deployment change.
+
+**R30-04-B1 observations are retained only for the isolated binary-passphrase candidate; protected storage is not implemented.** [The evidence and correction](R30_04_B1_SQLCIPHER_SPIKE_2026-09-28.md) preserve the R30-04-A workspace-key/offline-recovery obligations. Raw-key proof and final B2 custody acceptance remain pending. C integration depends on R30-05/07 contracts. R30-04 and dependent R31 capabilities remain open.
 
 The accepted C2 evidence is not authorization to add PHI to the reference shell or to activate a migration, local AI provider, sync path, protected feature or production deployment. R29-01 through R29-05 remain open wherever their RC CPU/latency/rows, cache activation, D1 replication/bookmarks, query/index benefit, Turnstile/Smart Placement or rollback evidence is still missing.
 

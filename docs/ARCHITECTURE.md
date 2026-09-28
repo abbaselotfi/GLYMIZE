@@ -2,6 +2,8 @@
 
 ## R30-04-A — Encrypted local storage design (2026-09-27; implementation pending)
 
+September 28 [B2 review checkpoint](architecture/KEY_CUSTODY_R30_04_B2_REVIEW.md): B1 used SQLCipher's binary-passphrase path, not the claimed raw-key path. Preserve its historical evidence; require corrected native encoding/interoperability tests and bounded Windows locked-memory/Stronghold feasibility probes before exact custody-protocol finalization. Native-only Stronghold remains a candidate, not an activated plugin; no renderer secret export or plaintext fallback. B2 is not complete.
+
 [The bounded design](architecture/ENCRYPTED_LOCAL_STORAGE_R30_04_A.md) selects SQLCipher Community page encryption as the candidate behind a native-only repository adapter. Separate authenticated envelopes cover attachment objects, key custody and portable backup; the renderer receives no generic SQL/key-export capability. Each workspace has independent keys, a planned password plus Windows-user-protected device unlock, and a separately held offline recovery secret. Local Only authority is local RBAC, not an expiring central grant or verified professional identity. Cloud-linked grants and Patient Portal remain distinct trust domains.
 
 This is a design decision, not evidence that storage or recovery is implemented. B1 proves the synthetic Windows build/search/side-file/backup behavior; B2 pins and tests the exact custody protocol; C integrates only after R30-05/07 contracts. R31-09 reuses these recovery primitives. No current Worker/D1, clinical authority, migration or reference-shell runtime changes; the broader Offline Clinic ADR stays Proposed.

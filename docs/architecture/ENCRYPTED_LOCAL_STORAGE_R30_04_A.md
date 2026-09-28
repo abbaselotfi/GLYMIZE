@@ -89,6 +89,8 @@ A local migration has its own version/checksum journal, exclusive writer lease, 
 
 ## 6. Execution packets and executable acceptance obligations
 
+Later evidence qualification: [B2 review checkpoint](KEY_CUSTODY_R30_04_B2_REVIEW.md) found B1's claimed raw-key helper uses binary-passphrase derivation. B1's observed storage tests remain historical evidence for that mode only; corrected raw-key proof is open. B2 first needs synthetic key-mode/memory/native-custody feasibility probes, then exact protocol finalization before persistent implementation. The candidate protocol in the review is not a frozen format or runtime acceptance.
+
 These are children of existing R30-04, **not duplicate R31 capabilities**. None of the tests below has been run by this design packet.
 
 | Packet / model | Boundaries and required acceptance |

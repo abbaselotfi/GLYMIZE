@@ -4,6 +4,8 @@ Date: 2026-09-28. Model checkpoint: Sol High. Parent: [R30-04-A](architecture/EN
 
 ## Verdict and boundary
 
+**September 28 B2 review correction:** the native call uses a 32-byte binary **passphrase**, not SQLCipher's raw-key encoding. The historical JSON/hash is retained unchanged. Build/encryption/query/WAL/backup observations remain valid for that candidate; raw-key compatibility and its cold-open baseline require corrective proof before custody integration. See [B2 review](architecture/KEY_CUSTODY_R30_04_B2_REVIEW.md). This correction supersedes the raw-key wording below and in the historical harness metadata.
+
 The isolated Windows-native SQLCipher spike is **accepted for R30-04-B1 only**. It proves that the pinned candidate can build and execute the required synthetic storage tests on the declared Windows host. It does not connect storage to Tauri, expose renderer IPC, create authentication, store PHI, migrate D1 data, activate a feature, or authorize production use. Parent R30-04 remains open for B2 key custody/recovery and C scoped integration.
 
 The crate lives under `apps/desktop/spikes/r30-04-b1-sqlcipher` and is intentionally outside the application runtime/workspace. Generated database files, keys and build output remain ignored. The crash child receives its generated test key over stdin rather than command-line arguments.
@@ -30,7 +32,7 @@ Vendored OpenSSL required a full Perl distribution and a short Cargo target path
 
 | Check | Result |
 | --- | --- |
-| Raw 256-bit binary key and workspace/schema identity | PASS |
+| 32-byte binary passphrase and workspace/schema identity | PASS; raw-key path NOT proven (B2 correction) |
 | No key and wrong key | PASS — unreadable |
 | Tampered database page | PASS — HMAC rejection/unreadable |
 | SQLite and SQLCipher integrity | PASS |
@@ -76,7 +78,7 @@ SQLCipher protects page contents, including the tested WAL frames, but file name
 
 ## Next checkpoint
 
-**STOP before R30-04-B2.** Switch to Astra High for the bounded exact key-protocol review. Only after that review may Sol High implement a synthetic custody/recovery harness. R30-04-C still depends on the reviewed R30-05/R30-07 contracts.
+The [B2 review checkpoint](architecture/KEY_CUSTODY_R30_04_B2_REVIEW.md) now records the key-mode correction and Windows memory hypothesis. Next: Sol High synthetic prerequisite probes, then bounded Astra High protocol finalization before custody implementation. B2 and R30-04-C remain open; C still depends on reviewed R30-05/R30-07 contracts.
 
 ## Repository and Graph Gate validation
 
