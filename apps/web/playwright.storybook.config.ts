@@ -1,16 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const runtimeUrl = "http://127.0.0.1:3199";
-const appPort = 4100;
-const appUrl = `http://127.0.0.1:${appPort}`;
-
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: "./storybook-e2e",
   fullyParallel: false,
   workers: 1,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: appUrl,
+    baseURL: "http://127.0.0.1:6006",
     ...(process.env.PLAYWRIGHT_USE_SYSTEM_CHROME === "1"
       ? { channel: "chrome" as const }
       : {}),
@@ -18,13 +14,9 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
   },
   webServer: {
-    command: `pnpm build && pnpm exec next start --port ${appPort}`,
-    env: {
-      NEXT_PUBLIC_ADMIN_API_URL: runtimeUrl,
-      NEXT_PUBLIC_RUNTIME_API_URL: runtimeUrl,
-    },
+    command: "pnpm storybook --ci --no-open",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
-    url: appUrl,
+    url: "http://127.0.0.1:6006",
   },
 });

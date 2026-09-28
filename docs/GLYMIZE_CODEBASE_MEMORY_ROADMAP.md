@@ -173,3 +173,11 @@ Before modifying GLYMIZE, an AI coding agent must first consult the applicable R
 After modifying GLYMIZE, the agent must run the post-task delta/refresh logic and re-check the Roadmap before reporting the task complete.
 
 If Codebase Memory is unavailable, work may proceed only with explicit fallback to direct repository inspection and the limitation must be reported. The shared graph must be restored before the next normal graph-dependent task where possible.
+
+## 13. Shared engineering-tooling and agent-entry files
+
+Engineering-tooling changes are graph-relevant when they alter package manifests, imports, test runners, generated entry points or package boundaries. Run the normal PRE/POST delta and coverage checks for those paths even when application runtime behavior is unchanged.
+
+Root `AGENTS.md` is the shared agent contract. `.clinerules/`, `.continue/`, `CLAUDE.md` and workspace recommendations may adapt invocation details for their host, but they must point back to the root contract, Roadmap and active handoff. When a shared tooling workflow changes, update all applicable entry files in the same bounded task and verify that none introduces a competing model, deployment, migration or clinical-authority policy.
+
+Security scanners, Storybook, accessibility runners and MCP connectivity provide additional evidence only. Their installation or a green result does not replace source review, deterministic tests, clinical/security gates, Graph Gate, RC evidence or deployment authorization. Scanner output must be sanitized so secrets and patient-level data never enter logs, reports or commits.

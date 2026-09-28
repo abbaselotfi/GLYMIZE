@@ -1,0 +1,16 @@
+{
+  "folders": [
+    {
+      "name": "GLYMIZE",
+      "path": "."
+    }
+  ],
+  "extensions": {
+    "recommendations": [
+      "anthropic.claude-code",
+      "openai.chatgpt",
+      "saoudrizwan.claude-dev",
+      "Continue.continue"
+    ]
+  }
+}

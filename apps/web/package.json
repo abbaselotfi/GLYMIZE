@@ -5,14 +5,17 @@
   "scripts": {
     "build": "node scripts/build-web.mjs",
     "build:rc": "node scripts/build-rc.mjs",
+    "build-storybook": "storybook build",
     "dev": "node scripts/next.cjs dev --webpack",
     "lint": "biome lint --diagnostic-level=error .",
     "start": "next start --port 3000",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:offline": "node scripts/test-offline-browser.mjs",
+    "test:storybook:a11y": "playwright test --config playwright.storybook.config.ts",
     "test:static-compatibility": "node scripts/test-static-compatibility.mjs",
-    "typecheck": "node scripts/next.cjs typegen && tsc -p tsconfig.json --noEmit"
+    "typecheck": "node scripts/next.cjs typegen && tsc -p tsconfig.json --noEmit",
+    "storybook": "storybook dev -p 6006"
   },
   "dependencies": {
     "@glymize/catalog-data": "workspace:*",
@@ -26,9 +29,17 @@
     "tesseract.js": "7.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.62.1",
+    "@storybook/addon-a11y": "10.6.0",
+    "@storybook/addon-docs": "10.6.0",
+    "@storybook/addon-mcp": "10.6.0",
+    "@storybook/nextjs-vite": "10.6.0",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "playwright": "1.62.1",
+    "storybook": "10.6.0",
+    "vite": "8.3.1",
     "vitest": "4.1.10"
   }
 }

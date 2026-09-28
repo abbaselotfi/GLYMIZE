@@ -37,3 +37,6 @@ apps/api/.local-data/
 # GLYMIZE retrospective evidence casebase — do not commit patient-level/raw source data
 validation/evidence-casebase/uci-v1/*.zip
 validation/evidence-casebase/uci-v1/*.jsonl
+
+apps/web/*storybook.log
+apps/web/storybook-static/

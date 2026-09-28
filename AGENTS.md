@@ -22,6 +22,19 @@ All coding agents working in this repository must follow the normative engineeri
 5. Re-read the applicable roadmap item and update roadmap/checklist documentation when the accepted product state changed.
 6. Do not declare the task complete until the applicable post-task gates are done.
 
+## Cross-agent continuation (Claude Code / Codex / Cline / other VS Code coding agents)
+
+- Keep a single authoritative Roadmap and engineering contract. Agent-specific instruction files may adapt their tools and UI behavior but must not create competing task or model policies.
+- Use owner-configured model providers. No central AI coordinator or routing gateway is required for cross-agent handoff.
+- Only one agent may edit a shared worktree at a time. Before taking over, inspect `docs/ACTIVE_TASK_HANDOFF.md`, the branch, `git status --short`, staged and unstaged diffs, and relevant tests.
+- Never assume a previous agent's uncommitted changes are complete. Do not discard or reset them.
+- At meaningful checkpoints or before a planned transfer, preserve a concise sanitized handoff with task ID, verified completed work, changed paths, actual test results, unresolved gates and precise next action.
+- If the previous agent exhausted its quota before writing a handoff, reconstruct from Git, source and evidence. Mark unknowns explicitly.
+- Every replacement agent follows the existing model-switch checkpoint and pre/post-task gates.
+- An agent may recommend a model but must not claim to change another extension's model selector, know its remaining quota, or initiate deployment or migration without existing authorization gates.
+
+When an engineering-tooling task changes the shared workflow, update the root contract, the applicable agent-specific rule files, `docs/ACTIVE_TASK_HANDOFF.md`, and the canonical Roadmap/Current State only to the extent that accepted repository state actually changed. Tool-specific files must mirror this contract and never become independent authorities.
+
 ## Pull request declarations
 
 Every PR to `main` must contain checked declarations:
