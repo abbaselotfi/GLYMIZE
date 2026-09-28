@@ -1,0 +1,13 @@
+[package]
+name = "glymize-r30-04-b2-stronghold-feasibility"
+version = "0.0.0"
+description = "Isolated synthetic Stronghold to SQLCipher native custody feasibility probe"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[dependencies]
+iota_stronghold = { version = "=2.1.0", default-features = true }
+rusqlite = { version = "=0.40.1", default-features = false, features = ["bundled-sqlcipher-vendored-openssl"] }
+serde_json = "=1.0.151"
+zeroize = "=1.8.2"

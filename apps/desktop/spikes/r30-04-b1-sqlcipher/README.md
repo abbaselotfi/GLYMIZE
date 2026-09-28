@@ -23,4 +23,12 @@ The harness uses only generated identifiers and explicit synthetic canaries. It 
 
 `cipher_memory_security=ON` produced a Windows `VirtualLock` failure (`LastError=1453`) and process stack overflow on the validation host. B1 therefore records it as disabled experimental configuration; the security and key-lifecycle decision remains an explicit R30-04-B2 review item rather than a runtime default.
 
+The B2 memory probe runs each memory/logging combination in a separate non-elevated subprocess with a fixed synthetic workload and timeout. It intentionally does not turn a successful probe into a production policy decision:
+
+```powershell
+& apps/desktop/spikes/r30-04-b1-sqlcipher/run-memory-probes.ps1 `
+  -PerlHome .tmp/toolchains/strawberry-perl `
+  -CargoTargetDir C:\glymize-r30-04-b1-target
+```
+
 Do not pass a key on the command line. The internal crash child receives the generated synthetic key over an inherited stdin pipe.

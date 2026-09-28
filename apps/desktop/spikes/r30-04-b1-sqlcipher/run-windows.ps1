@@ -87,6 +87,6 @@ function Invoke-CargoStep {
 Invoke-CargoStep @('fmt', '--manifest-path', $manifest, '--', '--check')
 Invoke-CargoStep @('test', '--locked', '--manifest-path', $manifest)
 Invoke-CargoStep @('clippy', '--locked', '--all-targets', '--manifest-path', $manifest, '--', '-D', 'warnings')
-Invoke-CargoStep @('run', '--release', '--locked', '--manifest-path', $manifest, '--', '--evidence', $EvidencePath)
+Invoke-CargoStep @('run', '--release', '--locked', '--manifest-path', $manifest, '--bin', 'glymize-r30-04-b1-sqlcipher-spike', '--', '--evidence', $EvidencePath)
 
 Write-Host "R30_04_B1_WINDOWS_RUN_ACCEPTED: $EvidencePath"

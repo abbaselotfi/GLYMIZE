@@ -1,0 +1,157 @@
+{
+  "schema": "glymize.r30-04-b2.memory-stronghold-feasibility.v1",
+  "date": "2026-09-29",
+  "accepted": false,
+  "classification": "prerequisite-feasibility-evidence-only",
+  "status": {
+    "solHighProbePacketCompleted": true,
+    "productionMemoryPolicyAccepted": false,
+    "persistentCustodyProtocolSelected": false,
+    "r30_04_b2Complete": false
+  },
+  "platform": {
+    "os": "Microsoft Windows 11 Pro 10.0.26200",
+    "architecture": "x86_64",
+    "nonElevated": true,
+    "logicalProcessors": 12,
+    "physicalMemoryBytes": 12752048128
+  },
+  "sqlcipherMemoryProbe": {
+    "version": "4.14.0 community",
+    "bounds": {
+      "childTimeoutSeconds": 20,
+      "allocationCount": 8,
+      "bytesPerAllocation": 2097152,
+      "maximumSyntheticBlobBytesPerChild": 16777216
+    },
+    "results": [
+      {
+        "mode": "off-none",
+        "exitCode": 0,
+        "passed": true,
+        "elapsedMs": 3366.241
+      },
+      {
+        "mode": "on-none",
+        "exitCode": 0,
+        "passed": true,
+        "elapsedMs": 2106.691,
+        "limitation": "logging disabled; absence of emitted warnings is not proof that VirtualLock succeeded"
+      },
+      {
+        "mode": "on-stderr",
+        "exitCode": -1073741571,
+        "passed": false,
+        "elapsedMs": 2162.655,
+        "failureClass": "stack-overflow"
+      },
+      {
+        "mode": "on-file",
+        "exitCode": 0,
+        "passed": true,
+        "elapsedMs": 2202.285,
+        "logBytes": 46360,
+        "logLines": 488,
+        "virtualLockLastError1453Lines": 488,
+        "unexpectedLogLines": 0
+      }
+    ],
+    "policy": {
+      "warningSuppressionAuthorized": false,
+      "workingSetExpansionAuthorized": false,
+      "administrativeExecutionAuthorized": false,
+      "productionMemoryPolicyAccepted": false
+    }
+  },
+  "strongholdProbe": {
+    "versions": {
+      "iota_stronghold": "2.1.0",
+      "stronghold_engine": "2.0.1",
+      "stronghold_runtime": "2.0.1",
+      "rusqlite": "0.40.1"
+    },
+    "checks": {
+      "privateUseSecretToNativeSqlcipher": "pass",
+      "procedureOutputContainsKeyBytes": false,
+      "snapshotCommitClearReload": "pass",
+      "wrongVaultSecretRejected": "pass",
+      "shortVaultSecretRejectedBeforeSqlcipher": "pass",
+      "clearRemovedVaultAccessForNewHandle": "pass",
+      "existingSqlcipherHandleRetainsNativeKeyCopyAfterStrongholdClear": true,
+      "invalidSnapshotKeyLengthRejected": true
+    },
+    "boundedAllocationResults": [
+      {
+        "bytes": 32,
+        "exitCode": 0,
+        "stored": true,
+        "strongholdClearCompleted": true
+      },
+      {
+        "bytes": 1048576,
+        "exitCode": 0,
+        "stored": true,
+        "strongholdClearCompleted": true
+      },
+      {
+        "bytes": 16777216,
+        "exitCode": 0,
+        "stored": true,
+        "strongholdClearCompleted": true
+      }
+    ],
+    "limitations": [
+      "SQLCipher copies key material into its native connection context",
+      "Stronghold clear cannot revoke an already-keyed open SQLCipher handle",
+      "stronghold-runtime 2.0.1 does not surface the sodium_mlock return value, so allocation success does not prove an operating-system page lock",
+      "no Stronghold allocation failure was observed inside the bounded 16 MiB maximum",
+      "snapshot KDF, recovery, rotation, rewrap and replacement-device protocol remain unselected"
+    ]
+  },
+  "advisoryScan": {
+    "tool": "cargo-audit 0.22.2",
+    "databaseAdvisories": 1273,
+    "databaseCommit": "ef03605143a913024f864d2edf476adad5720c93",
+    "lockedDependencies": 186,
+    "vulnerabilities": 0,
+    "unmaintainedWarnings": [
+      "RUSTSEC-2025-0141 bincode 1.3.3",
+      "RUSTSEC-2024-0436 paste 1.0.15"
+    ],
+    "selectionImpact": "requires Astra High dependency-selection review; no warning is suppressed"
+  },
+  "validation": {
+    "b1AndMemoryRustTests": "8/8 pass",
+    "strongholdRustTests": "2/2 pass",
+    "rustFormat": "pass",
+    "rustClippyWarningsDenied": "pass",
+    "releaseHarnesses": "pass",
+    "monorepoTasks": "21/21 pass; 19 cached",
+    "desktopTests": "9/9 pass",
+    "relativeDocumentationLinks": "112/112 pass",
+    "gitleaks": "one reviewed public-prose false positive; no rule disabled",
+    "semgrep": "five reviewed informational FFI/CLI findings across five explicit files; no rule disabled",
+    "graphGate": {
+      "status": "pass",
+      "nodes": 9183,
+      "edges": 34368,
+      "parsePartialFiles": 28,
+      "skippedFiles": 0
+    }
+  },
+  "artifacts": {
+    "generatedMemoryEvidenceSha256": "FE44A4E870DCB1829B30D7EE57C379FF9EDF96836489FFDC5484603CEE21BFAF",
+    "generatedStrongholdEvidenceSha256": "D4919B80F57847F8DF78D213951AD5471FA9BEB06436ABCA39735075D8A08C90",
+    "generatedAllocationEvidenceSha256": "5DE0965C56B1C99ACFA22A042C55324067414FE363A97BC422D565B355540FF9",
+    "strongholdCargoLockSha256": "B680106C530E8B261DCC72795F801461BE19C13799018D4FD1D06296A65DC1D8"
+  },
+  "scope": {
+    "syntheticDataOnly": true,
+    "tauriLinked": false,
+    "rendererIpc": false,
+    "runtimeActivation": false,
+    "patientData": false,
+    "migration": false,
+    "deployment": false
+  }
+}
