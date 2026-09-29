@@ -2,6 +2,8 @@
 
 Date: 2026-09-28. Status: **review findings recorded; B2 remains open**. This is a bounded continuation of [R30-04-A](ENCRYPTED_LOCAL_STORAGE_R30_04_A.md), not a replacement architecture or permission to persist patient data. Reviewed source: `990221bef058a772e73898aad74e7a05f9a522ec`; fetched main: `0b47d326da326a7997c8fcadd832032cefeed5de`. No application code, dependency lock, clinical behavior, migration or deployment changes in this packet.
 
+**Current continuation:** [KC1/native selection](KEY_CUSTODY_R30_04_B2_PROTOCOL_V1.md) supersedes the historical candidate/next-task status below after remediation. Select the native adapter for a synthetic persistent harness, not Stronghold product integration. Public primitive vectors and framing are defined; SQLCipher memory, full interoperability/parser and replacement-device recovery gates remain open. No prior evidence is deleted or rewritten.
+
 ## 1. Material correction to B1 evidence
 
 **Later Astra High disposition (2026-09-29):** [dependency/lifecycle decision](KEY_CUSTODY_R30_04_B2_DECISION_2026-09-29.md) reopens custody and memory selection, records checked lock/recovery requirements and schedules bounded Sol High remediation before final protocol selection. This supersedes this paper's next-task wording; the candidate table remains unfrozen and historical evidence is retained.

@@ -4,7 +4,7 @@ Started: 2026-09-22; reviewed: 2026-09-27. Status: bounded design packet; implem
 
 ## 1. Source baseline and decision boundary
 
-**September 29 follow-up:** [Astra High B2 decision](KEY_CUSTODY_R30_04_B2_DECISION_2026-09-29.md) retains SQLCipher and reopens the native custody dependency/memory selection after the completed probes. References below to Stronghold describe the candidate direction, not a mandatory accepted product dependency. Lock/recovery invariants are refined in that decision; the exact persistence protocol remains open. Next Sol High remediation precedes final selection and the persistent harness. Historical A/B1 results are preserved.
+**September 29 current follow-up:** [KC1/native selection](KEY_CUSTODY_R30_04_B2_PROTOCOL_V1.md) consumes the completed remediation/KDF matrix and selects a single-purpose native adapter, replacing Stronghold as the next implementation candidate. Historical Stronghold references below remain evidence, not a selected dependency. KC1 specifies the synthetic envelope/recovery/generation protocol and public vectors; next Sol High implements and tests the native/persistent harness. SQLCipher memory remains blocked and requires explicit remediation evidence/Astra review, not OFF or hidden warnings. A/B1 results and the earlier close-before-clear invariants are preserved; no protected runtime acceptance.
 
 Baseline `f4d4c6feda967c7fd825ad248179ea45df37138c`, equal to fetched `origin/main`, clean before task. R30-03-C2 accepts only the reference shell. Directly inspected:
 

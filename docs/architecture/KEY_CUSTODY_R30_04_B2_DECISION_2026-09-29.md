@@ -4,6 +4,8 @@ Date: 2026-09-29. Owner confirmed Astra High for this bounded review. Reviewed b
 
 **Review outcome: reopen the custody dependency and memory-policy selection.** The review is complete as a decision; B2, its persistent protocol and protected storage are not complete. The [prerequisite evidence](../R30_04_B2_MEMORY_STRONGHOLD_FEASIBILITY_2026-09-29.md) does not support freezing a production format around the current candidate. This is the reopen branch expressly allowed by [the previous review](KEY_CUSTODY_R30_04_B2_REVIEW.md), not a failed test being waived.
 
+**Later September 29 disposition:** [KC1/native selection](KEY_CUSTODY_R30_04_B2_PROTOCOL_V1.md) consumes the completed Sol remediation/KDF packet and supersedes this document's pending custody/protocol queue. A single-purpose native adapter and synthetic framing are selected, with public primitive vectors. Sections 3–4 remain normative lifecycle/recovery requirements. SQLCipher memory is still not accepted; OFF's loss of general allocator sanitization remains a blocker. Next Sol High persistent/native tests, then exact memory-policy Astra review before B2 closure. Keep all findings and historical validation below.
+
 ## 1. Decisions and evidence
 
 | Decision | Disposition and reason |

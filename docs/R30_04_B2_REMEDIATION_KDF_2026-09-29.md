@@ -65,6 +65,8 @@ Therefore any Stronghold-based candidate must reject an oversized artifact befor
 
 No compatible maintained Stronghold release newer than 2.1.0 was available in the crates.io query on 2026-09-29. Repository activity alone is not treated as a supported release or maintenance commitment.
 
+**Later selection:** [KC1/native protocol](architecture/KEY_CUSTODY_R30_04_B2_PROTOCOL_V1.md) consumes this matrix, selects Argon2 0.6.0 with unchanged parameters and the single-purpose native adapter for the next synthetic harness. It defines public primitive vectors and framing, not product custody acceptance. SQLCipher memory remains blocked. The handoff/checkpoint below is historical; current next packet is Sol High persistent/native testing.
+
 ## 5. KDF handoff
 
 Both pinned versions are byte-compatible for the tested parameters and synthetic vector. The median difference on this host is 5 ms and is too small, too noisy and too host-specific to drive selection. Version 0.6.0 has the more current allocation-failure handling in its allocating API and passes the clean RustSec scan; because GLYMIZE's safer path is caller-owned memory with `try_reserve_exact`, both candidates expose the required pre-hash failure boundary in this probe.
