@@ -1,0 +1,60 @@
+{
+  "accepted": true,
+  "algorithm": "Argon2id",
+  "candidateResults": [
+    {
+      "crateVersion": "0.5.3",
+      "fingerprintSha256": "01d1530b597a3d13c5356487db59e9ddddf88b5b300b96a6d667d29058d34e07",
+      "maximumElapsedMs": 237,
+      "medianElapsedMs": 234,
+      "minimumElapsedMs": 222,
+      "outputCleared": true,
+      "sampleElapsedMs": [235, 237, 222, 234, 224],
+      "workspaceBytes": 67108864,
+      "workspaceCleared": true,
+      "workspaceObservedNonzero": true
+    },
+    {
+      "crateVersion": "0.6.0",
+      "fingerprintSha256": "01d1530b597a3d13c5356487db59e9ddddf88b5b300b96a6d667d29058d34e07",
+      "maximumElapsedMs": 280,
+      "medianElapsedMs": 239,
+      "minimumElapsedMs": 219,
+      "outputCleared": true,
+      "sampleElapsedMs": [223, 219, 263, 280, 239],
+      "workspaceBytes": 67108864,
+      "workspaceCleared": true,
+      "workspaceObservedNonzero": true
+    }
+  ],
+  "classification": "synthetic-evidence-only",
+  "fingerprintsMatch": true,
+  "injectedWorkspaceAllocationFailureObserved": true,
+  "limitations": [
+    "The allocation failure is injected at the caller-owned workspace boundary; it is not an operating-system OOM event.",
+    "The password maximum is a probe safety bound, not a selected persistent protocol limit.",
+    "Elapsed time is a host observation, not a product latency SLO."
+  ],
+  "parameters": {
+    "iterations": 3,
+    "lanes": 4,
+    "memoryKiB": 65536,
+    "outputBytes": 32,
+    "saltBytes": 16
+  },
+  "passwordBoundFailureObserved": true,
+  "probeOnlyPasswordMaximumBytes": 1024,
+  "schema": "glymize.r30-04-b2.kdf-calibration.v1",
+  "version": "0x13",
+  "hostObservation": {
+    "nonElevated": true,
+    "processor": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
+    "logicalProcessors": 12,
+    "totalPhysicalMemoryBytes": 12752048128,
+    "wallClockMs": 3425,
+    "processCpuMs": 2546.875,
+    "peakWorkingSetBytes": 71176192
+  },
+  "stdoutClass": "accepted-marker",
+  "stderrBytes": 0
+}

@@ -1,0 +1,30 @@
+{
+  "schema": "glymize.r30-04-b2.stronghold-observability.v1",
+  "accepted": true,
+  "classification": "test-only-instrumented-dependency",
+  "dependency": "stronghold-runtime=2.0.1",
+  "sourceHashes": {
+    "boxedRsSha256": "EECDA5A2F6219CB21D69ECC2DC0CD28C9B572B9FB57166F08C2D217F728C6DB3",
+    "cargoTomlSha256": "5017FD48F57E7DF93CB282C325DD16F266A56FEC850C09AEA6C44CF894239AF3"
+  },
+  "injectedFailures": [
+    "allocation",
+    "sodium_mlock-nonzero",
+    "memory-protection"
+  ],
+  "expectedObservations": [
+    "all-panics-visible",
+    "mlock-zero-before-free",
+    "single-cleanup-per-partial-allocation"
+  ],
+  "executedTests": 1,
+  "exitCode": 0,
+  "elapsedMs": 18811,
+  "nonElevated": true,
+  "productionSelection": false,
+  "limitations": [
+    "The dependency is copied and patched only in a temporary directory.",
+    "This test proves the bounded injected path, not every operating-system failure mode.",
+    "The patch still reports failure by panic and is not an accepted product API."
+  ]
+}

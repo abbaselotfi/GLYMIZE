@@ -1,0 +1,103 @@
+diff --git a/src/boxed.rs b/src/boxed.rs
+index 160cf7a..8b10460 100644
+--- a/src/boxed.rs
++++ b/src/boxed.rs
+@@ -16,2 +16,2 @@ use libsodium_sys::{
+-    sodium_allocarray, sodium_free, sodium_init, sodium_mlock, sodium_mprotect_noaccess, sodium_mprotect_readonly,
+-    sodium_mprotect_readwrite,
++    sodium_allocarray, sodium_free, sodium_init, sodium_mlock, sodium_mprotect_noaccess,
++    sodium_mprotect_readonly, sodium_mprotect_readwrite, sodium_memzero,
+@@ -19,0 +20,3 @@ use libsodium_sys::{
++#[cfg(test)]
++use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
++
+@@ -28,0 +32,13 @@ type RefCount = u8;
++#[cfg(test)]
++static GLYMIZE_FORCE_MLOCK_FAILURE: AtomicBool = AtomicBool::new(false);
++#[cfg(test)]
++static GLYMIZE_FAILED_LOCK_CLEANUPS: AtomicUsize = AtomicUsize::new(0);
++#[cfg(test)]
++static GLYMIZE_ZERO_BEFORE_FREE: AtomicBool = AtomicBool::new(false);
++#[cfg(test)]
++static GLYMIZE_FORCE_ALLOCATION_FAILURE: AtomicBool = AtomicBool::new(false);
++#[cfg(test)]
++static GLYMIZE_FORCE_MPROTECT_FAILURE: AtomicBool = AtomicBool::new(false);
++#[cfg(test)]
++static GLYMIZE_FREE_CALLS: AtomicUsize = AtomicUsize::new(0);
++
+@@ -48 +64,20 @@ impl<T: Bytes> Boxed<T> {
+-        unsafe { lock_memory(boxed.ptr.as_mut(), len) };
++        if unsafe { lock_memory(boxed.ptr.as_mut(), len) } != 0 {
++            let byte_len = len
++                .checked_mul(mem::size_of::<T>())
++                .expect("Protected allocation size overflow");
++            unsafe { sodium_memzero(boxed.ptr.as_ptr() as *mut _, byte_len) };
++            #[cfg(test)]
++            GLYMIZE_ZERO_BEFORE_FREE.store(
++                unsafe {
++                    slice::from_raw_parts(boxed.ptr.as_ptr() as *const u8, byte_len)
++                        .iter()
++                        .all(|byte| *byte == 0)
++                },
++                Ordering::SeqCst,
++            );
++            unsafe { free(boxed.ptr.as_mut()) };
++            #[cfg(test)]
++            GLYMIZE_FAILED_LOCK_CLEANUPS.fetch_add(1, Ordering::SeqCst);
++            mem::forget(boxed);
++            panic!("Failed to lock protected memory");
++        }
+@@ -148,0 +184,5 @@ impl<T: Bytes> Boxed<T> {
++        #[cfg(test)]
++        if GLYMIZE_FORCE_ALLOCATION_FAILURE.load(Ordering::SeqCst) {
++            panic!("Injected protected allocation failure")
++        }
++
+@@ -308,0 +349,5 @@ fn mprotect<T>(ptr: *mut T, prot: Prot) {
++    #[cfg(test)]
++    if GLYMIZE_FORCE_MPROTECT_FAILURE.load(Ordering::SeqCst) {
++        panic!("Injected memory protection failure");
++    }
++
+@@ -318,0 +364,2 @@ pub(crate) unsafe fn free<T>(ptr: *mut T) {
++    #[cfg(test)]
++    GLYMIZE_FREE_CALLS.fetch_add(1, Ordering::SeqCst);
+@@ -322,2 +369,7 @@ pub(crate) unsafe fn free<T>(ptr: *mut T) {
+-pub(crate) unsafe fn lock_memory<T>(ptr: *mut T, len: usize) {
+-    sodium_mlock(ptr as *mut _, len);
++pub(crate) unsafe fn lock_memory<T>(ptr: *mut T, len: usize) -> i32 {
++    #[cfg(test)]
++    if GLYMIZE_FORCE_MLOCK_FAILURE.load(Ordering::SeqCst) {
++        return -1;
++    }
++
++    sodium_mlock(ptr as *mut _, len)
+@@ -334,0 +387,28 @@ mod test {
++    #[test]
++    fn glymize_injected_native_failures_are_observable_and_cleanup() {
++        GLYMIZE_FORCE_ALLOCATION_FAILURE.store(true, Ordering::SeqCst);
++        let allocation_result = std::panic::catch_unwind(|| Boxed::<u8>::new(32, |_| {}));
++        GLYMIZE_FORCE_ALLOCATION_FAILURE.store(false, Ordering::SeqCst);
++        assert!(allocation_result.is_err(), "allocation failure must be visible");
++
++        GLYMIZE_FREE_CALLS.store(0, Ordering::SeqCst);
++        GLYMIZE_FAILED_LOCK_CLEANUPS.store(0, Ordering::SeqCst);
++        GLYMIZE_ZERO_BEFORE_FREE.store(false, Ordering::SeqCst);
++        GLYMIZE_FORCE_MLOCK_FAILURE.store(true, Ordering::SeqCst);
++
++        let lock_result = std::panic::catch_unwind(|| Boxed::<u8>::new(32, |_| {}));
++
++        GLYMIZE_FORCE_MLOCK_FAILURE.store(false, Ordering::SeqCst);
++        assert!(lock_result.is_err(), "mlock failure must be visible");
++        assert_eq!(GLYMIZE_FAILED_LOCK_CLEANUPS.load(Ordering::SeqCst), 1);
++        assert_eq!(GLYMIZE_FREE_CALLS.load(Ordering::SeqCst), 1);
++        assert!(GLYMIZE_ZERO_BEFORE_FREE.load(Ordering::SeqCst));
++
++        GLYMIZE_FREE_CALLS.store(0, Ordering::SeqCst);
++        GLYMIZE_FORCE_MPROTECT_FAILURE.store(true, Ordering::SeqCst);
++        let protection_result = std::panic::catch_unwind(|| Boxed::<u8>::new(32, |_| {}));
++        GLYMIZE_FORCE_MPROTECT_FAILURE.store(false, Ordering::SeqCst);
++        assert!(protection_result.is_err(), "mprotect failure must be visible");
++        assert_eq!(GLYMIZE_FREE_CALLS.load(Ordering::SeqCst), 1);
++    }
++
