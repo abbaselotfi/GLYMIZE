@@ -6,7 +6,7 @@ Primary release branch: `release/glymize-clinical-ui-auth-v1`
 
 Canonical integration note (2026-09-21): [ROADMAP §16.1 — Offline Clinic & Local Intelligence](ROADMAP.md#161-glymize--offline-clinic--local-intelligence) extends these clinical/product contracts into one Offline-native product. It does not create a second Patient Core, Clinical Engine, Evidence Platform or AI authority. Where this older companion differs on sequencing or local-runtime/model selection, the canonical roadmap and its Proposed ADR control; no capability is complete from this note.
 
-Current engineering checkpoint (2026-09-29): [R30-04-B2 KC1/native selection](architecture/KEY_CUSTODY_R30_04_B2_PROTOCOL_V1.md) consumes completed remediation/KDF evidence and defines the synthetic framing/recovery contract plus public primitive vectors. Next is the Sol High persistent/native harness. SQLCipher memory remediation and subsequent Astra review remain required before B2 closes. Lock/recovery requirements, clinical authority and protected local runtime are unchanged.
+Current engineering checkpoint (2026-09-30): [R30-04-B2 KC1/native selection](architecture/KEY_CUSTODY_R30_04_B2_PROTOCOL_V1.md) has a [partial isolated harness](R30_04_B2_KC1_PARTIAL_HARNESS_2026-09-30.md) for framing, native key page/DPAPI and synthetic inventory. It is not persistent custody acceptance. Sol High still owes immutable publication/recovery, and SQLCipher memory evidence plus Astra review remain required before B2 closes. Lock/recovery requirements, clinical authority and protected local runtime are unchanged.
 
 ## 0. Product north star
 

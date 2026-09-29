@@ -1,0 +1,17 @@
+[package]
+name = "glymize-r30-04-b2-kc1"
+version = "0.0.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+description = "Isolated synthetic KC1 persistent custody and recovery acceptance harness"
+
+[dependencies]
+argon2 = { version = "=0.6.0", default-features = false, features = ["alloc", "zeroize"] }
+chacha20poly1305 = { version = "=0.10.1", default-features = false }
+hkdf = { version = "=0.12.4", default-features = false }
+sha2 = { version = "=0.10.9", default-features = false }
+zeroize = { version = "=1.8.2", default-features = false, features = ["alloc"] }
+rusqlite = { version = "=0.40.1", default-features = false, features = ["backup", "bundled-sqlcipher-vendored-openssl"] }
+serde_json = "=1.0.151"
+windows-sys = { version = "=0.61.2", default-features = false, features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_System_SystemInformation"] }
