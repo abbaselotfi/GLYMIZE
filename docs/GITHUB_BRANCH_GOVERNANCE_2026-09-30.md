@@ -1,4 +1,4 @@
-# GitHub branch governance and cleanup — 2026-09-30
+# OPS-GIT-01 — GitHub branch governance and cleanup — 2026-09-30
 
 Scope: `abbaselotfi/GLYMIZE` remote references only. No local worktree, source, migration, RC or production deployment was changed by the branch cleanup. This is repository governance evidence, not R30-04-B2 acceptance.
 
@@ -16,4 +16,22 @@ Creating `developer` triggered a **successful Cloudflare Pages Preview**, deploy
 
 For recovery, find the original branch's tag under that archive prefix and inspect its commit before intentionally recreating a branch. Recreating any archived branch would violate the owner's three-branch target until another branch is removed. These tags preserve committed remote tips only; they do not include uncommitted files in any local worktree. Local worktrees and their checked-out branches were neither reset nor pruned.
 
-GitHub reported the repository as **public** before the new protection ruleset was created. The cleanup did not change visibility. If public visibility was unintentional, the owner must decide how to regain private-repository branch-protection capability before switching visibility; doing so without a compatible plan could disable these protections. A GitHub administrator can still edit or remove rulesets, so "never delete" is enforced by the current active configuration rather than a physically irreversible guarantee.
+GitHub reported the repository as **public** before the new protection ruleset was created. The owner later confirmed this visibility is intentional until a future decision; OPS-GIT-01 did not change it. A GitHub administrator can still edit or remove rulesets, so "never delete" is enforced by the current active configuration rather than a physically irreversible guarantee.
+
+## Staged integration policy
+
+The owner confirmed that public visibility is intentional until a later decision. Branch protection does not hide a branch: all tracked content and history on `developer` and the active feature branch remain public. Secrets, credentials, patient data and developer-only confidential files are prohibited from every branch; restricted material belongs in a separate access-controlled private system.
+
+The persistent flow is:
+
+```text
+feat/<task> or feature/<task>
+  -> pull request to developer
+  -> integration validation and review
+  -> pull request from developer to main
+  -> stable main
+```
+
+Ruleset `24218935` was strengthened without bypass actors to require pull requests for updates to `main` and `developer`, in addition to its deletion and non-fast-forward protections. The approval count remains zero because this is currently a single-owner repository; unresolved review conversations must still be resolved. Repository validation additionally checks that PRs to `developer` originate from `feat/*` or `feature/*`, and PRs to `main` originate from `developer`. This workflow check becomes active on each target after the workflow file reaches that target through the staged flow; the ruleset-level PR requirement is active immediately.
+
+OPS-GIT-01 local validation passed `git diff --check`, explicit staged-path review and Gitleaks 8.30.1 with zero findings. Live GitHub GET reverified the active no-bypass ruleset, both protected branch objects, public visibility and the exact three-branch inventory. No local YAML parser or formatter is installed in this worktree, so workflow syntax is not represented as tool-validated locally; GitHub recognition/check results after publication remain the authoritative workflow gate.

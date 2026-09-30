@@ -18,3 +18,5 @@ Describe the task and the smallest intended scope.
 ## Notes
 
 Record any graph parser limitations, architecture/ADR updates, or roadmap changes relevant to this PR.
+
+Branch flow: `feat/<task>` or `feature/<task>` → `developer` → `main`. Because the repository is public, no branch may contain secrets, patient data, or developer-only confidential files.
